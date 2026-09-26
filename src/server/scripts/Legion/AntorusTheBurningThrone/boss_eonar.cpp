@@ -606,22 +606,20 @@ struct npc_eonar_the_paraxis : public ScriptedAI
     {
         bool valid = false;
 
-        std::list<HostileReference*> threatList = me->getThreatManager().getThreatList();
-        for (auto ref : threatList)
+        // All players in the map, not the threat list: players who port to the Paraxis fight the Inquisitor and drop
+        // out of this creature's threat list, so once he died the ship looked empty and the fight reset (#30)
+        instance->instance->ApplyOnEveryPlayer([&](Player* player)
         {
-            if (auto player = Player::GetPlayer(*me, ref->getUnitGuid()))
+            if (player->IsAlive() && !player->isGameMaster() && (player->GetCurrentAreaID() == 9333 || player->IsWithinBox({ -4206.80f, -10700.2f, 728.27f }, 100.0f, 100.0f, 20.0f)))
             {
-                if (player->IsAlive() && (player->GetCurrentAreaID() == 9333 || player->IsWithinBox({ -4206.80f, -10700.2f, 728.27f }, 100.0f, 100.0f, 20.0f)))
+                if (player->GetPositionZ() < 672.0f)
                 {
-                    if (player->GetPositionZ() < 672.0f)
-                    {
-                        player->Kill(player);
-                        player->NearTeleportTo(-3909.02f, -10842.39f, 706.56f, player->GetOrientation());
-                    }
-                    valid = true;
+                    player->Kill(player);
+                    player->NearTeleportTo(-3909.02f, -10842.39f, 706.56f, player->GetOrientation());
                 }
+                valid = true;
             }
-        }
+        });
 
         if (!valid)
             EnterEvadeMode();
