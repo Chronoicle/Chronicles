@@ -1,0 +1,18 @@
+-- Vault of the Wardens fixes (Claude, 2026-09-26). Undo: ~/undo_votw.sql
+-- Ash'golm: the clickable Countermeasures consoles (99240) were never spawned; one next to each Freeze Statue (99277)
+INSERT INTO creature (guid,id,map,zoneId,areaId,spawnMask,phaseMask,PhaseId,modelid,equipment_id,position_x,position_y,position_z,orientation,spawntimesecs,spawndist,currentwaypoint,curhealth,curmana,MovementType,npcflag,npcflag2,unit_flags,dynamicflags,AiID,MovementID,MeleeID,isActive,skipClone,personal_size,isTeemingSpawn,unit_flags3) SELECT 146907096,99240,map,zoneId,areaId,spawnMask,phaseMask,PhaseId,modelid,equipment_id,4248.12,-522.68,position_z,1.6959,spawntimesecs,spawndist,currentwaypoint,curhealth,curmana,MovementType,npcflag,npcflag2,unit_flags,dynamicflags,AiID,MovementID,MeleeID,isActive,skipClone,personal_size,isTeemingSpawn,unit_flags3 FROM creature WHERE guid=263842;
+INSERT INTO creature (guid,id,map,zoneId,areaId,spawnMask,phaseMask,PhaseId,modelid,equipment_id,position_x,position_y,position_z,orientation,spawntimesecs,spawndist,currentwaypoint,curhealth,curmana,MovementType,npcflag,npcflag2,unit_flags,dynamicflags,AiID,MovementID,MeleeID,isActive,skipClone,personal_size,isTeemingSpawn,unit_flags3) SELECT 146907097,99240,map,zoneId,areaId,spawnMask,phaseMask,PhaseId,modelid,equipment_id,4167.67,-452.51,position_z,0.0164,spawntimesecs,spawndist,currentwaypoint,curhealth,curmana,MovementType,npcflag,npcflag2,unit_flags,dynamicflags,AiID,MovementID,MeleeID,isActive,skipClone,personal_size,isTeemingSpawn,unit_flags3 FROM creature WHERE guid=263881;
+INSERT INTO creature (guid,id,map,zoneId,areaId,spawnMask,phaseMask,PhaseId,modelid,equipment_id,position_x,position_y,position_z,orientation,spawntimesecs,spawndist,currentwaypoint,curhealth,curmana,MovementType,npcflag,npcflag2,unit_flags,dynamicflags,AiID,MovementID,MeleeID,isActive,skipClone,personal_size,isTeemingSpawn,unit_flags3) SELECT 146907098,99240,map,zoneId,areaId,spawnMask,phaseMask,PhaseId,modelid,equipment_id,4249.80,-382.37,position_z,4.5591,spawntimesecs,spawndist,currentwaypoint,curhealth,curmana,MovementType,npcflag,npcflag2,unit_flags,dynamicflags,AiID,MovementID,MeleeID,isActive,skipClone,personal_size,isTeemingSpawn,unit_flags3 FROM creature WHERE guid=263909;
+-- Viletongue Belcher: Fiery Breath was never cast
+DELETE FROM smart_scripts WHERE entryorguid=96480 AND source_type=0 AND id=2;
+INSERT INTO smart_scripts (entryorguid,source_type,id,link,event_type,event_param1,event_param2,event_param3,event_param4,action_type,action_param1,target_type,comment) VALUES (96480,0,2,0,0,8000,12000,15000,18000,11,191691,1,'VotW - in combat - cast Fiery Breath');
+-- Felsworn Infester: remove the extra Infest cast
+DELETE FROM smart_scripts WHERE entryorguid=96587 AND source_type=0 AND id=2;
+-- Aranasi Broodmother: SmartAI without any lines
+DELETE FROM smart_scripts WHERE entryorguid=97678 AND source_type=0;
+INSERT INTO smart_scripts (entryorguid,source_type,id,link,event_type,event_param1,event_param2,event_param3,event_param4,action_type,action_param1,target_type,comment) VALUES
+(97678,0,0,0,0,5000,7000,9000,12000,11,193969,2,'VotW - in combat - cast Razors on victim'),
+(97678,0,1,0,0,12000,15000,20000,25000,11,193997,1,'VotW - in combat - cast Pull');
+-- Foul Mother: Foul Stench was never cast
+DELETE FROM smart_scripts WHERE entryorguid=98533 AND source_type=0 AND id=5;
+INSERT INTO smart_scripts (entryorguid,source_type,id,link,event_type,event_param1,event_param2,event_param3,event_param4,action_type,action_param1,target_type,comment) VALUES (98533,0,5,0,0,3000,5000,15000,18000,11,210202,2,'VotW - in combat - cast Foul Stench on victim');

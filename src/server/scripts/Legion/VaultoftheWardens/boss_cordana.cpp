@@ -109,7 +109,7 @@ public:
         {
             intro = false;
             SetCanSeeEvenInPassiveMode(true);
-            //me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
         }
 
         bool intro, vengeancePhase, creeping_phase;
@@ -255,6 +255,11 @@ public:
                 me->GetMotionMaster()->MovePoint(1, centrPos);
                 me->SetHomePosition(centrPos);
                 DoCast(SPELL_INTRO);
+                // fallback if the intro move never arrives
+                me->AddDelayedEvent(20000, [this]() -> void
+                {
+                    me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
+                });
             }
         }
 
@@ -536,7 +541,7 @@ public:
                     }
                     else
                     {
-                        for(x = creeping_walls[current_wall].first.GetPositionX(); y > creeping_walls[current_wall].second.GetPositionX(); x -= 2.5f)
+                        for(x = creeping_walls[current_wall].first.GetPositionX(); x > creeping_walls[current_wall].second.GetPositionX(); x -= 2.5f)
                         {
                             if (++number_of_npc >= position_of_passage-2 && number_of_npc <= position_of_passage+2)
                                 continue;

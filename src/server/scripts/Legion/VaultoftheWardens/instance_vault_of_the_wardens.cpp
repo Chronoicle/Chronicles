@@ -39,6 +39,7 @@ public:
         WorldLocation loc_res_pla;
         std::map<uint32, ObjectGuid> tormCageContainer;
         std::list<ObjectGuid> ashSysContainer;
+        uint32 ashSystemState = NOT_STARTED; // first boss Reset hides the consoles
         std::list<ObjectGuid> elunesContainer;
         std::list<ObjectGuid> centryContainer;
 
@@ -114,6 +115,7 @@ public:
             {
                 case DATA_ASHGOLM_SYSTEM:
                 {
+                    ashSystemState = data;
                     if (data == DONE)
                     {
                        for (std::list<ObjectGuid>::iterator itr = ashSysContainer.begin(); itr != ashSysContainer.end(); ++itr)
@@ -124,7 +126,10 @@ public:
                     {
                        for (std::list<ObjectGuid>::iterator itr = ashSysContainer.begin(); itr != ashSysContainer.end(); ++itr)
                             if (Creature* system = instance->GetCreature(*itr))
+                            {
                                 system->SetVisible(true);
+                                system->CastSpell(system, 195189, true); // Activate System visual
+                            }
                     }
                     if (data == IN_PROGRESS)
                     {
@@ -185,11 +190,8 @@ public:
 
         uint32 GetData(uint32 type) const override
         {
-            /* switch (type)
-            {
-                case 0:
-                    return 0;
-            } */
+            if (type == DATA_ASHGOLM_SYSTEM)
+                return ashSystemState;
             return 0;
         }
 

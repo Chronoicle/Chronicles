@@ -313,8 +313,11 @@ public:
             if (instance->GetBossState(DATA_ASHGOLM) != IN_PROGRESS)
                 return;
 
-            if (instance->GetData(DATA_ASHGOLM_SYSTEM) != IN_PROGRESS)
-                instance->SetData(DATA_ASHGOLM_SYSTEM, IN_PROGRESS);
+            if (instance->GetData(DATA_ASHGOLM_SYSTEM) != SPECIAL)
+                return;
+
+            DoCast(me, SPELL_ACTIVATE_SYSTEM, true);
+            instance->SetData(DATA_ASHGOLM_SYSTEM, DONE); // hides all consoles until the next System Security
         }
 
         void DoAction(int32 const action) override

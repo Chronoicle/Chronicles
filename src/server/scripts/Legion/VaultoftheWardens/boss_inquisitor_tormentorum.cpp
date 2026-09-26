@@ -70,6 +70,7 @@ public:
         {
             tpRand[0] = 0;
             tpRand[1] = 1;
+            tpCount = 0;
             CoordSelection();
         }
 
