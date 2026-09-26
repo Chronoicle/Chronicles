@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-09-27 (Oslo)
+
+- Codex — #46 cooldown clock fix 0f3d61f: character saves preserve active spell cooldowns; save/load converts between steady and Unix time; client cooldown history uses steady time. Live after approved restart at 01:33 Oslo (23:33 UTC Sep 26). Regression + build/install passed; awaiting in-game retest. Undo: revert 0f3d61f code, rebuild and approved restart. Player-facing changelog pending Grok.
+
 ## 2026-09-26
 
 - Claude (desktop session) — restart 22:31 UTC (owner OK), worldserver 45fa71a: #28 Legion Cruiser stays in the sky + officer rotation (2726233, temporary server.antoran logs); #29 temporary server.antorus logs; #39 Mendacius/Grimhorn SmartAI + Illianna facing (affe7ba, SQL) and Glayvianna (45fa71a); conf: Server.log appends with timestamps — live, changelog 1553534481116299355 — `git revert` the commits, `~/undo_votw_mythic_39.sql`, conf backup `~/legion/etc/worldserver.conf.bak_serverlog_20260926`.
