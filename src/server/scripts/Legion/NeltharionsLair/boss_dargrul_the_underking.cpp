@@ -244,8 +244,11 @@ struct npc_dargrul_molten_charskin : public ScriptedAI
         if (spell->Id == SPELL_FIXATE_PLR)
         {
             playerGuid = target->GetGUID();
-            AttackStart(target);
             me->ClearUnitState(UNIT_STATE_CASTING);
+            me->SetReactState(REACT_AGGRESSIVE);
+            me->getThreatManager().resetAllAggro();
+            me->AddThreat(target, 50000000.0f);
+            AttackStart(target);
             me->GetMotionMaster()->MoveChase(target);
         }
     }
@@ -414,8 +417,11 @@ struct npc_nl_understone_demolisher : public ScriptedAI
         if (spell->Id == SPELL_FIXATE_PLR)
         {
             playerGuid = target->GetGUID();
-            AttackStart(target);
             me->ClearUnitState(UNIT_STATE_CASTING);
+            me->SetReactState(REACT_AGGRESSIVE);
+            me->getThreatManager().resetAllAggro();
+            me->AddThreat(target, 50000000.0f);
+            AttackStart(target);
             me->GetMotionMaster()->MoveChase(target);
         }
     }

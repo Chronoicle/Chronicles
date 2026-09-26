@@ -56,7 +56,8 @@ enum eEvents
 
 enum Misc
 {
-    DATA_ACHIEVEMENT,  
+    DATA_ACHIEVEMENT,
+    ACTION_SPIKED_TONGUE,
 };
 
 Position const speakerPos[6] =
@@ -208,6 +209,22 @@ struct boss_naraxas : public BossAI
         }
     }
 
+    void DoAction(int32 const action) override
+    {
+        if (action != ACTION_SPIKED_TONGUE || !me->isInCombat() || me->HasAura(SPELL_SPIKED_TONGUE_CHANNEL))
+            return;
+
+        Unit* victim = me->getVictim();
+        if (!victim || !victim->IsAlive())
+            return;
+
+        me->SetPower(POWER_MANA, 0);
+        DoCast(victim, SPELL_SPIKED_TONGUE_CHANNEL, true);
+        DoCast(me, SPELL_SPIKED_TONGUE_AT, true);
+        Talk(SAY_EMOTE);
+        TC_LOG_INFO("server.nl", "Naraxas: Spiked Tongue started on %s", victim->GetGUID().ToString().c_str());
+    }
+
     void SpellHit(Unit* caster, const SpellInfo* spell) override
     {
         switch (spell->Id)
@@ -228,8 +245,7 @@ struct boss_naraxas : public BossAI
                 DoCast(caster, SPELL_DEVOUR_FANATIC);
                 break;
             case SPELL_SPIKED_TONGUE:
-                DoCastVictim(SPELL_SPIKED_TONGUE_CHANNEL, true);
-                DoCast(me, SPELL_SPIKED_TONGUE_AT, true);
+                DoAction(ACTION_SPIKED_TONGUE);
                 break;
         }
     }
@@ -290,9 +306,7 @@ struct boss_naraxas : public BossAI
                 DoCast(me, SPELL_GAIN_ENERGY, true);
             if (me->GetPower(POWER_MANA) >= 100)
             {
-                DoCast(me, SPELL_SPIKED_TONGUE);
-                Talk(SAY_EMOTE);
-                TC_LOG_INFO("server.nl", "Naraxas: Spiked Tongue at %u energy", me->GetPower(POWER_MANA));
+                DoAction(ACTION_SPIKED_TONGUE);
                 return;
             }
             if (++energyLogTicks % 10 == 0)
@@ -429,12 +443,8 @@ class spell_naraxas_gain_energy : public AuraScript
             return;
 
         if (caster->GetPower(POWER_MANA) >= 100)
-        {
-            caster->CastSpell(caster, SPELL_SPIKED_TONGUE);
-
-            if (Creature* target = caster->FindNearestCreature(91005, 50, true))
-                target->AI()->Talk(SAY_EMOTE);
-        }
+            if (Creature* creature = caster->ToCreature())
+                creature->AI()->DoAction(ACTION_SPIKED_TONGUE);
     }
 
     void Register() override
