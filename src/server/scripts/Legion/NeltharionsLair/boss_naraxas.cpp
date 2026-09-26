@@ -77,12 +77,24 @@ struct boss_naraxas : public BossAI
     {
         SetCombatMovement(false);
         me->SetMaxPower(POWER_MANA, 100);
-        DoCast(me, SPELL_INTRO_MYSTIC, true);
     }
 
     SummonList summons;
     bool introDone = false;
     bool introDone1 = false;
+    bool submerged = false;
+
+    // The submerge loop was cast in the constructor, before he is in the world, so players saw him standing there
+    // and could target him before the roleplay (#13). Apply it on the first update and keep him unselectable until he emerges.
+    void Submerge()
+    {
+        submerged = true;
+        if (introDone1 || (instance && instance->GetBossState(DATA_NARAXAS) == DONE))
+            return;
+
+        DoCast(me, SPELL_INTRO_MYSTIC, true);
+        me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC);
+    }
     bool stacksdone = false;
     uint8 berserkPct = 0;
     uint16 checkMeleeTimer = 0;
@@ -179,7 +191,11 @@ struct boss_naraxas : public BossAI
             // visual (kit 66791: AnimKit 10498 = emerge + bite, sound) never played. Play it, then cast.
             me->SendPlaySpellVisualKit(66791, 0, 4400);
             Unit* self = me;
-            me->AddDelayedEvent(4400, [self] { self->CastSpell(self, SPELL_INTRO_EMERGE, true); });
+            me->AddDelayedEvent(4400, [self]
+            {
+                self->CastSpell(self, SPELL_INTRO_EMERGE, true);
+                self->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC);
+            });
             if (Creature* mystic = me->FindNearestCreature(105766, 30, true))
                 mystic->AddDelayedEvent(4400, [mystic] { mystic->SetVisible(false); }); // eaten
             TC_LOG_INFO("server.nl", "Naraxas: intro emerge started");
@@ -290,6 +306,9 @@ struct boss_naraxas : public BossAI
 
     void UpdateAI(uint32 diff) override
     {
+        if (!submerged)
+            Submerge();
+
         if (!UpdateVictim())
             return;
 

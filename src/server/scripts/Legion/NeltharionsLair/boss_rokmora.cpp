@@ -88,25 +88,32 @@ struct boss_rokmora : public BossAI
         events.RescheduleEvent(EVENT_DEAD_CONVERSATION, 3000);
     }
 
+    // players saw him standing, then "snap into the ground and jump out", and the NPCs pop in. Prepare as soon as he is
+    // loaded (first AI update): MoveInLineOfSight only fired once players reached the bridge above him (#13)
+    void PrepareIntro()
+    {
+        introPrepared = true;
+        if (instance && instance->GetBossState(DATA_ROKMORA) == DONE)
+            return;
+
+        if (auto navarrogg = me->SummonCreature(NPC_NAVARROGG_INTRO, 2917.32f, 1402.29f, -2.28f, 2.744620f, TEMPSUMMON_MANUAL_DESPAWN))
+            navarroggGuid = navarrogg->GetGUID();
+        if (auto ularogg = me->SummonCreature(NPC_ULAROGG_INTRO, 2900.33f, 1410.06f, -2.32f, 4.05f, TEMPSUMMON_MANUAL_DESPAWN))
+        {
+            ularoggGuid = ularogg->GetGUID();
+            ularogg->CastSpell(me, SPELL_INTRO_ULAROGG, true); // channel keeps Rokmora submerged
+        }
+    }
+
     void MoveInLineOfSight(Unit* who) override
-    {  
+    {
         if (!who->IsPlayer())
             return;
 
-        // players saw him standing, then "snap into the ground and jump out", and the NPCs pop in: prepare earlier
-        if (!introPrepared && me->IsWithinDistInMap(who, 120.0f))
-        {
-            introPrepared = true;
-            if (auto navarrogg = me->SummonCreature(NPC_NAVARROGG_INTRO, 2917.32f, 1402.29f, -2.28f, 2.744620f, TEMPSUMMON_MANUAL_DESPAWN))
-                navarroggGuid = navarrogg->GetGUID();
-            if (auto ularogg = me->SummonCreature(NPC_ULAROGG_INTRO, 2900.33f, 1410.06f, -2.32f, 4.05f, TEMPSUMMON_MANUAL_DESPAWN))
-            {
-                ularoggGuid = ularogg->GetGUID();
-                ularogg->CastSpell(me, SPELL_INTRO_ULAROGG, true); // channel keeps Rokmora submerged
-            }
-        }
+        if (!introPrepared)
+            PrepareIntro();
 
-        if (introPrepared && !introDone && me->IsWithinDistInMap(who, 40.0f))
+        if (!introDone && me->IsWithinDistInMap(who, 40.0f))
         {
             introDone = true;
             for (ObjectGuid guid : { navarroggGuid, ularoggGuid })
@@ -152,6 +159,9 @@ struct boss_rokmora : public BossAI
 
     void UpdateAI(uint32 diff) override
     {
+        if (!introPrepared)
+            PrepareIntro();
+
         if (!UpdateVictim())
             return;
 
