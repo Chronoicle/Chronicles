@@ -130,8 +130,22 @@ struct boss_naraxas : public BossAI
         _JustDied();
         summons.DespawnAll();
 
-        if (auto target = me->FindNearestCreature(100700, 50, true))
-            target->CastSpell(target, 208691); //conversation
+        // ponytail: no sniffed path; they run in from the arena edge to their DB spawn points
+        Position const walkIn[2] = { {3031.9f, 1780.2f, -61.3f, 2.2f}, {3032.5f, 1772.4f, -61.1f, 2.2f} };
+        uint32 const allies[2] = { NPC_NAVARROGG_INTRO, NPC_SPIRITWALKER_EBONHORN };
+        for (uint8 i = 0; i < 2; ++i)
+        {
+            Creature* ally = me->FindNearestCreature(allies[i], 60.0f, true);
+            if (!ally)
+                continue;
+            Position home = ally->GetHomePosition();
+            ally->NearTeleportTo(walkIn[i]);
+            ally->SetVisible(true);
+            ally->SetWalk(false);
+            ally->GetMotionMaster()->MovePoint(1, home);
+            if (i == 0)
+                ally->AddDelayedEvent(7000, [ally] { ally->CastSpell(ally, 208691); }); // conversation 1807
+        }
     }
 
     uint32 GetData(uint32 type) const override
@@ -157,15 +171,17 @@ struct boss_naraxas : public BossAI
 
         if (!introDone1 && me->IsWithinDistInMap(who, 80.0f))
         {
-            me->CastSpell(me, 209629, true);
-            me->RemoveAurasDueToSpell(SPELL_INTRO_MYSTIC);
-            if (Creature* target = me->FindNearestCreature(105766, 30, true))
-            {
-                me->CastSpell(target, SPELL_INTRO_EMERGE, true); // triggered: a failed cast left her submerged (only visible in some animations)
-                target->SetVisible(false);
-                TC_LOG_INFO("server.nl", "Naraxas: intro emerge cast on %u", target->GetEntry());
-            }
             introDone1 = true;
+            me->CastSpell(me, 209629, true);                // conversation 1914: the mystic's scream, he must stay visible for it
+            me->RemoveAurasDueToSpell(SPELL_INTRO_MYSTIC);  // ends the submerged animation loop (kit 66786)
+            // 209641 has SPELL_ATTR4_TRIGGERED, so the core always casts it instantly and its 4.4 s precast
+            // visual (kit 66791: AnimKit 10498 = emerge + bite, sound) never played. Play it, then cast.
+            me->SendPlaySpellVisualKit(66791, 0, 4400);
+            Unit* self = me;
+            me->AddDelayedEvent(4400, [self] { self->CastSpell(self, SPELL_INTRO_EMERGE, true); });
+            if (Creature* mystic = me->FindNearestCreature(105766, 30, true))
+                mystic->AddDelayedEvent(4400, [mystic] { mystic->SetVisible(false); }); // eaten
+            TC_LOG_INFO("server.nl", "Naraxas: intro emerge started");
         }
     }
 

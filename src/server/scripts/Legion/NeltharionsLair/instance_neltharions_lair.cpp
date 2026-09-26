@@ -49,6 +49,12 @@ public:
                 case NPC_ULAROGG_CRAGSHAPER:    
                     UlaroggGUID = creature->GetGUID(); 
                     break;
+                case NPC_NAVARROGG_INTRO:
+                case NPC_SPIRITWALKER_EBONHORN:
+                    // the pair in Naraxas' arena (not Rokmora's intro summon or the Dargrul pair) walks in after her death
+                    if (creature->GetDistance(2991.3f, 1826.9f, -60.0f) < 60.0f && GetBossState(DATA_NARAXAS) != DONE)
+                        creature->SetVisible(false);
+                    break;
             } 
         }
 
