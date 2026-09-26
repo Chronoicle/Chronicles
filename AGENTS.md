@@ -42,7 +42,7 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
    For the reporter: <1-3 plain sentences for players: what was wrong, what will be different, "live after the next restart". No file names, commits or code.>
    ```
    Also use `For the reporter:` when you need something from the reporter (a question) or when the answer is "not a bug" or "can't be fixed yet".
-4. **After the restart:** the deployer comments `Live: <what changed>` plus a `For the reporter:` line ("live now, please test ...") and adds `live` (keep `needs-test` until someone checks it in game).
+4. **After the restart:** the deployer comments `Live: <what changed>` plus a `For the reporter:` line ("live now, please test ...") and adds `live` (keep `needs-test` until someone checks it in game). When nothing is left to do but the in-game test, move the card to the **Needs testing** status (board columns: Todo → In Progress → Needs testing → Done). Cards with open work stay In Progress.
 5. **Grok** passes every new `For the reporter:` line on as a reply to the report in Discord, then comments `Told the reporter (Grok)` on the issue, so nothing is sent twice.
 6. **Closing = Done.** Closing an issue moves its card to Done automatically (and dragging a card to Done closes it). **The fixer (the agent in the `agent:` label) closes the issue** when:
    - the reporter confirmed it works (Grok comments that on the issue), or
