@@ -516,7 +516,26 @@ class spell_entrance_run_plr_move : public AuraScript
             };
             Movement::PointsArray path;
             path.push_back(G3D::Vector3(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ())); // replaced by the real start
-            path.insert(path.end(), std::begin(slide), std::end(slide));
+            // The smooth (Catmull-Rom) curve swings out at sharp corners after a long leg and clipped the camera into the
+            // wall at the third corner (#13): around every corner over 30 degrees add points at 80 % of the leg in and
+            // 20 % of the leg out, so the curve hugs the waypoint line through the tunnel.
+            size_t const count = std::end(slide) - std::begin(slide);
+            for (size_t i = 0; i < count; ++i)
+            {
+                G3D::Vector3 const& p = slide[i];
+                bool corner = false;
+                if (i > 0 && i + 1 < count)
+                {
+                    G3D::Vector3 in = p - slide[i - 1], out = slide[i + 1] - p;
+                    float turn = std::fabs(Position::NormalizeOrientation(std::atan2(out.y, out.x) - std::atan2(in.y, in.x)));
+                    corner = std::min(turn, float(2 * M_PI) - turn) > float(M_PI) / 6.0f;
+                }
+                if (corner)
+                    path.push_back(slide[i - 1] + (p - slide[i - 1]) * 0.8f);
+                path.push_back(p);
+                if (corner)
+                    path.push_back(p + (slide[i + 1] - p) * 0.2f);
+            }
             player->GetMotionMaster()->MoveIdle();
             Movement::MoveSplineInit init(*player);
             init.MovebyPath(path);

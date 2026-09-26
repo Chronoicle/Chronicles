@@ -670,6 +670,12 @@ void Unit::UpdateSplineMovement(uint32 t_diff)
     if (m_movesplineTimer.Passed() || arrived)
         UpdateSplinePosition();
 
+    // The client sends no movement during a server spline, so the fall start stayed at the spline's start height and the
+    // first landing after e.g. a scripted slide or ride counted the whole descent as a fall (#13). Fall from where it ends.
+    if (arrived)
+        if (Player* player = ToPlayer())
+            player->SetFallInformation(0, GetPositionZ());
+
     /*_flightSplineSyncTimer.Update(t_diff);
     if (_flightSplineSyncTimer.Passed())
     {

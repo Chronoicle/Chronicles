@@ -453,7 +453,9 @@ struct npc_nl_understone_drummer : public ScriptedAI
                 }
                 case EVENT_2:
                 {
-                    me->SetOrientation(0.5f);
+                    // face the drum (was a fixed 0.5 rad, wrong for one of the two drums) (#13)
+                    if (Creature* drums = me->FindNearestCreature(92387, 5.0f, true))
+                        me->SetFacingToObject(drums);
                     me->SetReactState(REACT_AGGRESSIVE, 24000);
                     me->StopAttack(true);
                     DoCast(183526);
