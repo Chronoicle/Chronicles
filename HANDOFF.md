@@ -4,6 +4,8 @@ Last updated: 2026-09-26 ~15:30 UTC by Claude.
 
 ## Current state
 
+**In progress (Claude, server session):** #33 `ProcEventInfo::GetSpellInfo()` fix (Unit.h/Unit.cpp/SpellMgr.cpp, uncommitted in the working tree on purpose): full rebuild running (`~/build_33.log`, deploy lock held). Do not commit, reset or build over it; Claude commits it when `INSTALL_EXIT=0`. Also waiting for a restart: crash fix 0e21884 and the Hasabel trash SQL (#29).
+
 **17:07 UTC crash** (SIGSEGV in HandleAuraOverrideSpells, old build) → the loop restarted on the new build, so everything staged up to 9b68fd0 is LIVE (#24, #32, #15, #16, #31, #30 Paraxis + server.eonar logs). Changelog posted, issues commented + labelled live. **Crash fix 0e21884 is built + installed but NOT live: needs a restart (ask the owner).**
 
 0a. **Staged, not live:** commit after ea63b95 = #32 Discipline Focused Will (and warlock Soul Leech) no longer proc on jumps/own spells. Built + installed. Live with the same restart as #24.
