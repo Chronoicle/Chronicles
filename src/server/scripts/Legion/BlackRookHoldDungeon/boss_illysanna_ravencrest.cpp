@@ -323,7 +323,8 @@ struct boss_illysanna_ravencrest : public BossAI
                     Talk(SAY_DARK_RUSH);
                     DoCast(SPELL_DARK_RUSH_FILTER);
                     for (auto id : {EVENT_BRUTAL_GLAIVE, EVENT_VENGEFUL_SHEAR, EVENT_PHASE_FLY})
-                        events.RescheduleEvent(id, 9000, true);
+                        if (events.HasEvent(id)) // only delay what is scheduled: the 3rd argument is a group, it always scheduled them (Illysanna flew, Stinging Swarm on Normal)
+                            events.RescheduleEvent(id, 9000);
                     me->AddDelayedCombat(5500, [this]() -> void { SetCombatMovement(false); });
                     me->AddDelayedCombat(8500, [this]() -> void { SetCombatMovement(true); });
                     events.RescheduleEvent(EVENT_DARK_RUSH_1, 30000);

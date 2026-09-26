@@ -306,7 +306,8 @@ struct boss_latosius : public BossAI
                     Talk(SAY_DREADLORDS_GUILE);
                     DoCast(SPELL_DREADLORDS_GUILE);
                     for (auto id : {EVENT_SHADOW_BOLT_VOLLEY, EVENT_CLOUD_OF_HYPNOSIS, EVENT_STINGING_SWARM})
-                        events.RescheduleEvent(id, 26000, true);
+                        if (events.HasEvent(id)) // only delay what is scheduled: the 3rd argument is a group, it always scheduled them (Illysanna flew, Stinging Swarm on Normal)
+                            events.RescheduleEvent(id, 26000);
                     events.RescheduleEvent(EVENT_DREADLORDS_GUILE, 82000);
                     events.RescheduleEvent(EVENT_SUM_IMAGE, 4000);
                     break;
