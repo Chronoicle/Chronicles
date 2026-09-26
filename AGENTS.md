@@ -1,6 +1,6 @@
 # Chronicles server: rules and map for every AI agent
 
-Read this first, then `~/HANDOFF.md` (what is in progress) and `~/CHANGES.md` (what changed recently).
+Read this first, then `HANDOFF.md` (what is in progress), `CHANGES.md` (what changed recently) and `docs/NOTES.md` (decisions and lessons). All four are in the repo root / `docs/`; on the server `~/AGENTS.md`, `~/HANDOFF.md` and `~/CHANGES.md` link to them.
 This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it). `CLAUDE.md` is the same file (symlink). Claude, ChatGPT/Codex, Grok, Cursor and any other agent follow the same rules.
 
 ## The owner's rules (always)
@@ -26,6 +26,8 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 |---|---|---|
 | **Grok** | Discord intake: reads #bug-reports and #suggestions, asks reporters for details, turns reports into GitHub issues, tells reporters the status from issue comments. Never changes code, the DB or the server. | Own Linux user `grok`: read-only copies in `/srv/chronicles-view` (this file, HANDOFF, CHANGES, recent logs), read-only MySQL on `world` + `hotfixes`. Own GitHub token (issues + read code). Discord through the existing bot (grok-discord: new / list / reply only, via sudo as wow; the token stays with wow). |
 | **Claude, ChatGPT/Codex** | Fix, build, deploy (restarts with the owner's OK). | `wow` user on the server. |
+| **Claude Project** (cloud threads, claude.ai Projects) | Research, audits and code changes, several at once. Works from this repo and the board; code goes in as a pull request with `Refs #N`. Never builds, restarts or deploys, never talks to players. | This GitHub repo only (no server access). |
+| **Server session** (one Claude or ChatGPT session with SSH as `wow`) | Merges pull requests, builds, deploys, restarts (with the owner's OK), posts #changelog, writes `Live:` comments. Only one deploys at a time (`~/DEPLOY.lock`). | `wow` user on the server. |
 | **Cursor** | Code proposals from the owner's PC: a branch + pull request, never pushes to `main`. | GitHub only. |
 | **Owner** | Approves restarts, suggestions, fixes for non-James reports, and merges when in doubt. | Everything. |
 
