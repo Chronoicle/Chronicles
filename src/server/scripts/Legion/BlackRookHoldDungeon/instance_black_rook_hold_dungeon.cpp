@@ -107,7 +107,15 @@ public:
         {
             if (!InstanceScript::SetBossState(type, state))
                 return false;
-            
+
+            if (type == DATA_AMALGAM && state == DONE)
+                AddDelayedEvent(30000, [this]()
+                {
+                    // A failed ghost path must not block the exit after the boss dies.
+                    if (GetBossState(DATA_AMALGAM) == DONE)
+                        HandleGameObject(AmalgamGateGUID, true);
+                });
+
             return true;
         }
 
