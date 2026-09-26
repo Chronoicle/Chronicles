@@ -181,7 +181,8 @@ struct boss_felhounds_encounters : public BossAI
         if (!IsMythicRaid())
             return;
 
-        if (me->HealthBelowPct(51) && !swapTouched)
+        // retail swaps right at 50% (reporter, #25)
+        if (!swapTouched && me->HealthBelowPctDamaged(50, damage))
         {
             if (auto shatug = instance->instance->GetCreature(instance->GetGuidData(NPC_SHATUG)))
                 shatug->GetAI()->DoAction(ACTION_4);
@@ -398,8 +399,11 @@ struct npc_felhounds_shatug : public boss_felhounds_encounters
             me->SetReactState(REACT_AGGRESSIVE);
         }
 
+        // 244053 is triggered by 251444 before 251444's own effects 0/1 remove both marks from everyone
+        // (a target-less trigger effect runs first), so re-applying here was wiped at once and the swap left
+        // nobody marked (#25). Re-apply after 251444 is done.
         if (spell->Id == SPELL_SOULTOUCHED_FILTER)
-            SoulTouched();
+            me->AddDelayedCombat(200, [this]() -> void { SoulTouched(); });
     }
 
     void OnApplyOrRemoveAura(uint32 spellId, AuraRemoveMode mode, bool apply) override
@@ -825,9 +829,19 @@ class spell_felhounds_corruption_filter : public SpellScript
         }
     }
 
+    // The dummy only names the mark (base points 248815 / 248819); nothing applied it, so Enflamed Corruption and
+    // Siphon Corruption never marked anyone and their explosions on expiry never happened (#25)
+    void HandleDummy(SpellEffIndex /*effIndex*/)
+    {
+        if (Unit* caster = GetCaster())
+            if (Unit* target = GetHitUnit())
+                caster->CastSpell(target, GetSpellInfo()->Id == 244471 ? SPELL_ENFLAME_CORRUPTION_MARK : SPELL_SIPHONED_MARK, true);
+    }
+
     void Register()
     {
         OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_felhounds_corruption_filter::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
+        OnEffectHitTarget += SpellEffectFn(spell_felhounds_corruption_filter::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
     }
 };
 
