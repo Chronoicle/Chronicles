@@ -1,45 +1,33 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~18:40 UTC by Claude (desktop session).
+Last updated: 2026-09-26 ~19:00 UTC by Claude (Project thread).
+
+## Who does what right now
+
+- **Server session:** a Claude session on the owner's Windows desktop (Remote Control, started from a Project thread). SSH as `wow` with its own key, `gh` logged in with board access. Cloud threads cannot reach the server; they start this session when server work is needed.
+- The old server session on the owner's Mac is retired (its notes are in `docs/NOTES.md`).
 
 ## Current state
 
-**Live since the restart at 18:34 UTC (owner OK):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo 7aef6a1, Hasabel trash SQL (#29). Ports 3443/8085/8086 up, lock released. Issue comments + live labels done. #changelog posted: 1553476662119637004.
+- **Nothing staged.** Everything built so far is live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
+- The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
+- **No open pull requests.**
 
-**17:07 UTC crash** (SIGSEGV in HandleAuraOverrideSpells, old build) → the loop restarted on the new build, so everything staged up to 9b68fd0 is LIVE (#24, #32, #15, #16, #31, #30 Paraxis + server.eonar logs). Changelog posted, issues commented + labelled live. **Crash fix 0e21884 is built + installed but NOT live: needs a restart (ask the owner).**
+## Open work
 
-0a. **Staged, not live:** commit after ea63b95 = #32 Discipline Focused Will (and warlock Soul Leech) no longer proc on jumps/own spells. Built + installed. Live with the same restart as #24.
-0b. **Staged, not live:** 2817f3c Eye of Azshara #15 weather mechanics + #16 naga slots; 79eac34 Prestige cap 25 (#31). Eonar #30 partial (Paraxis reset fix + temporary server.eonar logs for Surge of Life; after a test: grep server.eonar ~/legion/logs/Server.log). #27 trinkets out of combat: findings posted, waiting for a retail source (needs-info).
-0. **Staged, not live (restart needed, ask the owner):** commit ea63b95 = Vault of the Wardens #24 (Ash'golm countermeasure consoles spawned + per-cycle click, Cordana walls + intro flags, Tormentorum tpCount, trash SmartAI). Built and installed; DB `~/fix_votw.sql` already applied (undo `~/undo_votw.sql`). After the restart: #changelog post (found by audit, no reporter), comment on #24, test in game (the console positions are estimates).
-1. **Live:** commit a1e44a2 (Dargrul Crystal Spikes summon 200338 after target spell 200551) is running since the restart at 14:29 UTC; binary hash verified, ports up. Changelog, James and #13 updated.
-2. **Completed by Codex:** Neltharion's Lair commit 07c4946 is live after a 60-second restart at ~14:17 UTC. Naraxas starts Spiked Tongue directly at full energy, and Dargrul's Molten Charskins/Understone Demolishers pin threat to the fixated player. The running process reports revision 07c4946, matches the installed binary hash, and ports 3443, 8085 and 8086 are listening.
-3. **Post-deploy complete:** James received staged and live replies. #changelog: https://discord.com/channels/1552349612726161459/1552351331392421908/1553410127409975378. GitHub #13 has a live-status comment and remains open.
-4. **Neltharion's Lair #13 still open:** investigate one-shot/death-state behavior on Vileshard Crawler 96247, Blightshard Shaper 90998 and Tarspitter Lurker 91001, and trash placement after Naraxas. Crystal Spikes is live (a1e44a2). James's DK screenshots are in report 1553289525655109654; pally screenshots were expected. Avoid a broad core death-state guard without stronger evidence.
-5. **Discord reports:** run cd ~/discord-bot && venv/bin/python bugs.py new regularly (automatic watcher is off). James (ID 947341290801078302) is pre-approved for game bug fixes; reply to every reporter with status updates. The latest run marked 14 reports shown: James's #13 follow-up was worked, while 13 Antorus reports from xinkeg remain unworked and require owner approval before building.
-6. **Good next tasks** (issues have details and proposed fixes):
-   - #16 Eye of Azshara: bounds check on NagasContainerGUID[NagasCount++] in instance_eye_of_azshara.cpp:95; possible crash.
-   - #15 Eye of Azshara: weather mechanics disabled by a bare return in instance_eye_of_azshara.cpp:280.
-   - #21 Black Rook Hold small script bugs; #23 fallback that opens the door behind Amalgam after 30 seconds.
-   - #17 dead spell_script_names rows, #18 cosmetic patrols/yell, #22 mobs without abilities.
-7. **Task board:** https://github.com/users/Chronoicle/projects/1. Use Refs #N for work that is not complete/live; never force-push.
-
-## Live now (last restart ~14:29 UTC)
-
-- Neltharion's Lair #13 commit a1e44a2: Dargrul Crystal Spikes summoned at the marker.
-
-- Neltharion's Lair #13 commit 07c4946: Naraxas Spiked Tongue full-energy trigger and Dargrul fixate threat/chase. Deployed by Codex; changelog and reporter updates posted.
-- Eye of Azshara #14 and Black Rook Hold #19/#20 commit f404d17: corrected encounter script bindings, boss-event scheduling and rolling-boulder visibility. Deployed by Codex; issues closed.
-- Neltharion's Lair #13 commits 7f5919b and da1bd14: Charskin/Demolisher chase, Landslide knockback, hammer and Dargrul-arena NPCs after his death, Hulks immune to CC/slows and still during Piercing Shards, Drums of War not attackable, Naraxas loot only from the chest, smooth tunnel slide, Rokmora submerged before the roleplay, and four duplicate trash spawns removed.
-- Naraxas intro #1 commit 35e5859, Rokmora/Ularogg/Naraxas fixes #2, Mythic health fix, creature proc cooldown fix, Glazer, Signal Lantern and Court of Stars boat: see ~/CHANGES.md.
-- Ularogg and Naraxas diagnostic steps: grep server.nl ~/legion/logs/Server.log.
+1. **New, approved, no agent yet:** #34 (Tirathon casts while moving, Vault of the Wardens), #35 (more than 2 legendaries equippable).
+2. **Antorus (xinkeg, approved):** #29 still open for the 60%/30% adds (activation spells 257941/257942 need their gateway NPCs 122543/122558; test with logging) and the other Hasabel points. #25 Felhounds, #26 platform, #28 High Command, #30 Eonar Surge of Life (after a test: `grep server.eonar ~/legion/logs/Server.log`, then remove the temporary logs).
+3. **#27** trinkets out of combat: waiting for a retail source (needs-info).
+4. **Neltharion's Lair #13:** one-shot/death-state behavior on Vileshard Crawler 96247, Blightshard Shaper 90998 and Tarspitter Lurker 91001, and trash placement after Naraxas. James's DK screenshots are in report 1553289525655109654. Avoid a broad core death-state guard without stronger evidence.
+5. **Audit findings (no reporter):** #21 Black Rook Hold small script bugs, #22 BRH mobs without AI, #23 door fallback behind Amalgam, #17 dead spell_script_names rows, #18 EoA patrols/yell.
+6. **Task board:** https://github.com/users/Chronoicle/projects/1. Use Refs #N for work that is not complete/live; never force-push.
 
 ## Needs an in-game check (issues labelled needs-test)
 
-#1 Naraxas intro, #2 Neltharion's Lair retest including live commit 07c4946 and a1e44a2, #3 Glazer on Mythic, #5 Court of Stars boat + lantern, and live fixes #14/#19/#20.
+#1 Naraxas intro, #2 Neltharion's Lair retest, #3 Glazer on Mythic, #5 Court of Stars boat + lantern, #15 EoA weather, #24 Vault of the Wardens (console positions are estimates), #29 Hasabel trash, #33 Marking Targets and other procs.
 
 ## Waiting for the owner
 
-- Team setup (commit b15809d, see AGENTS.md "Team and roles", GROK.md): grok user, tools (grok-discord, grok-gh), /srv/chronicles-view and cron are set up (2026-09-26 16:04); the owner still has to create Grok's Discord bot + GitHub token, and turn on the board's auto-add workflow. Until Grok is running, check Discord with bugs.py as before.
-- Approval/verdict for the 13 Antorus reports from xinkeg before any build.
+- Grok: create its Discord bot + GitHub token, and turn on the board's auto-add workflow (server side is set up, see GROK.md). Until Grok runs, check Discord with `cd ~/discord-bot && venv/bin/python bugs.py new`.
 - #4 Vileshard Crawler damage tuning; website #6 https, #7 shop items (SOAP), #8 Discord widget, #9 e-mail (SMTP).
 - Optional: add launcher / website / Discord bot code to the repo (#12).
