@@ -866,10 +866,11 @@ bool SpellMgr::CanSpellTriggerProcOnEvent(SpellProcEntry const& procEntry, ProcE
     // check spell family name/flags (if set) for spells
     if (eventInfo.GetTypeMask() & (PERIODIC_PROC_FLAG_MASK | SPELL_PROC_FLAG_MASK | PROC_FLAG_DONE_TRAP_ACTIVATION))
     {
-        if (procEntry.spellFamilyName && (procEntry.spellFamilyName != eventInfo.GetSpellInfo()->ClassOptions.SpellClassSet))
+        SpellInfo const* procSpellInfo = eventInfo.GetSpellInfo();
+        if (procEntry.spellFamilyName && (!procSpellInfo || procEntry.spellFamilyName != procSpellInfo->ClassOptions.SpellClassSet))
             return false;
 
-        if (procEntry.spellFamilyMask && !(procEntry.spellFamilyMask & eventInfo.GetSpellInfo()->ClassOptions.SpellClassMask))
+        if (procEntry.spellFamilyMask && (!procSpellInfo || !(procEntry.spellFamilyMask & procSpellInfo->ClassOptions.SpellClassMask)))
             return false;
     }
 

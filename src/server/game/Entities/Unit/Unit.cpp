@@ -188,6 +188,17 @@ bool DamageInfo::HasTargetInfoMask(uint32 Mask)
     return targetInfoMask & Mask;
 }
 
+SpellInfo const* ProcEventInfo::GetSpellInfo() const
+{
+    if (_spell)
+        return _spell->GetSpellInfo();
+    if (_damageInfo && _damageInfo->GetSpellInfo())
+        return _damageInfo->GetSpellInfo();
+    if (_healInfo)
+        return _healInfo->GetSpellInfo();
+    return nullptr;
+}
+
 ProcEventInfo::ProcEventInfo(Unit* actor, Unit* actionTarget, Unit* procTarget, uint32 typeMask, uint32 spellTypeMask, uint32 spellPhaseMask, uint32 hitMask, Spell* spell, DamageInfo* damageInfo, HealInfo* healInfo)
 :_actor(actor), _actionTarget(actionTarget), _procTarget(procTarget), _typeMask(typeMask), _spellTypeMask(spellTypeMask), _spellPhaseMask(spellPhaseMask),
 _hitMask(hitMask), _spell(spell), _damageInfo(damageInfo), _healInfo(healInfo)

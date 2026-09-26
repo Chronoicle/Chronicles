@@ -837,6 +837,7 @@ public:
         m_heal -= amount;
     }
 
+    SpellInfo const* GetSpellInfo() const { return m_spellInfo; }
     uint32 GetHeal() const { return m_heal; };
 };
 
@@ -863,7 +864,7 @@ public:
     uint32 GetSpellPhaseMask() const { return _spellPhaseMask; }
     uint32 GetHitMask() const { return _hitMask; }
     Spell* GetSpell() const { return _spell; }
-    SpellInfo const* GetSpellInfo() const { return nullptr; }
+    SpellInfo const* GetSpellInfo() const;
     SpellSchoolMask GetSchoolMask() const { return SPELL_SCHOOL_MASK_NONE; }
     DamageInfo* GetDamageInfo() const { return _damageInfo; }
     HealInfo* GetHealInfo() const { return _healInfo; }
