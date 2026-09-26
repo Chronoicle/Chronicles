@@ -24,7 +24,7 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 
 | Who | Does | Access |
 |---|---|---|
-| **Grok** | Discord intake: reads #bug-reports and #suggestions, asks reporters for details, turns reports into GitHub issues, tells reporters the status from issue comments. Never changes code, the DB or the server. | Own Linux user `grok`: read-only copies in `/srv/chronicles-view` (this file, HANDOFF, CHANGES, recent logs), read-only MySQL on `world` + `hotfixes`. Own GitHub token (issues + read code), own Discord bot. |
+| **Grok** | Discord intake: reads #bug-reports and #suggestions, asks reporters for details, turns reports into GitHub issues, tells reporters the status from issue comments. Never changes code, the DB or the server. | Own Linux user `grok`: read-only copies in `/srv/chronicles-view` (this file, HANDOFF, CHANGES, recent logs), read-only MySQL on `world` + `hotfixes`. Own GitHub token (issues + read code). Discord through the existing bot (grok-discord: new / list / reply only, via sudo as wow; the token stays with wow). |
 | **Claude, ChatGPT/Codex** | Fix, build, deploy (restarts with the owner's OK). | `wow` user on the server. |
 | **Cursor** | Code proposals from the owner's PC: a branch + pull request, never pushes to `main`. | GitHub only. |
 | **Owner** | Approves restarts, suggestions, fixes for non-James reports, and merges when in doubt. | Everything. |
