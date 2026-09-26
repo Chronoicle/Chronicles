@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~19:45 UTC by Claude (desktop session). Previously: 2026-09-26 ~19:30 UTC by Claude (Project thread).
+Last updated: 2026-09-26 ~20:00 UTC by Claude (Project thread). Previously: ~19:45 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -16,7 +16,8 @@ Last updated: 2026-09-26 ~19:45 UTC by Claude (desktop session). Previously: 202
 
 ## Open work
 
-1. **#34, #35:** staged, see above (agent:claude).
+1. **#41 (Claude, open PR from branch `claude/project-thread-3qur8k`):** Call to the Void tendrils never cast (GetOwner() null on a totem-mask summon, now GetAnyOwner) and are capped at 3; Acrid Catalyst Injector proc handler required GetTriggeredAuraEff() (always null) and now procs on damaging spell crits. Before deploying, check the bindings on the server: `SELECT * FROM spell_script_names WHERE spell_id IN (193371,253259);` (expect spell_arti_pri_call_of_the_void / spell_item_acrid_catalyst_injector) and `SELECT ScriptName FROM creature_template WHERE entry=98167;` (expect npc_arti_priest_void_tendril). Add missing rows with a fix/undo pair. The Acrid hook assumes 253259 effect 0 is a dummy aura; confirm with `~/client_parts/wdc1.py` (SpellEffect.db2) if it still does nothing.
+   **#39 (Claude, in progress):** Vault of the Wardens Mythic list. **#40** Arcway Mythic list is untaken.
 2. **Antorus (xinkeg, approved):** #29 still open for the 60%/30% adds (activation spells 257941/257942 need their gateway NPCs 122543/122558; test with logging) and the other Hasabel points. #25 Felhounds, #26 platform, #28 High Command, #30 Eonar Surge of Life (after a test: `grep server.eonar ~/legion/logs/Server.log`, then remove the temporary logs).
 3. **#27** trinkets out of combat: waiting for a retail source (needs-info).
 4. **Neltharion's Lair #13:** one-shot/death-state behavior on Vileshard Crawler 96247, Blightshard Shaper 90998 and Tarspitter Lurker 91001, and trash placement after Naraxas. James's DK screenshots are in report 1553289525655109654. Avoid a broad core death-state guard without stronger evidence.

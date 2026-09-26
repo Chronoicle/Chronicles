@@ -4467,71 +4467,42 @@ public:
 				});
 		}
 
+		// Tooltip: damaging spells that critically strike
+		bool CheckProc(ProcEventInfo& eventInfo)
+		{
+			DamageInfo* damageInfo = eventInfo.GetDamageInfo();
+			return eventInfo.GetSpellInfo() && damageInfo && damageInfo->GetDamage() && (eventInfo.GetHitMask() & PROC_EX_CRITICAL_HIT);
+		}
+
+		// One random stat stack per proc (45 sec, up to 5). A stat reaching 5 stacks consumes all three for Cycle of the Legion.
+		// This used to require GetTriggeredAuraEff(), which is always null for an equip aura, so the trinket never did anything (#41).
 		void HandleProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
 		{
-			/*if (eventInfo.GetHitMask() & PROC_HIT_CRITICAL)
-			{*/
-			static std::vector<uint32> const triggeredSpells[1] =
-			{
-				{ Critical, Haste, Mastery }
-			};
+			Unit* caster = eventInfo.GetActor();
+			if (!caster)
+				return;
 
-			//PreventDefaultAction();
-			if (Unit* caster = eventInfo.GetActor()) 
-			{
+			Item* castItem = nullptr;
+			if (ObjectGuid castItemGUID = GetAura()->GetCastItemGUID())
+				if (Player* player = caster->ToPlayer())
+					castItem = player->GetItemByGuid(castItemGUID);
 
-				if (Aura* aur = GetAura())
+			static std::vector<uint32> const stats = { Critical, Haste, Mastery };
+			uint32 spellId = Trinity::Containers::SelectRandomContainerElement(stats);
+			caster->CastSpell(caster, spellId, true, castItem, aurEff, caster->GetGUID());
+
+			if (Aura* stack = caster->GetAura(spellId))
+				if (stack->GetStackAmount() >= 5)
 				{
-					if (AuraEffect const* Eff = aur->GetTriggeredAuraEff())
-					{
-						Item* castItem = nullptr;
-						if (ObjectGuid castItemGUID = aur->GetCastItemGUID())
-						{
-							if (Player* player = caster->ToPlayer())
-								castItem = player->GetItemByGuid(castItemGUID);
-						}
-
-						std::vector<uint32> const& randomSpells = triggeredSpells[0];
-						if (randomSpells.empty())
-							return;
-
-						uint32 spellId = Trinity::Containers::SelectRandomContainerElement(randomSpells);
-
-						//caster->CastSpell(caster, spellId, true, nullptr, aurEff);
-
-						caster->CastSpell(caster, spellId, true, castItem, aurEff, caster->GetGUID());
-						//aur->SetDuration(6000);
-
-						for (std::vector<uint32>::const_iterator it = randomSpells.begin(); it != randomSpells.end(); ++it)
-						{
-							if (caster->HasAura((*it)))
-							{
-								auto trinketAura = caster->GetAura((*it));
-								if (trinketAura->GetStackAmount() >= 5)
-								{
-									//caster->CastSpell(caster, SPELL_CYCLE_OF_THE_LEGION, true, nullptr, aurEff);
-									caster->CastSpell(caster, SPELL_CYCLE_OF_THE_LEGION, true, castItem, aurEff, caster->GetGUID());
-									caster->RemoveAura(Critical);
-									caster->RemoveAura(Haste);
-									caster->RemoveAura(Mastery);
-									break;
-								}
-							}
-						}
-					}
+					caster->CastSpell(caster, SPELL_CYCLE_OF_THE_LEGION, true, castItem, aurEff, caster->GetGUID());
+					for (uint32 id : stats)
+						caster->RemoveAura(id);
 				}
-
-
-
-
-
-				//}
-			}
-
 		}
 
 		void Register() override
 		{
+			DoCheckProc += AuraCheckProcFn(spell_item_acrid_catalyst_injector_AuraScript::CheckProc);
 			OnEffectProc += AuraEffectProcFn(spell_item_acrid_catalyst_injector_AuraScript::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
 		}
 	};

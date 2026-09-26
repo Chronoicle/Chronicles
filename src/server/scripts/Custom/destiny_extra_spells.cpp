@@ -32,6 +32,8 @@ enum DestinyExtraSpells : uint32
     SPELL_WARLOCK_TEAR_CHAOS_BARRAGE        = 187394,
     SPELL_WARLOCK_TEAR_CHAOS_BOLT           = 215279,
     SPELL_WARLOCK_TEAR_SHADOW_BOLT          = 196657,
+
+    NPC_PRIEST_VOID_TENDRIL                 = 98167,
 };
 
 // 193371 - Call to the Void
@@ -42,7 +44,22 @@ class spell_arti_pri_call_of_the_void : public AuraScript
 
     bool CheckProc(ProcEventInfo& eventInfo)
     {
-        return eventInfo.GetSpellInfo() && eventInfo.GetSpellInfo()->Id == SPELL_PRIEST_MIND_FLAY;
+        if (!eventInfo.GetSpellInfo() || eventInfo.GetSpellInfo()->Id != SPELL_PRIEST_MIND_FLAY)
+            return false;
+
+        // At most 3 tendrils at once (#41)
+        Unit* caster = GetCaster();
+        if (!caster)
+            return false;
+
+        std::list<Creature*> tendrils;
+        caster->GetCreatureListWithEntryInGrid(tendrils, NPC_PRIEST_VOID_TENDRIL, 100.0f);
+        uint32 count = 0;
+        for (Creature* tendril : tendrils)
+            if (tendril->IsAlive() && tendril->ToTempSummon() && tendril->ToTempSummon()->GetSummonerGUID() == caster->GetGUID())
+                ++count;
+
+        return count < 3;
     }
 
     void HandleEffectProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
@@ -96,7 +113,9 @@ struct npc_arti_priest_void_tendril : public Scripted_NoMovementAI
         if (me->HasUnitState(UNIT_STATE_CASTING))
             return;
 
-        Unit* owner = me->GetOwner();
+        // The tendril is summoned with the totem mask, which never sets an owner GUID, so GetOwner() was
+        // always null and the tendril never cast anything (#41). The summoner is the priest.
+        Unit* owner = me->GetAnyOwner();
         Unit* target = ObjectAccessor::GetUnit(*me, targetGuid);
         if (!owner || !target || !target->IsAlive())
             return;
