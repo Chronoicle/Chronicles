@@ -5723,7 +5723,8 @@ void Player::_LoadSpellCooldowns(PreparedQueryResult result)
             if (db_time <= curTime)
                 continue;
 
-            AddSpellCooldown(spell_id, item_id, (double)db_time);
+            // Persistent deadlines use Unix time; runtime cooldowns use the steady clock.
+            AddSpellCooldown(spell_id, item_id, getPreciseTime() + double(db_time - curTime));
 
             TC_LOG_DEBUG("sql.sql", "Player (GUID: %u) spell %u, item %u cooldown loaded (%u secs).", GetGUIDLow(), spell_id, item_id, uint32(db_time-curTime));
         }
@@ -5737,9 +5738,10 @@ void Player::_SaveSpellCooldowns(CharacterDatabaseTransaction& trans)
     stmt->setUInt64(0, GetGUIDLow());
     trans->Append(stmt);
 
-    time_t curTime = GameTime::GetGameTime();
-    time_t infTime = curTime + infinityCooldownDelayCheck;
+    double curTime = getPreciseTime();
+    double infTime = curTime + infinityCooldownDelayCheck;
 
+    time_t unixTime = GameTime::GetGameTime();
     bool first_round = true;
     std::ostringstream ss;
 
@@ -5758,7 +5760,7 @@ void Player::_SaveSpellCooldowns(CharacterDatabaseTransaction& trans)
             // next new/changed record prefix
             else
                 ss << ',';
-            ss << '(' << GetGUIDLow() << ',' << itr->first << ',' << itr->second.itemid << ',' << uint64(itr->second.end) << ')';
+            ss << '(' << GetGUIDLow() << ',' << itr->first << ',' << itr->second.itemid << ',' << uint64(unixTime + std::ceil(itr->second.end - curTime)) << ')';
             ++itr;
         }
         else
@@ -29961,8 +29963,8 @@ void Player::SendInitialPacketsAfterAddToMap(bool login)
 
 void Player::SendSpellHistoryData()
 {
-    time_t curTime = GameTime::GetGameTime();
-    time_t infTime = curTime + infinityCooldownDelayCheck;
+    double curTime = getPreciseTime();
+    double infTime = curTime + infinityCooldownDelayCheck;
 
     WorldPackets::Spells::SendSpellHistory history;
     history.Entries.reserve(m_spellCooldowns.size());
