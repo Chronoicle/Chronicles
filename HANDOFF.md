@@ -16,7 +16,7 @@ Last updated: 2026-09-26 ~20:30 UTC by Claude (desktop session). Previously: ~20
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
 - **Live since the restart at 19:39 UTC (owner OK), worldserver 936195d:** #34 Tirathon holds still while casting; #35 legendary limit 1 (2 with the tier 6 class hall talent), live conf `Player.UnlimitedLegionLegendaries = 0` (backup `~/legion/etc/worldserver.conf.bak_legendaries_20260926`); Codex BRH #21 (SQL applied, undo `~/undo_brh_21.sql`) and #23 (Amalgam exit fallback). Changelog 1553491289952231566, Live comments + labels posted. All four need an in-game test (see the issues).
 - **Live since the restart at 20:26 UTC (owner OK), worldserver b1600a1 (PR #42) + 73f1b53:** #41 Call to the Void tendrils cast Mind Flay and cap at 3; Acrid Catalyst Injector works (253259 had no spell_script_names row; added with `~/fix_acrid_catalyst_injector.sql`, undo `~/undo_acrid_catalyst_injector.sql`; effect 0 checked in SpellEffect.db2: dummy aura). #39 the five VotW bosses have mechanic_immune_mask 617299839 (backup table `world.bak_votw_boss_immunities`, undo `~/undo_votw_boss_immunities.sql`). Deploy lock removed.
-  Changelog 1553504519290355794 posted (`~/changelog_restart_2026.json`). **Still to do:** `Live:` comments + `live`/`needs-test` labels on #41 and #39. Blocked by the Claude Code auto-mode classifier (GitHub writes), not by the owner.
+  Changelog 1553504519290355794 posted (`~/changelog_restart_2026.json`). `Live:` comments + `live`/`needs-test` labels posted on #41 and #39; both need an in-game test.
 
 ## Open work
 
