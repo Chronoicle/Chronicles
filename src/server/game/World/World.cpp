@@ -1489,7 +1489,7 @@ void World::LoadConfigSettings(bool reload)
 
 	m_bool_configs[CONFIG_PLAYER_CONTROL_GUARDIAN_PETS] = sConfigMgr->GetBoolDefault("Player.ControlGuardianPets", true);
 
-	m_bool_configs[CONFIG_PLAYER_UNLIMITED_LEGION_LEGENDARIES] = sConfigMgr->GetBoolDefault("Player.UnlimitedLegionLegendaries", true);
+	m_bool_configs[CONFIG_PLAYER_UNLIMITED_LEGION_LEGENDARIES] = sConfigMgr->GetBoolDefault("Player.UnlimitedLegionLegendaries", false);
 	m_int_configs[CONFIG_PLAYER_LEGION_LEGENDARY_EQUIP_COUNT] = sConfigMgr->GetIntDefault("Player.LegionLegendaryEquipCount", 0);
 	m_bool_configs[CONFIG_PLAYER_ALLOW_PVP_TALENTS_ALL_THE_TIME] = sConfigMgr->GetBoolDefault("Player.AllowPVPTalentsAllTheTime", false);
 
