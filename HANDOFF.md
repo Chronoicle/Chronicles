@@ -4,7 +4,7 @@ Last updated: 2026-09-26 ~15:30 UTC by Claude.
 
 ## Current state
 
-**Staged, not live (restart needed, ask the owner):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo (d. commit after 26f717c), Hasabel trash SQL (#29). All built and installed, deploy lock released.
+**Staged, not live (restart needed, ask the owner):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo 7aef6a1, Hasabel trash SQL (#29). All built and installed, deploy lock released.
 
 **17:07 UTC crash** (SIGSEGV in HandleAuraOverrideSpells, old build) → the loop restarted on the new build, so everything staged up to 9b68fd0 is LIVE (#24, #32, #15, #16, #31, #30 Paraxis + server.eonar logs). Changelog posted, issues commented + labelled live. **Crash fix 0e21884 is built + installed but NOT live: needs a restart (ask the owner).**
 
