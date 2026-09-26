@@ -9,6 +9,8 @@ Last updated: 2026-09-26 ~20:00 UTC by Claude (Project thread). Previously: ~19:
 
 ## Current state
 
+- **Codex, Refs #18:** entrance Wrangler yell now triggers once for the first nearby non-GM player, with retries on the existing 2-second instance tick; no full-group/leader requirement. Pathless Crusher 14507329 uses stationary fallback (SQL applied; backup/fix/undo `~/backup_eoa_18.sql`, `~/fix_eoa_18.sql`, `~/undo_eoa_18.sql`). Build and install passed (`~/build_eoa_18.log`, `~/install_eoa_18.log`); staged, not live, waiting for owner-approved restart. Arcanist path 9717100 is absent and unreferenced in creature_addon and creature_template_addon; no creature 97171 spawn exists. That report needs a current spawn/location or reliable route data; no guessed route added. Test solo/partial-group entry, delayed grid loading, no repeated yell, and Crusher behavior.
+
 
 - Previously deployed changes are live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.

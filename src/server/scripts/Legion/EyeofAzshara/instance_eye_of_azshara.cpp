@@ -2,7 +2,6 @@
     Dungeon : Eye of Azshara 100-110
 */
 
-#include "Group.h"
 #include "eye_of_azshara.h"
 
 Position const azsharaPos = { -3485.11f, 4386.22f, -5.58f };
@@ -62,7 +61,6 @@ public:
         uint32 CheckBossTimer = 0;
         uint32 WindsTimer = 0;
         uint32 WindsDisableTimer = 0;
-        uint32 PlayerCount = 0;
         uint32 StormTimer = 0;
         uint32 TempestTimer = 0;
 
@@ -224,19 +222,6 @@ public:
 
         void OnPlayerEnter(Player* player) override
         {
-            if (!StartEvent)
-            {
-                if (++PlayerCount == 5)
-                {
-                    StartEvent = true;
-
-                    if (Group *g = player->GetGroup())
-                        if (Player* leader = ObjectAccessor::GetPlayer(*player, g->GetLeaderGUID()))
-                            if (Creature* target = leader->FindNearestCreature(100216, 50.0f, true))
-                                target->AI()->Talk(0);
-                }
-            }
-
             ChangeWeather();
         }
 
@@ -353,6 +338,14 @@ public:
             {
                 instance->ApplyOnEveryPlayer([&](Player* player)
                 {
+                    // Retry after entrance creatures load; solo and partial groups count too.
+                    if (!StartEvent && !player->isGameMaster())
+                        if (Creature* target = player->FindNearestCreature(100216, 50.0f, true))
+                        {
+                            target->AI()->Talk(0);
+                            StartEvent = true;
+                        }
+
                     if (player->GetCurrentAreaID() == 8083)
                     {
                         if (!player->GetMap()->IsOutdoors(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ()))
