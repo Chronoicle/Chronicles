@@ -1215,7 +1215,9 @@ uint32 Unit::DealDamage(Unit* victim, uint32 damage, CleanDamage const* cleanDam
         if (victim->IsPlayer())
             victim->ToPlayer()->UpdateAchievementCriteria(CRITERIA_TYPE_TOTAL_DAMAGE_RECEIVED, damage);
 
-        victim->ModifyHealth(-static_cast<int32>(damage), this);
+        // damage and the kill check above are in real health units: passing `this` would subtract it from the
+        // attacker-scaled health, which could reach 0 without Kill() (dead-looking creatures that keep fighting, #13)
+        victim->ModifyHealth(-static_cast<int32>(damage));
 
         if (damagetype == DIRECT_DAMAGE || damagetype == SPELL_DIRECT_DAMAGE)
             victim->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_DIRECT_DAMAGE, spellProto ? spellProto->Id : 0, spellProto ? spellProto->Id : 0);

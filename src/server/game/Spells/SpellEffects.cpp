@@ -411,7 +411,7 @@ void Spell::EffectInstaKill(SpellEffIndex /*effIndex*/)
     data.SpellID = m_spellInfo->Id;
     m_caster->SendMessageToSet(data.Write(), true);
 
-    m_caster->DealDamage(unitTarget, unitTarget->GetHealth(m_caster), nullptr, NODAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
+    m_caster->DealDamage(unitTarget, unitTarget->GetHealth(), nullptr, NODAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
 
     if ((m_caster->IsPlayer() || m_caster->isPet()) && unitTarget->ToCreature() && unitTarget->ToCreature()->isWorldBoss())
         sLog->outWarden("Caster Unit %s (GUID: %u) casts SPELL_EFFECT_INSTAKILL(spellId: %u) to target unit %s (Entry: %u Guid: %u).",
