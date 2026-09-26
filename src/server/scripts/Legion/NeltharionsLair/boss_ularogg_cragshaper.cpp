@@ -58,12 +58,26 @@ enum eEvents
 //91004
 struct boss_ularogg_cragshaper : public BossAI
 {
-    boss_ularogg_cragshaper(Creature* creature) : BossAI(creature, DATA_ULAROGG) {}
+    boss_ularogg_cragshaper(Creature* creature) : BossAI(creature, DATA_ULAROGG), platformHome(creature->GetHomePosition()) {}
 
     std::map<uint32, std::list<ObjectGuid>> listGuid;
     ObjectGuid stanceGUID;
     bool intro = true;
     bool firstIdolSummoned = false; // the jump casts the first summon on landing
+    Position platformHome;
+    std::vector<Position> freeCircles;
+    uint32 lastShuffleHit = 0;
+
+    // The pull moves his home to the room centre; on a wipe he goes back up to his platform and jumps down again next pull (#13)
+    void EnterEvadeMode() override
+    {
+        if (!intro)
+        {
+            intro = true;
+            me->SetHomePosition(platformHome);
+        }
+        BossAI::EnterEvadeMode();
+    }
 
     void Reset() override
     {
@@ -134,9 +148,18 @@ struct boss_ularogg_cragshaper : public BossAI
         {
             case SPELL_STANCE_MOUNTAIN_FILTER:
             {
-                Position pos;
-                pos = me->GetRandomNearPosition(30.0f);
-                target->CastSpell(pos, SPELL_STANCE_MOUNTAIN_MOVE, true);
+                // Shuffle the idols over the floor circles: the centre (jump target) and the four summon spots from
+                // spell_target_position, one idol per circle per tick. Was a random point anywhere within 30 yd (#13).
+                if (getMSTimeDiff(lastShuffleHit, getMSTime()) > 1000 || freeCircles.empty())
+                {
+                    freeCircles = {
+                        { 2838.15f, 1667.87f, -40.82f }, { 2842.44f, 1660.35f, -40.83f }, { 2834.18f, 1677.19f, -40.82f },
+                        { 2831.69f, 1665.48f, -40.70f }, { 2844.77f, 1672.62f, -40.84f } };
+                    Trinity::Containers::RandomShuffle(freeCircles);
+                }
+                lastShuffleHit = getMSTime();
+                target->CastSpell(freeCircles.back(), SPELL_STANCE_MOUNTAIN_MOVE, true);
+                freeCircles.pop_back();
                 break;
             }
             case SPELL_STRIKE_MOUNTAIN_2:
