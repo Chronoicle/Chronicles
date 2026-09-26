@@ -1447,7 +1447,7 @@ void World::LoadConfigSettings(bool reload)
     m_serverTimeTZ = sConfigMgr->GetStringDefault("ServerTimeTZ", "Europe/Paris");// == number of seconds elapsed since 00:00 hours, Jan 1, 1970 UTC
     m_gameTimeTZ = sConfigMgr->GetStringDefault("GameTimeTZ", "Europe/Paris"); // == number of seconds elapsed since 00:00 hours, Jan 1, 1970 UTC
 
-    m_int_configs[CONFIG_MAX_PRESTIGE_LEVEL]  = sConfigMgr->GetIntDefault("MaxPrestigeLevel", 14);
+    m_int_configs[CONFIG_MAX_PRESTIGE_LEVEL]  = sConfigMgr->GetIntDefault("MaxPrestigeLevel", 25); // 7.3.5: PrestigeLevelInfo.db2 has levels 1-25 enabled
 
     m_int_configs[CONFIG_SIZE_CELL_FOR_PULL]  = sConfigMgr->GetIntDefault("SizeCellForPull", 8);
 
