@@ -5,6 +5,7 @@
 */
 
 #include "neltharions_lair.h"
+#include "MoveSplineInit.h"
 
 enum Says
 {
@@ -55,6 +56,8 @@ struct boss_rokmora : public BossAI
     }
 
     bool introDone = false;
+    bool introPrepared = false; // Ularogg + Navarrogg summoned and Rokmora submerged before the roleplay
+    ObjectGuid navarroggGuid, ularoggGuid;
 
     void Reset() override
     {
@@ -90,12 +93,25 @@ struct boss_rokmora : public BossAI
         if (!who->IsPlayer())
             return;
 
-        if (!introDone && me->IsWithinDistInMap(who, 40.0f))
+        // players saw him standing, then "snap into the ground and jump out", and the NPCs pop in: prepare earlier
+        if (!introPrepared && me->IsWithinDistInMap(who, 120.0f))
+        {
+            introPrepared = true;
+            if (auto navarrogg = me->SummonCreature(NPC_NAVARROGG_INTRO, 2917.32f, 1402.29f, -2.28f, 2.744620f, TEMPSUMMON_MANUAL_DESPAWN))
+                navarroggGuid = navarrogg->GetGUID();
+            if (auto ularogg = me->SummonCreature(NPC_ULAROGG_INTRO, 2900.33f, 1410.06f, -2.32f, 4.05f, TEMPSUMMON_MANUAL_DESPAWN))
+            {
+                ularoggGuid = ularogg->GetGUID();
+                ularogg->CastSpell(me, SPELL_INTRO_ULAROGG, true); // channel keeps Rokmora submerged
+            }
+        }
+
+        if (introPrepared && !introDone && me->IsWithinDistInMap(who, 40.0f))
         {
             introDone = true;
-            me->SummonCreature(NPC_NAVARROGG_INTRO, 2917.32f, 1402.29f, -2.28f, 2.744620f, TEMPSUMMON_TIMED_DESPAWN, 22000);
-            if (auto ularogg = me->SummonCreature(NPC_ULAROGG_INTRO, 2900.33f, 1410.06f, -2.32f, 4.05f, TEMPSUMMON_TIMED_DESPAWN, 22000))
-                ularogg->CastSpell(me, SPELL_INTRO_ULAROGG, true);
+            for (ObjectGuid guid : { navarroggGuid, ularoggGuid })
+                if (Creature* npc = ObjectAccessor::GetCreature(*me, guid))
+                    npc->DespawnOrUnsummon(22000);
 
             DoCast(me, 209374, true); //Convers
             DoCast(SPELL_INTRO_EMERGE);
@@ -107,6 +123,7 @@ struct boss_rokmora : public BossAI
         switch (spell->Id)
         {
             case SPELL_INTRO_EMERGE:
+                me->RemoveAurasDueToSpell(SPELL_INTRO_ULAROGG);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
                 break;
             case SPELL_RAZOR_SHARDS:
@@ -469,8 +486,25 @@ class spell_entrance_run_plr_move : public AuraScript
     {
         if (auto player = GetTarget()->ToPlayer())
         {
+            // path 20988800 (waypoint_data_script) as one smooth spline; its last point removed this aura (script 355)
+            static G3D::Vector3 const slide[] =
+            {
+                {2943.40f, 1010.11f, 343.522f}, {2956.19f, 1018.27f, 316.195f}, {2983.23f, 1033.45f, 301.663f},
+                {2985.90f, 1076.84f, 278.952f}, {2956.15f, 1099.25f, 259.601f}, {2937.74f, 1097.90f, 252.335f},
+                {2916.27f, 1078.37f, 239.762f}, {2903.84f, 1067.64f, 231.167f}, {2895.06f, 1072.93f, 225.513f},
+                {2882.42f, 1084.06f, 162.314f}, {2870.38f, 1101.64f, 101.272f}
+            };
+            Movement::PointsArray path;
+            path.push_back(G3D::Vector3(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ())); // replaced by the real start
+            path.insert(path.end(), std::begin(slide), std::end(slide));
             player->GetMotionMaster()->MoveIdle();
-            player->GetMotionMaster()->MovePath(20988800, false);
+            Movement::MoveSplineInit init(*player);
+            init.MovebyPath(path);
+            init.SetSmooth();
+            init.SetUncompressed();
+            init.SetVelocity(30.0f);
+            int32 duration = init.Launch();
+            player->AddDelayedEvent(uint64(std::max(duration, 0) + 200), [player] { player->RemoveAurasDueToSpell(209888); });
         }
     }
 
