@@ -14,13 +14,11 @@ Last updated: 2026-09-26 ~19:30 UTC by Claude (Project thread).
 - **Staged by Codex, Refs #21:** Black Rook Hold Soul Echoes array bounds, Scavenger potion reset, Dantalionax death dialogue, and Felspite Dominator SmartAI link. Build and install passed; SQL applied, waiting for owner-approved restart. Not live. Backup `~/backup_brh_21.sql`, fix `~/fix_brh_21.sql`, undo `~/undo_brh_21.sql`. Logs: `~/build_brh_21.log`, `~/install_brh_21.log`. Test Soul Echoes animations, Scavenger wipe/re-pull below 66%, boss death line and Dominator casts in game.
 - Previously deployed changes are live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
-- **Open pull request (branch `claude/project-thread-3qur8k`) for #34 and #35**, not merged or built yet:
-  - #34 Tirathon Saltheril now stands still while casting (script-only: `CastAndHold` focuses the current target so the chase stops until Spell::finish releases it).
-  - #35 legendary limit: `Player.UnlimitedLegionLegendaries` default is now 0 (code + conf.dist). **The server session must also set `Player.UnlimitedLegionLegendaries = 0` in `~/legion/etc/worldserver.conf`** (make install only replaces the .dist; the live conf probably still says 1). Players already wearing 3+ legendaries keep them until they unequip.
+- **Staged by Claude (desktop session), PR #38 merged (3781e4d) + 936195d, Refs #34/#35:** Tirathon stands still while casting (#34); legendary limit back to retail (#35): 1, 2 with the tier 6 class hall talent. Built + installed 19:31 UTC (`~/build_38.log`, `~/install_38.log`). Live `worldserver.conf` set to `Player.UnlimitedLegionLegendaries = 0` (backup `~/legion/etc/worldserver.conf.bak_legendaries_20260926`). Waiting for owner-approved restart, together with Codex #21/#23. Players already wearing 2+ keep them until they unequip one.
 
 ## Open work
 
-1. **#34, #35:** staged in the open PR above (agent:claude).
+1. **#34, #35:** staged, see above (agent:claude).
 2. **Antorus (xinkeg, approved):** #29 still open for the 60%/30% adds (activation spells 257941/257942 need their gateway NPCs 122543/122558; test with logging) and the other Hasabel points. #25 Felhounds, #26 platform, #28 High Command, #30 Eonar Surge of Life (after a test: `grep server.eonar ~/legion/logs/Server.log`, then remove the temporary logs).
 3. **#27** trinkets out of combat: waiting for a retail source (needs-info).
 4. **Neltharion's Lair #13:** one-shot/death-state behavior on Vileshard Crawler 96247, Blightshard Shaper 90998 and Tarspitter Lurker 91001, and trash placement after Naraxas. James's DK screenshots are in report 1553289525655109654. Avoid a broad core death-state guard without stronger evidence.
