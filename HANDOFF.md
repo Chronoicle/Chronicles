@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~21:40 UTC by Claude (desktop session). Previously: ~21:05 UTC by Claude (desktop session).
+Last updated: 2026-09-26 ~22:20 UTC by Claude (desktop session). Previously: ~21:40 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,6 +9,9 @@ Last updated: 2026-09-26 ~21:40 UTC by Claude (desktop session). Previously: ~21
 
 ## Current state
 
+- **Staged, NOT live (built + installed ~22:15 UTC, waiting for the owner's restart OK), worldserver 45fa71a:** #28 2726233 Legion Cruiser no longer falls into the arena (gravity disabled on summon), officer rotation uses the encounter state instead of the officer's own combat state + temporary `server.antoran` logs; #29 temporary `server.antorus` logs (portal thresholds, activation hits, Collapsing World cast results); #39 45fa71a Glayvianna waits for her cast (Metamorphosis not lost), Fel Seed fires. **Already applied in the DB (live at restart):** #39 affe7ba SmartAI for Mendacius 99649 / Grimhorn 102566 + Illianna turned (fix/undo `~/fix_votw_mythic_39.sql`). **Conf:** `Appender.Server=2,2,1,Server.log,a` (Server.log now appends with timestamps; backup `~/legion/etc/worldserver.conf.bak_serverlog_20260926`). After the restart: grep `server.antoran` / `server.antorus` in Server.log after someone tests, then remove the temporary logs.
+- **Website (live, no restart needed):** #10 character pages show gear via Wowhead links (pages/character.php, backup `~/backup_character_php_20260926.php`).
+- **#12 blocked:** the auto-mode safety check refused copying the website source into the repo; staging removed, needs the owner.
 - **Live since the restart at 21:34 UTC (owner OK), worldserver 363373c:** #30 60d790f core fix so JUMP_DEST landing spells run (EffectMovementGenerator cast on a null target failed; Surge of Life glide + Dive Down and 515 other jump spells, **watch for doubled landing effects**), Antorus event objects one-shot per instance (statue trigger 805 was dead server-wide after the first trigger), statue visual always plays, temporary `server.eonar` logs removed; #30 363373c no reset after the Paraxis Inquisitor dies (controller now counts all living players in area 9333 / the ship box, not its threat list); #25 82ca524 Felhounds mark swap at 50% keeps the new marks, Enflamed 244471 / Siphon 244578 apply marks 248815 / 248819. Changelog 1553520116816285859, Live comments + labels, xinkeg told. Open: #30 which crystal beams are missing (asked), 4b/4c unverified; #25 Decay / Consuming Sphere / Desolate Path need an in-game look.
 - **#26:** xinkeg says the platform "no longer takes me up" since "our change", but nothing was changed (no commit/SQL/core); asked what they see and whether Clobex 127732 + 2 Felblade Shocktroopers 127725 are dead (the platform is phased out until then). **High priority once they answer** (blocks the raid).
 - **Owner rule since ~21:10 UTC: ask before every restart.**
