@@ -1,9 +1,7 @@
 name: GCC
 
+# Only pull requests (Cursor): server pushes are built on the server itself.
 on:
-  push:
-    branches:
-      - main
   pull_request:
 
 jobs:
