@@ -341,6 +341,7 @@ struct boss_antoran_high_command : BossAI
 
                 auto newCommand = Creature::GetCreature(*me, commandVector[phase]);
                 auto newCapsule = Creature::GetCreature(*me, commandVector[phase + 3]);
+                TC_LOG_INFO("server.antoran", "High Command: switch to stage %u (officer %s, pod %s)", phase, newCommand ? "found" : "MISSING", newCapsule ? "found" : "MISSING"); // ponytail: temporary, #28
 
                 if (newCommand && newCapsule)
                 {
@@ -578,12 +579,16 @@ struct boss_antoran_high_command_generic : ScriptedAI
 
     void OnApplyOrRemoveAura(uint32 spellId, AuraRemoveMode mode, bool apply) override
     {
-        if (!me->isInCombat() || apply || mode != AURA_REMOVE_BY_EXPIRE)
+        // Encounter state, not this officer's own combat: an officer who spent a rotation invisible and unattackable
+        // in his pod can be out of combat when he comes back, and then his energy running out never handed over
+        // command (rotation stopped after Erodus, #28)
+        if (apply || mode != AURA_REMOVE_BY_EXPIRE || instance->GetBossState(DATA_ANTORAN) != IN_PROGRESS)
             return;
 
         switch (spellId)
         {
             case SPELL_ENERGY_FILL:
+                TC_LOG_INFO("server.antoran", "High Command: %u energy full (in combat %u), assuming command", me->GetEntry(), me->isInCombat()); // ponytail: temporary, #28
                 events.Reset();
                 me->StopAttack(false, true);
                 me->CastSpell(me, SPELL_ASSUME_COMMAND);
@@ -951,6 +956,9 @@ struct npc_command_legion_cruiser : ScriptedAI
 
     void IsSummonedBy(Unit* summoner) override
     {
+        // It is summoned ~108 yd above the arena; its movement template only allows flight (CanFly) without
+        // disabling gravity, so the client dropped the ship onto the players (#28)
+        me->SetDisableGravity(true);
         zeroingTimer = 14000;
         me->CastSpell(me, SPELL_CRUISER_FUSILLADE);
     }

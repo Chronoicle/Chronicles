@@ -277,6 +277,9 @@ struct boss_hasabel : BossAI
 
     void SpellHitTarget(Unit* target, SpellInfo const* spellInfo) override
     {
+        if (spellInfo->Id == SPELL_ACTIVATE_XOROTH || spellInfo->Id == SPELL_ACTIVATE_RANCORA || spellInfo->Id == SPELL_ACTIVATE_NATHREZA)
+            TC_LOG_INFO("server.antorus", "Hasabel: activate spell %u hit %u", spellInfo->Id, target->GetEntry()); // ponytail: temporary, #29
+
         switch (spellInfo->Id)
         {
             case SPELL_ACTIVATE_XOROTH:
@@ -324,7 +327,7 @@ struct boss_hasabel : BossAI
                 healthPct = 61;
                 Talk(SAY_OPEN_PORTAL_XOROTH);
                 Talk(SAY_WARN_OPEN_PORTAL_XOROTH);
-                me->CastSpell(me, SPELL_ACTIVATE_XOROTH, true);
+                { SpellCastResult res = me->CastSpell(me, SPELL_ACTIVATE_XOROTH, true); TC_LOG_INFO("server.antorus", "Hasabel: portal XOROTH at %.1f%% health, activate result %u", me->GetHealthPct(), uint32(res)); } // ponytail: temporary, #29
                 events.RescheduleEvent(EVENT_TRANSPORT_PORTAL, 2000);
             }
             else if (healthPct == 61)
@@ -332,14 +335,14 @@ struct boss_hasabel : BossAI
                 healthPct = 31;
                 Talk(SAY_OPEN_PORTAL_RANCORA);
                 Talk(SAY_WARN_OPEN_PORTAL_RANCORA);
-                me->CastSpell(me, SPELL_ACTIVATE_RANCORA, true);
+                { SpellCastResult res = me->CastSpell(me, SPELL_ACTIVATE_RANCORA, true); TC_LOG_INFO("server.antorus", "Hasabel: portal RANCORA at %.1f%% health, activate result %u", me->GetHealthPct(), uint32(res)); } // ponytail: temporary, #29
             }
             else if (healthPct == 31)
             {
                 healthPct = 0;
                 Talk(SAY_OPEN_PORTAL_NATHREZA);
                 Talk(SAY_WARN_OPEN_PORTAL_NATHREZA);
-                me->CastSpell(me, SPELL_ACTIVATE_NATHREZA, true);
+                { SpellCastResult res = me->CastSpell(me, SPELL_ACTIVATE_NATHREZA, true); TC_LOG_INFO("server.antorus", "Hasabel: portal NATHREZA at %.1f%% health, activate result %u", me->GetHealthPct(), uint32(res)); } // ponytail: temporary, #29
             }
         }
     }
@@ -1235,7 +1238,8 @@ class spell_hasabel_energize : public AuraScript
         else if (!caster->HasUnitState(UNIT_STATE_CASTING) && !caster->AI()->GetData(DATA_COLLAPSING_DELAY))
         {
             powerTick = 3;
-            caster->CastSpell(caster, SPELL_COLLAPSING_WORLD, false);
+            SpellCastResult res = caster->CastSpell(caster, SPELL_COLLAPSING_WORLD, false);
+            TC_LOG_INFO("server.antorus", "Hasabel: 100 energy, Collapsing World cast result %u", uint32(res)); // ponytail: temporary, #29
             if (auto hasabel = caster->ToCreature())
                 hasabel->AI()->Talk(SAY_COLLAPSING_WORLD);
         }
