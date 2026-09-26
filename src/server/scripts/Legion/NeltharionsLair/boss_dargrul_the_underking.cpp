@@ -22,6 +22,7 @@ enum Spells
     SPELL_LANDSLIDE                 = 200700,
     SPELL_LANDSLIDE_MISSILE         = 200722,
     SPELL_CRYSTAL_WALL              = 200551,
+    SPELL_CRYSTAL_SPIKES_SUMMON     = 200338,
     SPELL_MAGMA_WAVE                = 200404,
     SPELL_MAGMA_WAVE_AT             = 200418,
     SPELL_MAGMA_WAVE_DMG_AOE        = 217090,
@@ -127,6 +128,12 @@ struct boss_dargrul_the_underking : public BossAI
                 me->CastSpell(pos, SPELL_LANDSLIDE_MISSILE, true);
             }
         }
+    }
+
+    void SpellFinishCast(SpellInfo const* spell) override
+    {
+        if (spell->Id == SPELL_CRYSTAL_WALL)
+            me->CastSpell(static_cast<Unit*>(nullptr), SPELL_CRYSTAL_SPIKES_SUMMON, false);
     }
 
     void DoAction(int32 const action) override
