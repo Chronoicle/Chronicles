@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-26
 
+- Claude (desktop session) — restart 21:34 UTC (owner OK), worldserver 363373c: core fix so jump-to-location landing spells run (60d790f, all JUMP_DEST spells); #30 Surge of Life glide, Antorus event triggers per instance + statue visual (60d790f), no reset after the Paraxis Inquisitor (363373c); #25 Felhounds mark swap + Enflamed/Siphon marks (82ca524) — live, changelog 1553520116816285859 — `git revert` the commits.
 - Claude (desktop session) — restart 21:00 UTC (owner OK), worldserver fc5af4b: core fix for creatures at 0 health that kept fighting (a34f340, all dungeons); #13 Hulks Piercing Shards + Fixate chase (4151cf7, core Spell.cpp focus), Ularogg reset/idols (81608bb), Rokmora/Naraxas intros (5fdbdc9), barrel ride (fc5af4b) — live, changelog 1553511610889404507 — `git revert` the commits.
 - Claude (desktop session) — restart 20:41 UTC (owner OK), worldserver 7ca8ea4 (Codex): #18 Eye of Azshara Wrangler yell for solo/partial groups, pathless Crusher 14507329 stationary — live, changelog 1553507051139768341 — `git revert 7ca8ea4`, `~/undo_eoa_18.sql`.
 - Claude (desktop session) — restart 20:26 UTC (owner OK), worldserver b1600a1 (PR #42) + 73f1b53: #41 Call to the Void tendrils deal damage, max 3; Acrid Catalyst Injector procs (missing script binding added); #39 VotW bosses immune to CC — live, changelog 1553504519290355794 — `git revert` the commits, `~/undo_acrid_catalyst_injector.sql`, `~/undo_votw_boss_immunities.sql`.
