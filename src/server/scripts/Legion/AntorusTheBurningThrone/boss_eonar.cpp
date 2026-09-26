@@ -611,7 +611,7 @@ struct npc_eonar_the_paraxis : public ScriptedAI
         {
             if (auto player = Player::GetPlayer(*me, ref->getUnitGuid()))
             {
-                if (player->IsAlive() && player->GetCurrentAreaID() == 9333)
+                if (player->IsAlive() && (player->GetCurrentAreaID() == 9333 || player->IsWithinBox({ -4206.80f, -10700.2f, 728.27f }, 100.0f, 100.0f, 20.0f)))
                 {
                     if (player->GetPositionZ() < 672.0f)
                     {
@@ -1784,7 +1784,7 @@ class spell_eonar_paraxis_teleport : public SpellScript
         if (!GetCaster())
             return;
 
-        Position pos;
+        Position pos = teleportPos[4];
         float dist = 15.0f;
 
         for (uint8 i = 0; i < 4; ++i)
@@ -1816,6 +1816,7 @@ class spell_eonar_surge_of_life : public SpellScript
 
         Position pos = {GetCaster()->GetPositionX(), GetCaster()->GetPositionY(), GetCaster()->GetPositionZ() + 50.0f, GetCaster()->GetOrientation()};
         GetHitDest()->Relocate(pos);
+        TC_LOG_INFO("server.eonar", "Surge of Life: %s jumps to z %.1f", GetCaster()->GetName(), pos.GetPositionZ()); // ponytail: temporary, issue #30
     }
 
     void Register()

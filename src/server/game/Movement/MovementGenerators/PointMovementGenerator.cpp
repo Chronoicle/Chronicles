@@ -169,7 +169,11 @@ void EffectMovementGenerator::Finalize(Unit& owner)
 void EffectMovementGenerator::MovementInform(Unit& owner)
 {
     if (_arrivalSpellId)
+    {
+        if (owner.IsPlayer()) // ponytail: temporary diagnostics for issue #30, remove once Surge of Life works
+            TC_LOG_INFO("server.eonar", "jump arrival: player %s casts %u (jump spell %u)", owner.GetName(), _arrivalSpellId, _pointId);
         owner.CastSpell(ObjectAccessor::GetUnit(owner, _arrivalSpellTargetGuid), _arrivalSpellId, true);
+    }
 
     if (Creature* creature = owner.ToCreature())
         if (creature->AI())
