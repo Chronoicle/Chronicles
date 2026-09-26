@@ -170,9 +170,11 @@ void EffectMovementGenerator::MovementInform(Unit& owner)
 {
     if (_arrivalSpellId)
     {
-        if (owner.IsPlayer()) // ponytail: temporary diagnostics for issue #30, remove once Surge of Life works
-            TC_LOG_INFO("server.eonar", "jump arrival: player %s casts %u (jump spell %u)", owner.GetName(), _arrivalSpellId, _pointId);
-        owner.CastSpell(ObjectAccessor::GetUnit(owner, _arrivalSpellTargetGuid), _arrivalSpellId, true);
+        // EffectJumpDest leaves the target empty when the arrival spell is the effect's own TriggerSpell, and
+        // CastSpell(nullptr) fails outright, so those arrival spells never ran (Surge of Life's glide, #30)
+        Unit* target = _arrivalSpellTargetGuid.IsEmpty() ? &owner : ObjectAccessor::GetUnit(owner, _arrivalSpellTargetGuid);
+        if (target)
+            owner.CastSpell(target, _arrivalSpellId, true);
     }
 
     if (Creature* creature = owner.ToCreature())

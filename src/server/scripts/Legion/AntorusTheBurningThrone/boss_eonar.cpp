@@ -1816,7 +1816,6 @@ class spell_eonar_surge_of_life : public SpellScript
 
         Position pos = {GetCaster()->GetPositionX(), GetCaster()->GetPositionY(), GetCaster()->GetPositionZ() + 50.0f, GetCaster()->GetOrientation()};
         GetHitDest()->Relocate(pos);
-        TC_LOG_INFO("server.eonar", "Surge of Life: %s jumps to z %.1f", GetCaster()->GetName(), pos.GetPositionZ()); // ponytail: temporary, issue #30
     }
 
     void Register()

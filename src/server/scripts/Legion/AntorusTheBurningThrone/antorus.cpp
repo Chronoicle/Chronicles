@@ -368,18 +368,23 @@ class eventobject_antorus_into : public EventObjectScript
 public:
     eventobject_antorus_into() : EventObjectScript("eventobject_antorus_into") {}
 
-    bool eventDone = false;
+    // One-shot state per instance and event object. This used to be a single bool on the script, which exists once
+    // for the whole server: the first trigger anywhere disabled every later one, including the repeatable Surge of
+    // Life statues (805), until a restart (#30).
+    // ponytail: never pruned, a few entries per Antorus run; clear on instance unload if it ever matters
+    std::set<std::pair<uint32, ObjectGuid>> doneEvents;
 
     bool OnTrigger(Player* player, EventObject* eo, bool enter) override
     {
         if (!enter)
             return true;
 
-        if (eventDone)
-            return true;
-
+        std::pair<uint32, ObjectGuid> const key(player->GetInstanceId(), eo->GetGUID());
         if (eo->GetEntry() != 805 && eo->GetEntry() != 815 && eo->GetEntry() != 816)
-            eventDone = true;
+        {
+            if (!doneEvents.insert(key).second)
+                return true;
+        }
 
         InstanceScript* instance = player->GetInstanceScript();
         if (!instance)
@@ -411,7 +416,7 @@ public:
         case 803:
             if (instance->GetBossState(DATA_HASABEL) != DONE)
             {
-                eventDone = false;
+                doneEvents.erase(key);
                 return false;
             }
             eo->SummonCreature(NPC_IMAGE_OF_EONAR, eo->GetPosition(), TEMPSUMMON_TIMED_DESPAWN, 21000);
@@ -424,14 +429,15 @@ public:
             }
             break;
         case 805:
-            if (!player->HasAura(SPELL_SURGE_OF_LIFE_OVERRIDE))
-            {
-                std::list<Creature*> mobs;
-                player->GetCreatureListWithEntryInGrid(mobs, 127681, 30.0f);
-                for (auto& npc : mobs)
-                    npc->CastSpell(player, SPELL_BLESSING_LIFEBINDER_VISUAL, true);
-            }
+        {
+            // statues at the doorway: the instance's area check usually grants the button before this trigger,
+            // so don't skip the visual when the player already has it (#30)
+            std::list<Creature*> mobs;
+            player->GetCreatureListWithEntryInGrid(mobs, 127681, 30.0f);
+            for (auto& npc : mobs)
+                npc->CastSpell(player, SPELL_BLESSING_LIFEBINDER_VISUAL, true);
             break;
+        }
         case 806:
             player->AddDelayedEvent(1000, [player]() -> void
             {
