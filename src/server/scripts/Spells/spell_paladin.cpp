@@ -894,7 +894,13 @@ class spell_pal_divine_intervention : public SpellScriptLoader
                     uint32 triggerFlags = TRIGGERED_FULL_MASK;
                     triggerFlags &= ~TRIGGERED_IGNORE_SPELL_AND_CATEGORY_CD;
 
-                    target->CastSpell(target, 642, TriggerCastFlags(triggerFlags));
+                    // Only save the paladin when Divine Shield really goes off: the cooldown check above missed its cooldown
+                    // in some cases, and the absorb happened even though the cast failed (owner report 2026-09-27)
+                    SpellCastResult res = target->CastSpell(target, 642, TriggerCastFlags(triggerFlags));
+                    TC_LOG_INFO("server.paladin", "Divine Intervention on %s: Divine Shield cooldown %.1f s left, cast result %u", target->GetName(), target->ToPlayer()->GetSpellCooldownDelay(642), uint32(res)); // ponytail: temporary, owner report 2026-09-27
+                    if (res != SPELL_CAST_OK)
+                        return;
+
                     uint32 health20 = target->CountPctFromMaxHealth(GetSpellInfo()->Effects[EFFECT_1]->CalcValue(target));
 
                     // hp > 20% - absorb hp till 20%
