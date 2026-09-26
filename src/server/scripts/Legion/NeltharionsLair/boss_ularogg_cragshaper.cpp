@@ -5,6 +5,7 @@
 */
 
 #include "neltharions_lair.h"
+#include "MoveSplineInit.h"
 
 enum Says
 {
@@ -473,8 +474,30 @@ class spell_barrel_ride_plr_move : public AuraScript
     {
         if (Player* player = GetTarget()->ToPlayer())
         {
+            // path 9100400 (waypoint_data_script, speed 25) as one smooth spline like the entrance slide: point by point
+            // it was snappy (#13). Its last point removed this aura (waypoint script 335).
+            static G3D::Vector3 const ride[] =
+            {
+                {2820.56f, 1325.45f, -4.546f}, {2802.25f, 1316.70f, -4.298f}, {2795.72f, 1301.30f, -4.298f},
+                {2778.16f, 1288.85f, -4.324f}, {2768.90f, 1267.93f, -4.298f}, {2744.28f, 1259.70f, -4.781f},
+                {2735.45f, 1246.16f, -4.783f}, {2717.75f, 1251.40f, -4.783f}, {2695.62f, 1251.58f, -4.783f},
+                {2677.29f, 1259.60f, -4.782f}, {2660.60f, 1268.23f, -4.782f}, {2655.97f, 1281.47f, -4.782f},
+                {2642.57f, 1294.07f, -4.783f}, {2635.10f, 1313.17f, -4.783f}, {2625.24f, 1329.53f, -4.783f},
+                {2622.05f, 1348.13f, -4.783f}, {2614.58f, 1355.12f, -4.783f}, {2605.50f, 1377.67f, -4.783f},
+                {2595.58f, 1381.25f, -4.783f}, {2575.87f, 1396.24f, -4.783f}, {2556.38f, 1397.96f, -4.783f},
+                {2545.27f, 1408.56f, -4.783f}, {2549.71f, 1449.33f, -51.0f}
+            };
+            Movement::PointsArray path;
+            path.push_back(G3D::Vector3(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ())); // replaced by the real start
+            path.insert(path.end(), std::begin(ride), std::end(ride));
             player->GetMotionMaster()->MoveIdle();
-            player->GetMotionMaster()->MovePath(9100400, false);
+            Movement::MoveSplineInit init(*player);
+            init.MovebyPath(path);
+            init.SetSmooth();
+            init.SetUncompressed();
+            init.SetVelocity(25.0f);
+            int32 duration = init.Launch();
+            player->AddDelayedEvent(uint64(std::max(duration, 0) + 200), [player] { player->RemoveAurasDueToSpell(183213); });
         }
     }
 
