@@ -58,7 +58,6 @@ public:
 
         bool StartEvent = false;
         bool StormActive = false;
-        uint8 NagasCount = 0;
         uint16 shelterTimer = 0;
         uint32 CheckBossTimer = 0;
         uint32 WindsTimer = 0;
@@ -89,10 +88,16 @@ public:
                     SerpentrixGUID = creature->GetGUID();
                     break;
                 case NPC_MYSTIC_SSAVEH:
+                    NagasContainerGUID[0] = creature->GetGUID();
+                    break;
                 case NPC_RITUALIST_LESHA:
+                    NagasContainerGUID[1] = creature->GetGUID();
+                    break;
                 case NPC_CHANNELER_VARISZ:
+                    NagasContainerGUID[2] = creature->GetGUID();
+                    break;
                 case NPC_BINDER_ASHIOI:
-                    NagasContainerGUID[NagasCount++] = creature->GetGUID();
+                    NagasContainerGUID[3] = creature->GetGUID();
                     break;
             }
         }
@@ -176,10 +181,12 @@ public:
                 if (GetBossState(i) == DONE)
                     ++bossDiedCount;
 
-            if (!WindsTimer && bossDiedCount >= 2)
+            bool wrathDone = GetBossState(DATA_WRATH_OF_AZSHARA) == DONE;
+
+            if (!wrathDone && !WindsTimer && bossDiedCount >= 2)
                 WindsTimer = 60 * IN_MILLISECONDS;
 
-            if (!StormActive && bossDiedCount >= 3)
+            if (!wrathDone && !StormActive && bossDiedCount >= 3)
             {
                 StormActive = true;
                 StormTimer = 10 * IN_MILLISECONDS;
@@ -276,8 +283,6 @@ public:
                 else
                     CheckBossTimer -= diff;            
             }
-
-            return;
 
             if (WindsTimer)
             {
