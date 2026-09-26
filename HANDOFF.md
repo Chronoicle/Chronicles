@@ -9,7 +9,8 @@ Last updated: 2026-09-26 ~19:00 UTC by Claude (Project thread).
 
 ## Current state
 
-- **Nothing staged.** Everything built so far is live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
+- **Staged by Codex, Refs #21:** Black Rook Hold Soul Echoes array bounds, Scavenger potion reset, Dantalionax death dialogue, and Felspite Dominator SmartAI link. Build and install passed; SQL applied, waiting for owner-approved restart. Not live. Backup `~/backup_brh_21.sql`, fix `~/fix_brh_21.sql`, undo `~/undo_brh_21.sql`. Logs: `~/build_brh_21.log`, `~/install_brh_21.log`. Test Soul Echoes animations, Scavenger wipe/re-pull below 66%, boss death line and Dominator casts in game.
+- Previously deployed changes are live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
 - **No open pull requests.**
 

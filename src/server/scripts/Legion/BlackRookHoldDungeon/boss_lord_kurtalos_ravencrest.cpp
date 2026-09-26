@@ -16,6 +16,7 @@ enum Says
     SAY_WARN_DREADLORDS_GUILE   = 1,
     SAY_DREADLORDS_GUILE        = 2,
     SAY_CLOUD_OF_HYPNOSIS       = 3,
+    SAY_DEATH                   = 4,
 };
 
 enum Spells
@@ -168,6 +169,7 @@ struct boss_latosius : public BossAI
 
     void JustDied(Unit* /*killer*/) override
     {
+        Talk(SAY_DEATH);
         _JustDied();
         RemoveAuras();
         

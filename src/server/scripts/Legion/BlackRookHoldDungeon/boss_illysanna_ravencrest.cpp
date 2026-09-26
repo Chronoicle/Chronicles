@@ -547,6 +547,8 @@ struct npc_brh_wyrmtongue_scavenger : public ScriptedAI
     void Reset()
     {
         fixateGUID.Clear();
+        ancientEvent = 0;
+        healthPct = 66;
         me->SetReactState(REACT_AGGRESSIVE);
         indigestionTimer = 0;
         hyperactiveTimer = 0;
