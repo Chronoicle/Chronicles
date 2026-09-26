@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~20:30 UTC by Claude (desktop session). Previously: ~20:00 UTC by Claude (Project thread).
+Last updated: 2026-09-26 ~20:45 UTC by Claude (desktop session). Previously: ~20:30 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -16,6 +16,8 @@ Last updated: 2026-09-26 ~20:30 UTC by Claude (desktop session). Previously: ~20
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
 - **Live since the restart at 19:39 UTC (owner OK), worldserver 936195d:** #34 Tirathon holds still while casting; #35 legendary limit 1 (2 with the tier 6 class hall talent), live conf `Player.UnlimitedLegionLegendaries = 0` (backup `~/legion/etc/worldserver.conf.bak_legendaries_20260926`); Codex BRH #21 (SQL applied, undo `~/undo_brh_21.sql`) and #23 (Amalgam exit fallback). Changelog 1553491289952231566, Live comments + labels posted. All four need an in-game test (see the issues).
 - **Live since the restart at 20:26 UTC (owner OK), worldserver b1600a1 (PR #42) + 73f1b53:** #41 Call to the Void tendrils cast Mind Flay and cap at 3; Acrid Catalyst Injector works (253259 had no spell_script_names row; added with `~/fix_acrid_catalyst_injector.sql`, undo `~/undo_acrid_catalyst_injector.sql`; effect 0 checked in SpellEffect.db2: dummy aura). #39 the five VotW bosses have mechanic_immune_mask 617299839 (backup table `world.bak_votw_boss_immunities`, undo `~/undo_votw_boss_immunities.sql`). Deploy lock removed.
+- **Live since the restart at 20:41 UTC (owner OK), worldserver 7ca8ea4:** Codex #18 Eye of Azshara Wrangler yell for solo/partial groups + Crusher 14507329 stationary (undo `~/undo_eoa_18.sql`). Changelog 1553507051139768341, Live comment posted. Still open on #18: Arcanist path 9717100 (no waypoints, no spawn reference).
+- **Discord:** Grok is out of usage; Claude relays `For the reporter:` lines (`bugs.py reply`) and checks new reports only when the owner says so.
   Changelog 1553504519290355794 posted (`~/changelog_restart_2026.json`). `Live:` comments + `live`/`needs-test` labels posted on #41 and #39; both need an in-game test.
 
 ## Open work
