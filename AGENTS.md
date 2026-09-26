@@ -41,7 +41,10 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
    Also use `For the reporter:` when you need something from the reporter (a question) or when the answer is "not a bug" or "can't be fixed yet".
 4. **After the restart:** the deployer comments `Live: <what changed>` plus a `For the reporter:` line ("live now, please test ...") and adds `live` (keep `needs-test` until someone checks it in game).
 5. **Grok** passes every new `For the reporter:` line on as a reply to the report in Discord, then comments `Told the reporter (Grok)` on the issue, so nothing is sent twice.
-6. The reporter confirms → Grok comments that, the owner or a fixer closes the issue. Never write `Fixes #N` before something is live (pushing it closes the issue).
+6. **Closing = Done.** Closing an issue moves its card to Done automatically (and dragging a card to Done closes it). **The fixer (the agent in the `agent:` label) closes the issue** when:
+   - the reporter confirmed it works (Grok comments that on the issue), or
+   - for issues without a reporter (audits): someone tested it in game and `needs-test` was removed.
+   The owner may close anything they tested. Grok never closes issues. At the start of every work session, fixers check their `live` issues for a confirmation and close those.
 
 Issue body format: **Reporter** (Discord name + message link) · **Where** (zone/dungeon, difficulty) · **What happens** · **What should happen** · **Steps** · **IDs** (NPC/spell/quest/item, if known) · **Screenshots/video** (links).
 
