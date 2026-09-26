@@ -326,6 +326,20 @@ struct npc_nl_vileshard_hulk : public ScriptedAI
         }
     }
 
+    // Piercing Shards: stand still and do not turn while casting. Effect 0 targets the enemy target (6), so keep the
+    // victim: StopAttack() clears it and a plain DoCast() then had no target and never cast (#13)
+    void CastPiercingShards(uint32 spellId)
+    {
+        Unit* victim = me->getVictim();
+        if (!victim)
+            return;
+
+        me->StopAttack(true);
+        me->SetReactState(REACT_AGGRESSIVE, 4000);
+        me->SetFacingToObject(victim);
+        DoCast(victim, spellId);
+    }
+
     void UpdateAI(uint32 diff) override
     {
         if (!UpdateVictim())
@@ -345,15 +359,11 @@ struct npc_nl_vileshard_hulk : public ScriptedAI
                     events.RescheduleEvent(EVENT_1, 16000);
                     break;
                 case EVENT_2:
-                    me->StopAttack(true); // Piercing Shards: stand still and do not turn while casting
-                    me->SetReactState(REACT_AGGRESSIVE, 4000);
-                    DoCast(226296);
+                    CastPiercingShards(226296);
                     events.RescheduleEvent(EVENT_2, 16000);
                     break;
                 case EVENT_3:
-                    me->StopAttack(true); // Piercing Shards: stand still and do not turn while casting
-                    me->SetReactState(REACT_AGGRESSIVE, 4000);
-                    DoCast(226304);
+                    CastPiercingShards(226304);
                     events.RescheduleEvent(EVENT_3, 16000);
                     break;
             }

@@ -3752,7 +3752,9 @@ void Spell::preparePetCast(SpellCastTargets const* targets, Unit* target, Unit* 
         SendSpellStart();
 
         // set target for proper facing
-        if ((m_casttime || m_spellInfo->IsChanneled()) && !(_triggeredCastFlags & TRIGGERED_IGNORE_SET_FACING))
+        // not for channels usable while moving: the focus is held for the whole channel and stops chase movement
+        // (Dargrul's adds stood still for the 30 s Fixate channel, #13)
+        if ((m_casttime || m_spellInfo->IsChanneled()) && !m_spellInfo->IsMoveAllowedChannel() && !(_triggeredCastFlags & TRIGGERED_IGNORE_SET_FACING))
             if (m_targets.GetObjectTargetGUID() && m_caster->GetGUID() != m_targets.GetObjectTargetGUID() && m_caster->IsCreature())
                 m_caster->FocusTarget(this, m_targets.GetObjectTargetGUID());
 
@@ -3976,7 +3978,9 @@ SpellCastResult Spell::prepare(SpellCastTargets const* targets)
         SendSpellStart();
 
         // set target for proper facing
-        if ((m_casttime || m_spellInfo->IsChanneled()) && !(_triggeredCastFlags & TRIGGERED_IGNORE_SET_FACING))
+        // not for channels usable while moving: the focus is held for the whole channel and stops chase movement
+        // (Dargrul's adds stood still for the 30 s Fixate channel, #13)
+        if ((m_casttime || m_spellInfo->IsChanneled()) && !m_spellInfo->IsMoveAllowedChannel() && !(_triggeredCastFlags & TRIGGERED_IGNORE_SET_FACING))
             if (m_targets.GetObjectTargetGUID() && m_caster->GetGUID() != m_targets.GetObjectTargetGUID() && m_caster->IsCreature())
                 m_caster->FocusTarget(this, m_targets.GetObjectTargetGUID());
 
