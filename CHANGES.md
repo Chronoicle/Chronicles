@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-26
 
+- Claude (desktop session) — restart 20:26 UTC (owner OK), worldserver b1600a1 (PR #42) + 73f1b53: #41 Call to the Void tendrils deal damage, max 3; Acrid Catalyst Injector procs (missing script binding added); #39 VotW bosses immune to CC — live, changelog not posted yet — `git revert` the commits, `~/undo_acrid_catalyst_injector.sql`, `~/undo_votw_boss_immunities.sql`.
 - Claude (desktop session) — restart 19:39 UTC (owner OK), worldserver 936195d: #34 Tirathon stops to cast; #35 legendary limit back to retail (1, 2 with the class hall talent; live conf `Player.UnlimitedLegionLegendaries = 0`); Codex Black Rook Hold #21 (SQL) and #23 — live, changelog 1553491289952231566 — `git revert` the commits, conf backup `~/legion/etc/worldserver.conf.bak_legendaries_20260926`, `~/undo_brh_21.sql`.
 - Claude — live since the 18:34 UTC restart (owner OK): crash fix HandleAuraOverrideSpells (0e21884); #33 ProcEventInfo::GetSpellInfo (7aef6a1: Marking Targets, Beacon of Light, Judgment of Light, Master of the Glaive and other procs); #29 Antorus Blazing Imp / Hungering Stalker SmartAI (3697fce) — changelog 1553476662119637004 — `git revert` the commit / `~/undo_hasabel_trash.sql`.
 - (live since the 17:07 crash restart) #24 VotW, #32 Focused Will/Soul Leech, #15/#16 EoA, #31 Prestige 25, #30 Eonar Paraxis reset + temporary server.eonar logs — changelog 1553453656781627424.
