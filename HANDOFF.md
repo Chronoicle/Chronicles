@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~19:30 UTC by Claude (Project thread).
+Last updated: 2026-09-26 ~19:45 UTC by Claude (desktop session). Previously: 2026-09-26 ~19:30 UTC by Claude (Project thread).
 
 ## Who does what right now
 
@@ -9,12 +9,10 @@ Last updated: 2026-09-26 ~19:30 UTC by Claude (Project thread).
 
 ## Current state
 
-- **Staged by Codex, Refs #23:** Amalgam exit gate opens after 30 seconds even if an outro ghost cannot finish its path; normal outro and saved-instance opening remain intact. Build and install passed; waiting for owner-approved restart. Not live. No DB changes. Logs: `~/build_brh_23.log`, `~/install_brh_23.log`. In-game test: kill Amalgam with a stuck outro ghost and verify the exit opens after 30 seconds; also verify normal outro, wipe, and saved-instance re-entry.
 
-- **Staged by Codex, Refs #21:** Black Rook Hold Soul Echoes array bounds, Scavenger potion reset, Dantalionax death dialogue, and Felspite Dominator SmartAI link. Build and install passed; SQL applied, waiting for owner-approved restart. Not live. Backup `~/backup_brh_21.sql`, fix `~/fix_brh_21.sql`, undo `~/undo_brh_21.sql`. Logs: `~/build_brh_21.log`, `~/install_brh_21.log`. Test Soul Echoes animations, Scavenger wipe/re-pull below 66%, boss death line and Dominator casts in game.
 - Previously deployed changes are live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
-- **Staged by Claude (desktop session), PR #38 merged (3781e4d) + 936195d, Refs #34/#35:** Tirathon stands still while casting (#34); legendary limit back to retail (#35): 1, 2 with the tier 6 class hall talent. Built + installed 19:31 UTC (`~/build_38.log`, `~/install_38.log`). Live `worldserver.conf` set to `Player.UnlimitedLegionLegendaries = 0` (backup `~/legion/etc/worldserver.conf.bak_legendaries_20260926`). Waiting for owner-approved restart, together with Codex #21/#23. Players already wearing 2+ keep them until they unequip one.
+- **Live since the restart at 19:39 UTC (owner OK), worldserver 936195d:** #34 Tirathon holds still while casting; #35 legendary limit 1 (2 with the tier 6 class hall talent), live conf `Player.UnlimitedLegionLegendaries = 0` (backup `~/legion/etc/worldserver.conf.bak_legendaries_20260926`); Codex BRH #21 (SQL applied, undo `~/undo_brh_21.sql`) and #23 (Amalgam exit fallback). Changelog 1553491289952231566, Live comments + labels posted. All four need an in-game test (see the issues).
 
 ## Open work
 
