@@ -900,7 +900,7 @@ Player.ControlGuardianPets = 1
 #   Player.UnlimitedLegionLegendaries
 #       If this option is enabled it will override the player legion legendary equip count and make
 #       the player be able to equip an unlimited number of legendaries.
-#       Default: 0 - (Retail 7.3.5: 2 legendaries, limit category 357)
+#       Default: 0 - (Retail 7.3.5: 1 legendary, 2 with the tier 6 class hall talent; limit category 357)
 #                1 - (Unlimited)
 
 Player.UnlimitedLegionLegendaries = 0
