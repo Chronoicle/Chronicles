@@ -6646,12 +6646,14 @@ void AuraEffect::HandleAuraOverrideSpells(AuraApplication const* aurApp, uint8 m
 
     if (apply)
     {
-        auto const& overrideList = target->GetAuraEffectsByType(SPELL_AURA_OVERRIDE_SPELLS);
-        for (auto const& over : overrideList)
-        {
-            if (over->GetId() != GetId())
-                over->GetBase()->Remove();
-        }
+        // Collect first: removing an aura while iterating the target's effect list invalidated the iterator (crash 2026-09-26 17:07)
+        std::vector<Aura*> others;
+        for (AuraEffect const* over : target->GetAuraEffectsByType(SPELL_AURA_OVERRIDE_SPELLS))
+            if (over->GetId() != GetId() && std::find(others.begin(), others.end(), over->GetBase()) == others.end())
+                others.push_back(over->GetBase());
+        for (Aura* aura : others)
+            if (!aura->IsRemoved())
+                aura->Remove();
         target->SetUInt16Value(PLAYER_FIELD_BYTES_5, PLAYER_BYTES_2_OVERRIDE_SPELLS_UINT16_OFFSET, overrideId);
         if (OverrideSpellDataEntry const* overrideSpells = sOverrideSpellDataStore.LookupEntry(overrideId))
             for (uint32 spellId : overrideSpells->Spells)
