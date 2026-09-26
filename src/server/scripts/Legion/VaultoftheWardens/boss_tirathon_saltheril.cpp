@@ -414,12 +414,23 @@ public:
                 me->AI()->AttackStart(who);
         }
 
+        // Fel Seed 193615 is a dummy naming its missile 193613; nothing fired it (#39)
+        void SpellHitTarget(Unit* target, SpellInfo const* spell) override
+        {
+            if (spell->Id == 193615 && target != me)
+                me->CastSpell(target, 193613, true);
+        }
+
         void UpdateAI(uint32 diff) override
         {
             if (!UpdateVictim())
                 return;
 
             events.Update(diff);
+
+            // without this a cast during another cast failed and one-shot events were lost, e.g. Metamorphosis at 60% (#39)
+            if (me->HasUnitState(UNIT_STATE_CASTING))
+                return;
 
             if (uint32 eventId = events.ExecuteEvent())
             {
