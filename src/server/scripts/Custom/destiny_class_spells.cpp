@@ -1674,23 +1674,15 @@ public:
 
         bool HandleProc(ProcEventInfo& eventInfo)
         {
-            Unit* caster = GetCaster();
-            if (!caster)
-                return false;
-
             DamageInfo* damage = eventInfo.GetDamageInfo();
-            if (damage && (damage->GetAttackType() == BASE_ATTACK || damage->GetAttackType() == OFF_ATTACK))
-            {
-                caster->CastSpell(caster, SPELL_PRIEST_FOCUSED_WILL_BUFF, true);
-                return true;
-            }
-
-            return false;
+            return damage && (damage->GetAttackType() == BASE_ATTACK || damage->GetAttackType() == OFF_ATTACK);
         }
 
         void PreventAction(AuraEffect const* /*aurEff*/, ProcEventInfo& /*eventInfo*/)
         {
             PreventDefaultAction();
+            if (Unit* caster = GetCaster())
+                caster->CastSpell(caster, SPELL_PRIEST_FOCUSED_WILL_BUFF, true);
         }
 
         void Register() override
@@ -3130,11 +3122,12 @@ class spell_warl_soul_leech_aura : public AuraScript
         return ValidateSpellInfo({ SPELL_WARLOCK_DEMONSKIN });
     }
 
-    bool OnCheckProc(ProcEventInfo& eventInfo)
+    void HandleProc(AuraEffect const* /*aurEff*/, ProcEventInfo& eventInfo)
     {
+        PreventDefaultAction();
         Unit* caster = GetCaster();
         if (!caster)
-            return false;
+            return;
 
         int32 basePoints = GetSpellInfo()->GetEffect(EFFECT_0)->BasePoints;
         int32 absorb = ((eventInfo.GetDamageInfo() ? eventInfo.GetDamageInfo()->GetDamage(): 0) * basePoints) / 100.f;
@@ -3152,12 +3145,11 @@ class spell_warl_soul_leech_aura : public AuraScript
         absorb = std::min(absorb, threshold);
 
         caster->CastCustomSpell(SPELL_WARLOCK_SOUL_LEECH_ABSORB, SPELLVALUE_BASE_POINT0, absorb, caster, TRIGGERED_FULL_MASK);
-        return true;
     }
 
     void Register() override
     {
-        DoCheckProc += AuraCheckProcFn(spell_warl_soul_leech_aura::OnCheckProc);
+        OnEffectProc += AuraEffectProcFn(spell_warl_soul_leech_aura::HandleProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
