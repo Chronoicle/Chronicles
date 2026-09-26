@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~19:00 UTC by Claude (Project thread).
+Last updated: 2026-09-26 ~19:30 UTC by Claude (Project thread).
 
 ## Who does what right now
 
@@ -11,11 +11,13 @@ Last updated: 2026-09-26 ~19:00 UTC by Claude (Project thread).
 
 - **Nothing staged.** Everything built so far is live. Last restart 18:34 UTC (owner OK): crash fix 0e21884, #33 7aef6a1, #29 Hasabel trash 3697fce. Changelog 1553476662119637004, Live comments posted.
 - The 17:07 UTC crash restart made #24, #32, #15, #16, #31 and #30 (Paraxis reset + temporary `server.eonar` logs for Surge of Life) live.
-- **No open pull requests.**
+- **Open pull request (branch `claude/project-thread-3qur8k`) for #34 and #35**, not merged or built yet:
+  - #34 Tirathon Saltheril now stands still while casting (script-only: `CastAndHold` focuses the current target so the chase stops until Spell::finish releases it).
+  - #35 legendary limit: `Player.UnlimitedLegionLegendaries` default is now 0 (code + conf.dist). **The server session must also set `Player.UnlimitedLegionLegendaries = 0` in `~/legion/etc/worldserver.conf`** (make install only replaces the .dist; the live conf probably still says 1). Players already wearing 3+ legendaries keep them until they unequip.
 
 ## Open work
 
-1. **New, approved, no agent yet:** #34 (Tirathon casts while moving, Vault of the Wardens), #35 (more than 2 legendaries equippable).
+1. **#34, #35:** staged in the open PR above (agent:claude).
 2. **Antorus (xinkeg, approved):** #29 still open for the 60%/30% adds (activation spells 257941/257942 need their gateway NPCs 122543/122558; test with logging) and the other Hasabel points. #25 Felhounds, #26 platform, #28 High Command, #30 Eonar Surge of Life (after a test: `grep server.eonar ~/legion/logs/Server.log`, then remove the temporary logs).
 3. **#27** trinkets out of combat: waiting for a retail source (needs-info).
 4. **Neltharion's Lair #13:** one-shot/death-state behavior on Vileshard Crawler 96247, Blightshard Shaper 90998 and Tarspitter Lurker 91001, and trash placement after Naraxas. James's DK screenshots are in report 1553289525655109654. Avoid a broad core death-state guard without stronger evidence.

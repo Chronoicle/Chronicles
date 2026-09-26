@@ -73,6 +73,21 @@ public:
         uint8 randMetamorph;
         uint32 timer, phase;
 
+        // Retail: Tirathon stands still while a spell with a cast time is going (#34).
+        // Most of his casts have no unit target, so the core does not lock him in
+        // place by itself; focusing on the current target stops the chase until the
+        // cast ends (Spell::finish releases the focus).
+        void CastAndHold(uint32 spellId)
+        {
+            DoCast(spellId);
+            if (Spell* spell = me->GetCurrentSpell(CURRENT_GENERIC_SPELL))
+                if (spell->GetSpellInfo()->Id == spellId && spell->GetCastTime() > 0)
+                {
+                    me->StopMoving();
+                    me->FocusTarget(spell, me->GetGuidValue(UNIT_FIELD_TARGET));
+                }
+        }
+
         void Reset() override
         {
             _Reset();
@@ -128,7 +143,7 @@ public:
             {
                 if (id == SPELL_SWOOP_JUMP)
                 {
-                    DoCast(SPELL_FURIOUS_BLAST);
+                    CastAndHold(SPELL_FURIOUS_BLAST);
                     Talk(SAY_FURIOUS);
                 }
             }
@@ -212,28 +227,28 @@ public:
                 switch (eventId)
                 {
                     case EVENT_DARKSTRIKES:
-                        DoCast(SPELL_DARKSTRIKES);
+                        CastAndHold(SPELL_DARKSTRIKES);
                         Talk(SAY_DARKSTRIKES);
                         events.RescheduleEvent(EVENT_DARKSTRIKES, 60000);
                         break;
                     case EVENT_SWOOP:
-                        DoCast(SPELL_SWOOP);
+                        CastAndHold(SPELL_SWOOP);
                         events.RescheduleEvent(EVENT_SWOOP, 17500);
                         break;
                     case EVENT_METAMORPHOSIS:
                         if (!randMetamorph)
                         {
-                            DoCast(SPELL_METAMORPHOSIS_HAVOC);
+                            CastAndHold(SPELL_METAMORPHOSIS_HAVOC);
                             events.RescheduleEvent(EVENT_LASER_BEAM, 24000);
                         }
                         else
                         {
                             events.CancelEvent(EVENT_SWOOP);
-                            DoCast(SPELL_METAMORPHOSIS_VENGEANCE);
+                            CastAndHold(SPELL_METAMORPHOSIS_VENGEANCE);
                         }
                         break;
                     case EVENT_FEL_MORTAR:
-                        DoCast(SPELL_FEL_MORTAR);
+                        CastAndHold(SPELL_FEL_MORTAR);
                         events.RescheduleEvent(EVENT_FEL_MORTAR, 16000);
                         break;
                     case EVENT_LASER_BEAM:
