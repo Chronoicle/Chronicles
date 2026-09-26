@@ -4,7 +4,7 @@ Last updated: 2026-09-26 ~18:40 UTC by Claude (desktop session).
 
 ## Current state
 
-**Live since the restart at 18:34 UTC (owner OK):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo 7aef6a1, Hasabel trash SQL (#29). Ports 3443/8085/8086 up, lock released. Issue comments + live labels done. **#changelog post still missing** (the desktop session was not allowed to post; post it with bugs.py embed, draft in ~/changelog_restart_1834.json if present).
+**Live since the restart at 18:34 UTC (owner OK):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo 7aef6a1, Hasabel trash SQL (#29). Ports 3443/8085/8086 up, lock released. Issue comments + live labels done. #changelog posted: 1553476662119637004.
 
 **17:07 UTC crash** (SIGSEGV in HandleAuraOverrideSpells, old build) → the loop restarted on the new build, so everything staged up to 9b68fd0 is LIVE (#24, #32, #15, #16, #31, #30 Paraxis + server.eonar logs). Changelog posted, issues commented + labelled live. **Crash fix 0e21884 is built + installed but NOT live: needs a restart (ask the owner).**
 
