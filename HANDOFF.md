@@ -1,10 +1,10 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-26 ~15:30 UTC by Claude.
+Last updated: 2026-09-26 ~18:40 UTC by Claude (desktop session).
 
 ## Current state
 
-**Staged, not live (restart needed, ask the owner):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo 7aef6a1, Hasabel trash SQL (#29). All built and installed, deploy lock released.
+**Live since the restart at 18:34 UTC (owner OK):** crash fix 0e21884 (override-spell auras), #33 ProcEventInfo::GetSpellInfo 7aef6a1, Hasabel trash SQL (#29). Ports 3443/8085/8086 up, lock released. Issue comments + live labels done. **#changelog post still missing** (the desktop session was not allowed to post; post it with bugs.py embed, draft in ~/changelog_restart_1834.json if present).
 
 **17:07 UTC crash** (SIGSEGV in HandleAuraOverrideSpells, old build) → the loop restarted on the new build, so everything staged up to 9b68fd0 is LIVE (#24, #32, #15, #16, #31, #30 Paraxis + server.eonar logs). Changelog posted, issues commented + labelled live. **Crash fix 0e21884 is built + installed but NOT live: needs a restart (ask the owner).**
 
@@ -40,7 +40,6 @@ Last updated: 2026-09-26 ~15:30 UTC by Claude.
 ## Waiting for the owner
 
 - Team setup (commit b15809d, see AGENTS.md "Team and roles", GROK.md): grok user, tools (grok-discord, grok-gh), /srv/chronicles-view and cron are set up (2026-09-26 16:04); the owner still has to create Grok's Discord bot + GitHub token, and turn on the board's auto-add workflow. Until Grok is running, check Discord with bugs.py as before.
-- Restart for the crash fix 0e21884 (override-spell auras).
 - Approval/verdict for the 13 Antorus reports from xinkeg before any build.
 - #4 Vileshard Crawler damage tuning; website #6 https, #7 shop items (SOAP), #8 Discord widget, #9 e-mail (SMTP).
 - Optional: add launcher / website / Discord bot code to the repo (#12).

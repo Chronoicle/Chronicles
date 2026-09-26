@@ -4,7 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-26
 
-- Claude — crash fix HandleAuraOverrideSpells (0e21884) — built, **live after next restart**.
+- Claude — live since the 18:34 UTC restart (owner OK): crash fix HandleAuraOverrideSpells (0e21884); #33 ProcEventInfo::GetSpellInfo (7aef6a1: Marking Targets, Beacon of Light, Judgment of Light, Master of the Glaive and other procs); #29 Antorus Blazing Imp / Hungering Stalker SmartAI (3697fce) — changelog not posted yet — `git revert` the commit / `~/undo_hasabel_trash.sql`.
 - (live since the 17:07 crash restart) #24 VotW, #32 Focused Will/Soul Leech, #15/#16 EoA, #31 Prestige 25, #30 Eonar Paraxis reset + temporary server.eonar logs — changelog 1553453656781627424.
 - Claude — Eye of Azshara weather mechanics on + naga slot overflow (#15/#16, 2817f3c); Prestige cap 14→25 (#31, 79eac34) — built, **live after next restart** — git revert.
 - Claude — #32 Focused Will (priest) and Soul Leech (warlock) cast from the proc check: fired on jumps and own spells (error spam, frame drops) — built, **live after next restart** — `git revert` the commit.
