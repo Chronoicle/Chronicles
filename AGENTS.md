@@ -46,7 +46,7 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 6. **Closing = Done.** Closing an issue moves its card to Done automatically (and dragging a card to Done closes it). **The fixer (the agent in the `agent:` label) closes the issue** when:
    - the reporter confirmed it works (Grok comments that on the issue), or
    - for issues without a reporter (audits): someone tested it in game and `needs-test` was removed.
-   The owner may close anything they tested. Grok never closes issues. At the start of every work session, fixers check their `live` issues for a confirmation and close those.
+   The Claude Project routine "Daily board check" (daily 07:45 UTC) also closes `live` issues with a "Reporter confirmed it works (Grok)" comment. The owner may close anything they tested. Grok never closes issues. At the start of every work session, fixers check their `live` issues for a confirmation and close those.
 
 Issue body format: **Reporter** (Discord name + message link) · **Where** (zone/dungeon, difficulty) · **What happens** · **What should happen** · **Steps** · **IDs** (NPC/spell/quest/item, if known) · **Screenshots/video** (links).
 
