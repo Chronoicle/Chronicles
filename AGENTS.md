@@ -33,9 +33,15 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 
 1. **Grok** creates an issue for each real report (template below): label `bug` or `suggestion`, an area label (`dungeon`, `website`, `launcher`, `infra`), and `approved` (game bugs from approved reporters) or `needs-owner` (everyone else and all suggestions). Not enough info: `needs-info`, and Grok asks the reporter. Duplicates: comment on the existing issue instead.
 2. **The owner** approves (`needs-owner` → `approved`) and may assign one fixer with `agent:claude`, `agent:chatgpt` or `agent:cursor`. An `approved` issue without an agent label may be taken by anyone: first comment "Taking this (<name>)".
-3. **Fixer:** commit with `Refs #N`, then comment on the issue: `Staged: <what changed>, live after the next restart`.
-4. **After the restart:** the deployer comments `Live: <what players will notice>` and adds `live` (keep `needs-test` until someone checks it in game). Grok passes this on to the reporter and asks them to test.
-5. The reporter confirms → Grok comments that, the owner or a fixer closes the issue. Never write `Fixes #N` before something is live (pushing it closes the issue).
+3. **Fixer:** commit with `Refs #N`, then comment on the issue:
+   ```
+   Staged: <what changed, technical>
+   For the reporter: <1-3 plain sentences for players: what was wrong, what will be different, "live after the next restart". No file names, commits or code.>
+   ```
+   Also use `For the reporter:` when you need something from the reporter (a question) or when the answer is "not a bug" or "can't be fixed yet".
+4. **After the restart:** the deployer comments `Live: <what changed>` plus a `For the reporter:` line ("live now, please test ...") and adds `live` (keep `needs-test` until someone checks it in game).
+5. **Grok** passes every new `For the reporter:` line on as a reply to the report in Discord, then comments `Told the reporter (Grok)` on the issue, so nothing is sent twice.
+6. The reporter confirms → Grok comments that, the owner or a fixer closes the issue. Never write `Fixes #N` before something is live (pushing it closes the issue).
 
 Issue body format: **Reporter** (Discord name + message link) · **Where** (zone/dungeon, difficulty) · **What happens** · **What should happen** · **Steps** · **IDs** (NPC/spell/quest/item, if known) · **Screenshots/video** (links).
 
