@@ -55,6 +55,7 @@ enum eGameObjects
     GO_CRYSTAL_WALL_COLLISION   = 246251,
 
     GO_NARAXAS_CHEST            = 251482,
+    GO_HAMMER_OF_KHAZGOROTH     = 250548,
 };
 
 #endif

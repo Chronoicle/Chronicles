@@ -328,10 +328,14 @@ struct npc_nl_vileshard_hulk : public ScriptedAI
                     events.RescheduleEvent(EVENT_1, 16000);
                     break;
                 case EVENT_2:
+                    me->StopAttack(true); // Piercing Shards: stand still and do not turn while casting
+                    me->SetReactState(REACT_AGGRESSIVE, 4000);
                     DoCast(226296);
                     events.RescheduleEvent(EVENT_2, 16000);
                     break;
                 case EVENT_3:
+                    me->StopAttack(true); // Piercing Shards: stand still and do not turn while casting
+                    me->SetReactState(REACT_AGGRESSIVE, 4000);
                     DoCast(226304);
                     events.RescheduleEvent(EVENT_3, 16000);
                     break;

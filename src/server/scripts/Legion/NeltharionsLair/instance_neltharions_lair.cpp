@@ -36,6 +36,8 @@ public:
 
         ObjectGuid NaraxasChestGUID;
         ObjectGuid UlaroggGUID;
+        ObjectGuid HammerGUID;
+        GuidList DargrulAllies; // Navarrogg + Ebonhorn in Dargrul's arena, shown after his death
 
         void Initialize() override
         {
@@ -54,6 +56,12 @@ public:
                     // the pair in Naraxas' arena (not Rokmora's intro summon or the Dargrul pair) walks in after her death
                     if (creature->GetDistance(2991.3f, 1826.9f, -60.0f) < 60.0f && GetBossState(DATA_NARAXAS) != DONE)
                         creature->SetVisible(false);
+                    else if (creature->GetDistance(2770.8f, 2035.9f, -210.7f) < 120.0f)
+                    {
+                        DargrulAllies.push_back(creature->GetGUID());
+                        if (GetBossState(DATA_DARGRUL) != DONE)
+                            creature->SetVisible(false);
+                    }
                     break;
             } 
         }
@@ -73,6 +81,11 @@ public:
                 case GO_NARAXAS_CHEST:
                     NaraxasChestGUID = go->GetGUID();
                     break;
+                case GO_HAMMER_OF_KHAZGOROTH: // appears when Dargrul dies
+                    HammerGUID = go->GetGUID();
+                    if (GetBossState(DATA_DARGRUL) != DONE)
+                        go->SetVisible(false);
+                    break;
                 default:
                     break;
             }
@@ -89,6 +102,16 @@ public:
                     if (state == DONE)
                         if (GameObject* chest = instance->GetGameObject(NaraxasChestGUID))
                             chest->SetRespawnTime(604800);
+                    break;
+                case DATA_DARGRUL:
+                    if (state == DONE)
+                    {
+                        if (GameObject* hammer = instance->GetGameObject(HammerGUID))
+                            hammer->SetVisible(true);
+                        for (ObjectGuid const& guid : DargrulAllies)
+                            if (Creature* ally = instance->GetCreature(guid))
+                                ally->SetVisible(true);
+                    }
                     break;
                 default:
                     break;

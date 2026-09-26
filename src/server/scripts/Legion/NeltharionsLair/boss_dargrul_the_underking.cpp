@@ -246,6 +246,7 @@ struct npc_dargrul_molten_charskin : public ScriptedAI
             playerGuid = target->GetGUID();
             AttackStart(target);
             me->ClearUnitState(UNIT_STATE_CASTING);
+            me->GetMotionMaster()->MoveChase(target);
         }
     }
 
@@ -284,7 +285,11 @@ struct npc_dargrul_molten_charskin : public ScriptedAI
                                 }
                     }
                     else
+                    {
                         AttackStart(player);
+                        if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
+                            me->GetMotionMaster()->MoveChase(player);
+                    }
                     events.RescheduleEvent(EVENT_1, 2000);
                     break;
                 }
@@ -411,6 +416,7 @@ struct npc_nl_understone_demolisher : public ScriptedAI
             playerGuid = target->GetGUID();
             AttackStart(target);
             me->ClearUnitState(UNIT_STATE_CASTING);
+            me->GetMotionMaster()->MoveChase(target);
         }
     }
 
@@ -448,7 +454,11 @@ struct npc_nl_understone_demolisher : public ScriptedAI
                         }
                     }
                     else
+                    {
                         AttackStart(player);
+                        if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
+                            me->GetMotionMaster()->MoveChase(player);
+                    }
                     events.RescheduleEvent(EVENT_1, 2000);
                     break;
                 }
@@ -652,14 +662,18 @@ class spell_dargrul_landslide_filter : public SpellScript
 {
     PrepareSpellScript(spell_dargrul_landslide_filter);
 
+    std::list<WorldObject*> _targets;
+
     void FilterTargets(std::list<WorldObject*>& targets)
     {
         if (auto caster = GetCaster()->ToCreature())
-        {
-            for (std::list<WorldObject*>::const_iterator itr = targets.begin(); itr != targets.end(); ++itr)
-                if (caster->AI()->GetObjectData((*itr)->GetGUID()))
-                    targets.remove(*itr++);
-        }
+            targets.remove_if([caster](WorldObject* target) { return caster->AI()->GetObjectData(target->GetGUID()); });
+        _targets = targets;
+    }
+
+    void CopyTargets(std::list<WorldObject*>& targets)
+    {
+        targets = _targets;
     }
 
     void FilterTargetsEntry(std::list<WorldObject*>& targets)
@@ -676,7 +690,7 @@ class spell_dargrul_landslide_filter : public SpellScript
     void Register() override
     {
         OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dargrul_landslide_filter::FilterTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ENEMY);
-        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dargrul_landslide_filter::FilterTargets, EFFECT_1, TARGET_UNIT_DEST_AREA_ENEMY);
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dargrul_landslide_filter::CopyTargets, EFFECT_1, TARGET_UNIT_DEST_AREA_ENEMY);
         OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_dargrul_landslide_filter::FilterTargetsEntry, EFFECT_2, TARGET_UNIT_DEST_AREA_ENTRY);
     }
 };
