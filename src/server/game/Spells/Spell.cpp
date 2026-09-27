@@ -1501,6 +1501,18 @@ void Spell::SelectImplicitDestDestTargets(SpellEffIndex effIndex, SpellImplicitT
             SelectImplicitTrajTargets();
             exit = true;
             break;
+        case TARGET_DEST_TARGET_DEST:
+            // 148: next to the unit target, "radius" yards towards the caster (Harpoon 186260 pulls the hunter to its target,
+            // Charge, Feral Lunge, Implosion ...). Without this the dest fell back to the caster: a jump in place (#55)
+            if (Unit* target = m_targets.GetUnitTarget())
+            {
+                float dist = m_spellInfo->GetEffect(effIndex, m_diffMode)->CalcRadius(m_caster);
+                float angle = target->GetAngle(m_caster);
+                m_targets.SetDst(target->GetPositionX() + dist * std::cos(angle), target->GetPositionY() + dist * std::sin(angle),
+                    target->GetPositionZ(), Position::NormalizeOrientation(angle + float(M_PI)));
+                exit = true;
+            }
+            break;
         default:
             break;
     }
