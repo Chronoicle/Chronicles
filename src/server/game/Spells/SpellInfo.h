@@ -588,6 +588,7 @@ public:
 
         std::vector<SpellProcsPerMinuteModEntry const*> ProcPPMMods;
         float ProcBasePPM;
+        uint8 ProcPPMFlags = 0; // SpellProcsPerMinute.Flags: 1 on item, artifact and set-bonus procs (only in combat)
 
         bool IsProcAura;
     } AuraOptions;
