@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~18:20 UTC by Claude (desktop session). Previously: ~17:50 UTC by Claude (desktop session).
+Last updated: 2026-09-27 ~19:02 UTC by Claude (desktop session). Previously: ~18:20 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,6 +9,7 @@ Last updated: 2026-09-27 ~18:20 UTC by Claude (desktop session). Previously: ~17
 
 ## Current state
 
+- **Staged, needs a restart:** (1) crash fix 4d04709 built + installed 19:00: crash 18:25:02 UTC in FunctionProcessor::Update (Map::UpdateSessions, session changing map, rb-tree erase); Update now holds its recursive lock and removes each function before running it (`~/crashes/crash_2026-09-27_182502.log`). (2) Priest class hall scenario (map 1629) final stage: Balnazzar 111247 stayed on his spawn ledge after the 75% add phase; timed list 111247 rows 35/36 jump him back to the floor and make him aggressive (DB applied, `~/fix_priest_scenario_balnazzar.sql` / undo). **Ask the owner:** two extra Balnazzar spawns (guids 146931246, 146931248, phaseMask 65535) were added by the owner with .npc add and should be deleted.
 - **Rxven (guid 37, priest), owner request, done while offline:** 24 quests marked rewarded (artifact questlines 218 219 239 243 + Netherlight Crucible 372), T'uure mailed (mail 38), class hall talent Armed by Faith 456 (second legendary). Backups `characters.bak_rxven_*`, undo `~/undo_rxven_quests.sql`.
 - **Chronp (guid 25, owner's Shadow priest), owner request, done while offline:** mails 34-36 with BiS gear (T21 Crown/Robes/Handwraps/Leggings, Mother Shahraz's Seduction + Zeks Exterminatus at 1000 (bonus 3630), Chain of the Unmaker (1517), Viridian Flameweaver cuffs, Sash of Diabolic Preparation, Lady Dacidion's slippers, Zealous Tormentor's Ring, Loop of the Life-Binder, Acrid Catalyst Injector (567 651), Aman'Thul's Vision (1547), all 985) and Xal'atath + Secrets of the Void + T'uure; mail 37 relics Censer of Dark Intent + Unwavering Soul Essence (Shadow), Svirax's Grim Trophy (Blood) at 985 (567 651); 176 quests marked rewarded (questlines 218 219 230 239 243 309 344 345 346 348 350 353 367 368 371 372: priest campaign, artifacts, Legionfall, Argus, Netherlight Crucible); class hall talent Armed by Faith 456 (second legendary). Backups `characters.bak_chronp_*`, undo `~/undo_chronp_quests.sql` (gear: backup table bak_chronp_gear).
 - **Staged, built + installed (17:46), NOT applied yet (apply right before the restart, not earlier: the old binary would sell the gear without its ilvl bonus):** shop -> Donate Vendor (5d1df94, 21ebc44, owner request). At restart: `mysql < ~/fix_shop_to_donate_vendor.sql` (copy from sql/custom) and set `Bpay.Enabled = 0` in worldserver.conf (backup first). 853 gear pieces in categories 401-412 under 985 ilevel (313), Premium 30/90/180 (500/1400/2700) under Services as product type 7; shop level-90 boost not moved.
