@@ -21,6 +21,7 @@ enum Spells : uint32
     SPELL_BLINDING_LIGHT_FLASH  = 33009,    // NPC Blinding Light: holy flash + damage around the caster
     SPELL_BLINDING_LIGHT        = 105421,   // paladin Blinding Light disorient on nearby enemies
     SPELL_JUDGMENT              = 66005,    // NPC Judgement (Trial of the Crusader champions)
+    SPELL_SACRED_GROUND         = 227789,   // Maiden of Virtue (Karazhan): holy pool at a player, damage over time while standing in it
 };
 
 enum Events : uint32
@@ -29,6 +30,7 @@ enum Events : uint32
     EVENT_SHIELD_OF_RIGHTEOUS,
     EVENT_CONSECRATION,
     EVENT_BLINDING_LIGHT,
+    EVENT_SACRED_GROUND,
 };
 
 // Tuning knobs
@@ -107,6 +109,7 @@ struct boss_avenging_angel : public ScriptedAI
         events.RescheduleEvent(EVENT_SHIELD_OF_RIGHTEOUS, 12000);
         events.RescheduleEvent(EVENT_CONSECRATION, 15000);
         events.RescheduleEvent(EVENT_BLINDING_LIGHT, 35000);
+        events.RescheduleEvent(EVENT_SACRED_GROUND, 20000);
     }
 
     void UpdateAI(uint32 diff) override
@@ -141,6 +144,12 @@ struct boss_avenging_angel : public ScriptedAI
                     Cast(SPELL_BLINDING_LIGHT_FLASH, me, nullptr, &BLINDING_LIGHT_DAMAGE);
                     Cast(SPELL_BLINDING_LIGHT, me);
                     events.RescheduleEvent(EVENT_BLINDING_LIGHT, 40000);
+                    break;
+                case EVENT_SACRED_GROUND:
+                    // with its cast bar, like Maiden
+                    if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 60.0f, true))
+                        TC_LOG_INFO("server.angel", "Avenging Angel: spell %u at %s, result %u", SPELL_SACRED_GROUND, target->GetName(), uint32(me->CastSpell(target, SPELL_SACRED_GROUND, false)));
+                    events.RescheduleEvent(EVENT_SACRED_GROUND, 23000);
                     break;
                 default:
                     break;
