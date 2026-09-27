@@ -9,6 +9,8 @@ Last updated: 2026-09-26 ~22:35 UTC by Claude (desktop session). Previously: ~22
 
 ## Current state
 
+- **Monitoring (owner request, 2026-09-27, Claude):** owner's Raspberry Pi 5 at home (`raspberrypi`, Tailscale 100.100.104.31) runs Uptime Kuma (:3001, TCP checks on 1119/8081/8085/8086 + ping, Discord alerts) and the Beszel hub (:8090). VPS joined the owner's Tailscale (100.69.9.10, installed by the owner with sudo); Docker container `beszel-agent` (as `wow`, `--network host`, restart unless-stopped) listens only on 100.69.9.10:45876, nothing new is public. No worldserver restart involved. Remove with `docker rm -f beszel-agent`.
+
 - **Codex #47 In Progress:** owner reports Mind Control 605 on another priest grants possession but cannot move target. No confirmed root cause yet. Narrow `server.possession` diagnostics added to SetClientControl and directional movement starts (IDs/flags only, no player names). No control or anti-cheat behavior changes. Build pending in `~/build_possession_47.log`; no restart authorized. After an approved diagnostic restart, cast on another player and press forward/backward; inspect control allow/state and movement GUID matches, then remove diagnostics after resolving.
 - **Discord intake 2026-09-27 (Claude):** read #bug-reports / #suggestions directly (21:00 UTC onwards). New issues #48 Psyfiend, #49 Mind Control on stunned target, #50 Sharpen Blade, #51 Heroic Leap / Ravager visuals, #52 Garothi Annihilator circles, #53 Represent achievement (item 151498 on loot), #54 suggestion: Final Doom crystal scaling (needs owner). Follow-ups on #13, #25, #26, #28, #29, #30, #39, #41, #44; #33 closed (reporter confirmed). #25 #28 #29 #30 #39 #41 back to In Progress (reporters: still broken). Reporters not answered yet.
 
