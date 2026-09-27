@@ -341,7 +341,7 @@ struct boss_eonar : public ScriptedAI
         }
     }
 
-    void DamageTaken(Unit* /*attacker*/, uint32& damage, DamageEffectType dmgType) override
+    void DamageTaken(Unit* attacker, uint32& damage, DamageEffectType dmgType) override
     {
         if (damage >= me->GetHealth())
         {
@@ -349,6 +349,8 @@ struct boss_eonar : public ScriptedAI
 
             if (!restart)
             {
+                // temporary (#30): which hit ended the fight
+                TC_LOG_INFO("server.eonar", "Eonar: lethal damage by %s (entry %u), type %u -> reset", attacker ? attacker->GetName() : "nobody", attacker ? attacker->GetEntry() : 0, uint32(dmgType));
                 restart = true;
                 EntryCheckPredicate pred(NPC_THE_PARAXIS);
                 summons.DoAction(ACTION_EVADE, pred);
@@ -432,6 +434,7 @@ struct npc_eonar_the_paraxis : public ScriptedAI
 
     void EnterEvadeMode() override
     {
+        TC_LOG_INFO("server.eonar", "Paraxis: evade -> encounter reset");   // temporary (#30)
         ScriptedAI::EnterEvadeMode();
         summons.DespawnAll();
         events.Reset();
@@ -445,6 +448,7 @@ struct npc_eonar_the_paraxis : public ScriptedAI
 
     void JustDied(Unit* killer) override
     {
+        TC_LOG_INFO("server.eonar", "Paraxis: died, killer %s", killer ? killer->GetName() : "nobody");   // temporary (#30)
         events.Reset();
         summons.DespawnAll();
         instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
@@ -622,7 +626,15 @@ struct npc_eonar_the_paraxis : public ScriptedAI
         });
 
         if (!valid)
+        {
+            // temporary (#30): where everyone was when the fight decided nobody was left
+            instance->instance->ApplyOnEveryPlayer([&](Player* player)
+            {
+                TC_LOG_INFO("server.eonar", "Paraxis: no valid player; %s alive %u gm %u area %u pos %.1f %.1f %.1f", player->GetName(),
+                    uint32(player->IsAlive()), uint32(player->isGameMaster()), player->GetCurrentAreaID(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+            });
             EnterEvadeMode();
+        }
     }
 
     void PortalEvent()
