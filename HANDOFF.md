@@ -9,6 +9,8 @@ Last updated: 2026-09-26 ~22:35 UTC by Claude (desktop session). Previously: ~22
 
 ## Current state
 
+- **Owner request (Claude, ~23:15 UTC):** removed the Ahn'kahar Swarm Egg 31446 spawn (guid 146920309) from Gurubashi Arena (DB only, gone after the next restart); undo `~/undo_gurubashi_31446.sql`.
+
 - **Codex #46 root cause:** character autosave erased active runtime cooldowns by comparing steady-clock deadlines to Unix time. Fixed save/load conversion and outgoing spell history in Player.cpp. Regression test runs the real save method: old code fails on active Divine Shield; patched code passes expiration, on-hold, fractional deadline and restart/load cases. Build and install passed (`~/build_cooldown_46.log`, `~/install_cooldown_46.log`); LIVE after owner-approved 60-second restart at 2026-09-26 23:33:44 UTC (01:33 Oslo), commit 0f3d61f. PID 406058 ready; running/installed/pre-restart binary SHA256 match; ports 3443/8085/8086 listening. Issue #46 moves to Needs testing. Player-facing changelog pending Grok per owner instruction not to contact players. No manual character/account DB edits. Retest Divine Shield on cooldown across autosave and relog, then lethal damage with Divine Intervention.
 
 - **Live since ~23:05 UTC restart (606383f), #46 (owner report):** Divine Intervention only saves the paladin when the triggered Divine Shield really casts; temporary `server.paladin` log (Divine Shield cooldown + cast result). Superseded by the cooldown clock fix 0f3d61f above; retain temporary diagnostics until retested.

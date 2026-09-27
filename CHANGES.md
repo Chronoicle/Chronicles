@@ -8,6 +8,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-26
 
+- Claude (desktop session) — owner request: Gurubashi Arena spawn of NPC 31446 (guid 146920309) deleted — DB, live after the next restart — `~/undo_gurubashi_31446.sql`.
+
 - Claude (desktop session) — restart 22:31 UTC (owner OK), worldserver 45fa71a: #28 Legion Cruiser stays in the sky + officer rotation (2726233, temporary server.antoran logs); #29 temporary server.antorus logs; #39 Mendacius/Grimhorn SmartAI + Illianna facing (affe7ba, SQL) and Glayvianna (45fa71a); conf: Server.log appends with timestamps — live, changelog 1553534481116299355 — `git revert` the commits, `~/undo_votw_mythic_39.sql`, conf backup `~/legion/etc/worldserver.conf.bak_serverlog_20260926`.
 - Claude (desktop session) — #10 website character pages show gear via Wowhead links — live (deploy.sh, no restart) — `cp ~/backup_character_php_20260926.php ~/website_src/SahtoutCMS/pages/character.php && bash ~/website_src/deploy.sh`.
 - Claude (desktop session) — restart 21:34 UTC (owner OK), worldserver 363373c: core fix so jump-to-location landing spells run (60d790f, all JUMP_DEST spells); #30 Surge of Life glide, Antorus event triggers per instance + statue visual (60d790f), no reset after the Paraxis Inquisitor (363373c); #25 Felhounds mark swap + Enflamed/Siphon marks (82ca524) — live, changelog 1553520116816285859 — `git revert` the commits.
