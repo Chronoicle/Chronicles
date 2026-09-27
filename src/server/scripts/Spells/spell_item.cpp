@@ -4487,14 +4487,19 @@ public:
 				if (Player* player = caster->ToPlayer())
 					castItem = player->GetItemByGuid(castItemGUID);
 
+			// The buffs have 0 base points; the item-level-scaled ratings are effect 1 (per stack) and effect 2 (Cycle) of 253259 (#41)
+			float perStack = GetSpellInfo()->Effects[EFFECT_1]->CalcValue(caster, nullptr, nullptr, castItem);
+			float cycle = GetSpellInfo()->Effects[EFFECT_2]->CalcValue(caster, nullptr, nullptr, castItem);
+
 			static std::vector<uint32> const stats = { Critical, Haste, Mastery };
 			uint32 spellId = Trinity::Containers::SelectRandomContainerElement(stats);
-			caster->CastSpell(caster, spellId, true, castItem, aurEff, caster->GetGUID());
+			caster->CastCustomSpell(caster, spellId, &perStack, nullptr, nullptr, true, castItem, aurEff, caster->GetGUID());
+			TC_LOG_INFO("server.acrid", "Acrid Catalyst Injector: %s gets %u (+%.0f per stack), Cycle %.0f, item %s", caster->GetName(), spellId, perStack, cycle, castItem ? "found" : "missing");
 
 			if (Aura* stack = caster->GetAura(spellId))
 				if (stack->GetStackAmount() >= 5)
 				{
-					caster->CastSpell(caster, SPELL_CYCLE_OF_THE_LEGION, true, castItem, aurEff, caster->GetGUID());
+					caster->CastCustomSpell(caster, SPELL_CYCLE_OF_THE_LEGION, &cycle, &cycle, &cycle, true, castItem, aurEff, caster->GetGUID());
 					for (uint32 id : stats)
 						caster->RemoveAura(id);
 				}

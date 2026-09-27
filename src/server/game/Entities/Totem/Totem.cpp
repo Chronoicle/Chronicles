@@ -121,6 +121,10 @@ void Totem::InitStats(uint32 duration)
 
 void Totem::InitSummon()
 {
+    // IsSummonedBy/JustSummoned live in the base; skipping it left totem-type summons without their
+    // summon hook (Void Tendrils never picked a target, #41)
+    Minion::InitSummon();
+
     if (m_type == TOTEM_PASSIVE && GetSpell())
         CastSpell(this, GetSpell(), true);
 

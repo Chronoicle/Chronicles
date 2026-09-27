@@ -21711,8 +21711,12 @@ bool Unit::RollProcResult(Unit* victim, Aura* aura, WeaponAttackType attType, bo
 
             if (procked)
             {
-                plr->SetLastSuccessfulProc(spellInfo->Id, getPreciseTime(), castItemGUID);
-                plr->AddRPPMSpellCooldown(spellInfo->Id, castItemGUID, getPreciseTime() + cooldown);
+                // Create the entry before setting the times: the setters only update an existing entry, so the
+                // first proc left both times at 0 and the next roll got full bad-luck protection (double procs, #41)
+                double now = getPreciseTime();
+                plr->AddRPPMSpellCooldown(spellInfo->Id, castItemGUID, now + cooldown);
+                plr->SetLastSuccessfulProc(spellInfo->Id, now, castItemGUID);
+                plr->SetLastChanceToProc(spellInfo->Id, now, castItemGUID);
             }
 
             return procked;
