@@ -7228,12 +7228,6 @@ void SpellMgr::LoadSpellCustomAttr()
         spellInfo->GetMisc()->MiscData.Attributes[5] |= SPELL_ATTR5_START_PERIODIC_AT_APPLY;
     });
 
-    // Castigation
-    ApplySpellFix({193134}, [](SpellInfo* spellInfo)
-    {
-        spellInfo->Effects[EFFECT_0]->BasePoints = -66;
-    });
-
     // War Banner (Honor Talent)
     ApplySpellFix({236321}, [](SpellInfo* spellInfo)
     {

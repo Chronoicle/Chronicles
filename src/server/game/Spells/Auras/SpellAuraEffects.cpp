@@ -1685,9 +1685,10 @@ void AuraEffect::CalculatePeriodic(Unit* caster, bool resetPeriodicTimer /*= tru
     // Apply casting time mods
     if (m_period)
     {
-        // Apply periodic time mod
+        // Apply periodic time mod to the period itself, like RecalculateTickPeriod does after every tick. On
+        // m_activation_time (starts at 0) percent mods were lost, so the first tick ignored them (Castigation, #58)
         if (modOwner)
-            modOwner->ApplySpellMod(GetId(), SPELLMOD_ACTIVATION_TIME, m_activation_time);
+            modOwner->ApplySpellMod(GetId(), SPELLMOD_ACTIVATION_TIME, m_period);
 
         if (caster)
         {
