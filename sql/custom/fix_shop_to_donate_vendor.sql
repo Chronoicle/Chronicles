@@ -15,10 +15,10 @@ JOIN world.battlepay_product p ON p.ProductID = e.ProductID
 JOIN world.battlepay_product_item i ON i.ProductID = e.ProductID
 WHERE e.GroupID BETWEEN 10 AND 21;
 
--- Premium 30 / 90 / 180 days (shop 900-902) under Services (1).
+-- Premium 30 / 90 / 180 days (shop 900-902, at the shop's current prices) under Services (1).
 DELETE FROM auth.donate_products WHERE category = 1 AND type = 7;
 INSERT INTO auth.donate_products (category, sort, name, type, param1, token) VALUES
 (1, 10, 'Premium 30 days', 7, 30, 500),
-(1, 11, 'Premium 90 days', 7, 90, 1500),
-(1, 12, 'Premium 180 days', 7, 180, 3000);
+(1, 11, 'Premium 90 days', 7, 90, 1400),
+(1, 12, 'Premium 180 days', 7, 180, 2700);
 -- The shop's level 90 boost (100 tokens) is not moved: the vendor already sells level 110 for 50.
