@@ -3527,6 +3527,8 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
 
         ChallengeKeyInfo m_challengeKeyInfo;
         bool InitChallengeKey(Item* item);
+        bool HasGmChallengeAffixes() const;
+        void DepleteChallengeKeyForInstance(uint32 instanceId);
         void UpdateChallengeKey(Item* item);
         void CreateChallengeKey(Item* item);
         void ResetChallengeKey();

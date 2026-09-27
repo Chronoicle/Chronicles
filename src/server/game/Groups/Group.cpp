@@ -2319,6 +2319,11 @@ void Group::ResetInstances(uint8 method, bool isRaid, bool isLegacy, Player* Sen
 
         if (isEmpty || method == INSTANCE_RESET_GROUP_DISBAND || method == INSTANCE_RESET_CHANGE_DIFFICULTY)
         {
+            // a started keystone of a member in this instance loses one level (Player::DepleteChallengeKeyForInstance)
+            for (GroupReference* ref = GetFirstMember(); ref != nullptr; ref = ref->next())
+                if (Player* member = ref->getSource())
+                    member->DepleteChallengeKeyForInstance(instanceSave->GetInstanceId());
+
             // do not reset the instance, just unbind if others are permanently bound to it
             if (instanceSave->CanReset())
                 instanceSave->DeleteFromDB();
