@@ -31286,6 +31286,10 @@ void Player::SetClientControl(Unit* target, bool allowMove)
     if (target->HasUnitState(UNIT_STATE_CONTROLLED))
         allowMove = false;
 
+    // Temporary #47 diagnostics: player possession movement handoff.
+    if (target->IsPlayer() && (!target->GetCharmerGUID().IsEmpty() || !GetCharmGUID().IsEmpty()))
+        TC_LOG_INFO("server.possession", "Control session=%u target=%u allow=%u controlled=%u flags=%u", GetGUIDLow(), target->GetGUIDLow(), uint32(allowMove), uint32(target->HasUnitState(UNIT_STATE_CONTROLLED)), target->GetUInt32Value(UNIT_FIELD_FLAGS));
+
     // don't allow possession to be overridden
     WorldPackets::Movement::ControlUpdate update;
     update.Guid = target->GetGUID();

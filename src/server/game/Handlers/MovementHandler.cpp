@@ -254,6 +254,11 @@ void WorldSession::HandleMovementOpcode(OpcodeClient opcode, MovementInfo& movem
     if (!mover)
         return;
 
+    // Temporary #47 diagnostics, only directional input starts during player possession.
+    if (_player->GetCharmGUID().IsPlayer() &&
+        (opcode == CMSG_MOVE_START_FORWARD || opcode == CMSG_MOVE_START_BACKWARD))
+        TC_LOG_INFO("server.possession", "Move session=%u mover=%u packet=%u matches=%u valid=%u possessed=%u", _player->GetGUIDLow(), mover->GetGUIDLow(), movementInfo.Guid.GetGUIDLow(), uint32(movementInfo.Guid == mover->GetGUID()), uint32(movementInfo.Pos.IsPositionValid()), uint32(mover->HasAura(605)));
+
     Player* plrMover = mover->ToPlayer();
     if (mover->GetVehicleKit())
         if (mover->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED))
