@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~17:20 UTC by Claude (desktop session). Previously: ~17:12 UTC by Claude (desktop session).
+Last updated: 2026-09-27 ~17:33 UTC by Claude (desktop session). Previously: ~17:20 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,7 +9,7 @@ Last updated: 2026-09-27 ~17:20 UTC by Claude (desktop session). Previously: ~17
 
 ## Current state
 
-- **Staged, built + installed (17:17), DB applied, needs a restart:** #30 2f83235: garden door 273687 flags 48 (not clickable), one Focus NPC 125930 above each Focusing Crystal (beams straight up), temporary `server.eonar` logs on every Mythic reset path (asked xinkeg to test; grep Server.log, then remove). #54 (crystal scaling) waits for the owner.
+- **Live since the restart at 17:31 UTC (owner OK), changelog posted, xinkeg told:** #30 2f83235: garden door 273687 flags 48 (not clickable), one Focus NPC 125930 above each Focusing Crystal (beams straight up), temporary `server.eonar` logs on every Mythic reset path (asked xinkeg to test; grep Server.log, then remove). #54 (crystal scaling) waits for the owner.
 - **Crash 17:05:44 UTC (auto-restarted 17:05:54):** KillRewarder -> XP::Gain read a null xp.txt row: Rxven was level 210 (xp.txt ends at 123) and got XP from a group kill. Fix 24d34bf (BaseGain + quest XP return 0 for levels without a row) live since the restart at 17:11 UTC (owner OK). Rxven is back at 110 (someone reset it). Backtrace `~/crashes/crash_2026-09-27_170544.log`.
 - **Live since the restart at 16:54 UTC (owner OK), changelog 1553812361251397835, eru told, cards in Needs testing:** #44 30b4ba2 Mindbender gets Mana Leech 123050 via creature_template_addon (DB applied, `~/fix_mindbender_44.sql` / undo); #58 30b4ba2 core: SPELLMOD_ACTIVATION_TIME applies to the period on the first calculation too, Castigation -66 hack removed (watch DoT tick timings). eru told.
 - **Live since the 16:54 UTC restart:** #41 5eee31d: Acrid values take the trinket rating multiplier (~234 per stack / ~2665 Cycle at ilvl 985, matches retail), Call to the Void one tendril per proc (spell_trigger row summons, script only caps). eru told. After a test: remove the temporary `server.acrid` log. Also open from eru: #44 Mindbender still no resources, #58 Penance still choppy with Castigation, #59 Command Map.
