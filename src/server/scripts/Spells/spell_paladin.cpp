@@ -707,14 +707,17 @@ class spell_pal_ardent_defender : public SpellScriptLoader
                 return GetUnitOwner()->GetTypeId() == TYPEID_PLAYER;
             }
 
-            void CalculateAmount(AuraEffect const* aurEff, float & amount, bool & canBeRecalculated)
+            // The amount is only the percentage, so the buff shows "Damage taken reduced by 20%" (#60, it showed the old -1 as 1%).
+            // Set after apply: the core scales absorb amounts (versatility, absorb mods) after the calc hooks.
+            void AfterApply(AuraEffect const* aurEff, AuraEffectHandleModes /*mode*/)
             {
-                // Set absorbtion amount to unlimited
-                amount = -1;
+                const_cast<AuraEffect*>(aurEff)->SetAmount(absorbPct);
             }
 
             void Absorb(AuraEffect* aurEff, DamageInfo & dmgInfo, float & absorbAmount)
             {
+                PreventDefaultAction(); // unlimited absorb: the amount is never used up (#60)
+
                 Unit* victim = GetTarget();
                 int32 remainingHealth = victim->GetHealth() - dmgInfo.GetDamage();
                 // If damage kills us
@@ -733,7 +736,7 @@ class spell_pal_ardent_defender : public SpellScriptLoader
 
             void Register() override
             {
-                 DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pal_ardent_defender_AuraScript::CalculateAmount, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB);
+                 AfterEffectApply += AuraEffectApplyFn(spell_pal_ardent_defender_AuraScript::AfterApply, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB, AURA_EFFECT_HANDLE_REAL);
                  OnEffectAbsorb += AuraEffectAbsorbFn(spell_pal_ardent_defender_AuraScript::Absorb, EFFECT_0, SPELL_AURA_SCHOOL_ABSORB);
             }
         };
