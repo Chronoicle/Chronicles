@@ -1191,6 +1191,7 @@ SpellInfo::SpellInfo(SpellInfoLoadHelper const& data, SpellEntry const* spellEnt
 
         SpellProcsPerMinuteEntry const* _ppm = auraOpStore ? sSpellProcsPerMinuteStore.LookupEntry(auraOpStore->SpellProcsPerMinuteID) : nullptr;
         optionsDiff.ProcBasePPM = _ppm ? _ppm->BaseProcRate : 0.0f;
+        optionsDiff.ProcPPMFlags = _ppm ? _ppm->Flags : 0;
         if (auraOpStore)
             optionsDiff.ProcPPMMods = sDB2Manager.GetSpellProcsPerMinuteMods(auraOpStore->SpellProcsPerMinuteID);
 

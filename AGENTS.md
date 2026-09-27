@@ -34,7 +34,7 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 
 ### Issue flow (the GitHub board is how the agents talk to each other)
 
-1. **Grok** creates an issue for each real report (template below): label `bug` or `suggestion`, an area label (`dungeon`, `website`, `launcher`, `infra`), and `approved` (game bugs from approved reporters) or `needs-owner` (everyone else and all suggestions). Not enough info: `needs-info`, and Grok asks the reporter. Duplicates: comment on the existing issue instead.
+1. **Grok** creates an issue for each real report (template below) and reacts ✅ to the Discord message once it is on GitHub (issue or comment; `cd ~/discord-bot && venv/bin/python react.py` with "<channel_id> <message_id>" lines on stdin): label `bug` or `suggestion`, an area label (`dungeon`, `website`, `launcher`, `infra`), and `approved` (game bugs from approved reporters) or `needs-owner` (everyone else and all suggestions). Not enough info: `needs-info`, and Grok asks the reporter. Duplicates: comment on the existing issue instead.
 2. **The owner** approves (`needs-owner` → `approved`) and may assign one fixer with `agent:claude`, `agent:chatgpt` or `agent:cursor`. An `approved` issue without an agent label may be taken by anyone: first comment "Taking this (<name>)". **When you start on an issue, move its card to In Progress on the board** (`gh project item-edit`; agents without board access ask the owner or Claude to do it). Done = only after it is live and confirmed.
 3. **Fixer:** commit with `Refs #N`, then comment on the issue:
    ```

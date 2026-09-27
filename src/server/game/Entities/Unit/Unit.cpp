@@ -21700,6 +21700,11 @@ bool Unit::RollProcResult(Unit* victim, Aura* aura, WeaponAttackType attType, bo
     {
         if (Player* plr = ToPlayer())
         {
+            // RPPM entries with flag 1 (trinkets, artifact traits like Concordance, set bonuses) only proc in combat;
+            // casting anything out of combat (mounts, gameobjects, buffs) pre-procced them (owner, #27)
+            if ((spellInfo->GetAuraOptions(m_spawnMode)->ProcPPMFlags & 1) && !plr->isInCombat())
+                return false;
+
             float spellRPPM = spellInfo->CalcProcPPM(this, aura->GetCasterLevel());
             double cooldown = plr->GetRPPMSpellCooldownDelay(spellInfo->Id, castItemGUID); //base cap
             bool procked = plr->GetRPPMProcChance(cooldown, spellRPPM, spellInfo, castItemGUID);
