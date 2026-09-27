@@ -43,6 +43,7 @@ struct boss_avenging_angel : public ScriptedAI
 {
     boss_avenging_angel(Creature* creature) : ScriptedAI(creature) { }
 
+    EventMap events;
     std::set<ObjectGuid> attackers;
     Position consecrationPos;
     uint8 consecrationTicks = 0;
