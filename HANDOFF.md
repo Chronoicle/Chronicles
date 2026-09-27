@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~16:50 UTC by Claude (desktop session). Previously: ~16:27 UTC by Claude (desktop session).
+Last updated: 2026-09-27 ~17:00 UTC by Claude (desktop session). Previously: ~16:50 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,6 +9,7 @@ Last updated: 2026-09-27 ~16:50 UTC by Claude (desktop session). Previously: ~16
 
 ## Current state
 
+- **Staged, built + installed (16:52), needs a restart:** #44 30b4ba2 Mindbender gets Mana Leech 123050 via creature_template_addon (DB applied, `~/fix_mindbender_44.sql` / undo); #58 30b4ba2 core: SPELLMOD_ACTIVATION_TIME applies to the period on the first calculation too, Castigation -66 hack removed (watch DoT tick timings). eru told.
 - **Staged, built + installed (16:45), needs a restart:** #41 5eee31d: Acrid values take the trinket rating multiplier (~234 per stack / ~2665 Cycle at ilvl 985, matches retail), Call to the Void one tendril per proc (spell_trigger row summons, script only caps). eru told. After a test: remove the temporary `server.acrid` log. Also open from eru: #44 Mindbender still no resources, #58 Penance still choppy with Castigation, #59 Command Map.
 - **Live since the restart at 16:26 UTC (owner OK):** Avenging Angel v3 (c348fc2, 4145b23): Witness the Void 207720 instead of Blinding Light, Crusader Strike 210370 tank stacks every 8 s (full 137%, ~4.8M holy, owner wants it), Frenzy 111730 +100% on the boss = all boss damage x2, base health 2.147B, two Monkes (500003, Hyrja look + weapons, 150M health) every 60 s with Expel Light (228029 now has an aura script casting 228030 from the marked player) and Shield of Light. Minion spells keep their raid values (not doubled).
 - **Live since the restart at 15:53 UTC (owner OK):** Avenging Angel 500002 (spawned by the owner in the Gurubashi arena, guid 146929294, respawn 300 s) now uses NPC spell versions so the visuals show (player Consecration only has player-only visuals): Consecration 43429, Judgement 66005, Blinding Light flash 33009 + disorient 105421, plus Sacred Ground 227789 (Maiden of Virtue) every 23 s (009f40d, 68c3656). Temporary `server.angel` log of every cast result; remove after tuning.
