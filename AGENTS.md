@@ -1,6 +1,6 @@
 # Chronicles server: rules and map for every AI agent
 
-Read this first, then `HANDOFF.md` (what is in progress), `CHANGES.md` (what changed recently) and `docs/NOTES.md` (decisions and lessons). All four are in the repo root / `docs/`; on the server `~/AGENTS.md`, `~/HANDOFF.md` and `~/CHANGES.md` link to them.
+Read this first, then `HANDOFF.md` (what is in progress), `CHANGES.md` (what changed recently) and `docs/NOTES.md` (decisions and lessons). A server session taking over on the owner's desktop also reads `docs/SESSION_GUIDE.md` (practical how-to and standing permissions). All four are in the repo root / `docs/`; on the server `~/AGENTS.md`, `~/HANDOFF.md` and `~/CHANGES.md` link to them.
 This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it). `CLAUDE.md` is the same file (symlink). Claude, ChatGPT/Codex, Grok, Cursor and any other agent follow the same rules.
 
 ## The owner's rules (always)
