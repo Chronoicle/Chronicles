@@ -152,6 +152,30 @@ numbers: find the faulting instruction with `gdb -batch -ex "info symbol 0x<addr
   can be removed), `server.angel` (Avenging Angel boss casts), `server.eonar` (Mythic reset paths, waiting for xinkeg's
   test), `server.antoran` / `server.antorus` (Antorus), `server.paladin` (#46), `server.possession` (Codex, #47).
 
+### Filling a character (gear, quests, artifacts, relics, Crucible): `tools/fill_character`
+
+One script does everything that was done by hand for Chronp, for any class/spec (owner request 2026-09-27):
+```
+cd ~/LegionCore/tools/fill_character
+python3 fill_character.py plan  <name> [--spec shadow]    # show what it would do (no changes)
+python3 fill_character.py all   <name> [--spec shadow]    # character OFFLINE: gear mail + quests + artifacts
+python3 fill_character.py artifacts|quests|gear <name>    # one part only (e.g. artifacts for a character that has gear)
+python3 fill_character.py all <name> --rollback           # test: SQL in a transaction, prints the result, rolls back
+python3 fill_character.py undo ~/fill_character/<name>_<time>
+python3 fill_character.py check                           # validate presets.json for all 36 specs
+```
+- **gear:** 14 slots by mail (`send items` console) at ilvl 985 (legendaries 1000): preset legendaries + trinkets,
+  T21 in the free tier slots, best Antorus piece for the rest by the spec's stat priority. `--all-legendaries` adds
+  every class legendary. Missing artifacts (+ off-hands) are mailed too and moved straight into free bag slots.
+- **quests:** level 110, class campaign + artifact questlines + Legionfall/Argus/Crucible (`CLASS_QUESTLINES`),
+  third relic slot quest, class hall row if missing, class hall talent for the second legendary.
+- **artifacts:** every artifact the character holds: rank 101 (all traits, 4th ranks, Concordance 50), tier 2,
+  3 Antorus relics at 985, Crucible tier 1 + tier 2 (`crucible`) + tier 3 (`crucible_trait`) on each relic.
+- Choices per spec live in `presets.json` (Shadow = Chronp's setup: Light Speed + Fiending Dark). Override the Crucible
+  for one run with `--crucible "Light Speed" --crucible-trait "Fiending Dark"`.
+- Every real run writes `~/fill_character/<name>_<time>/log.txt` + `undo.sql`. Artifacts still in the mailbox:
+  take them out, log out, run `artifacts` again.
+
 ## 8. Custom content made in this session
 
 - **Avenging Angel** world boss 500002 (`src/server/scripts/Custom/world_boss_avenging_angel.cpp`), spawned in the

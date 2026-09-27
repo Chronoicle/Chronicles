@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~19:25 UTC by Claude (desktop session). Previously: ~19:02 UTC by Claude (desktop session).
+Last updated: 2026-09-27 ~20:30 UTC by Claude (desktop session). Previously: ~19:25 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,6 +9,7 @@ Last updated: 2026-09-27 ~19:25 UTC by Claude (desktop session). Previously: ~19
 
 ## Current state
 
+- **New tool (owner request, no restart, not run on any character yet):** `tools/fill_character/fill_character.py` fills any class/spec like Chronp: gear by mail at 985 (+ legendaries 1000), level 110 + class campaign/artifact/Argus/Crucible quests + class hall talent, every artifact at rank 101 with 3 relics and the Netherlight Crucible picked. Presets per spec in `presets.json`; usage in `docs/SESSION_GUIDE.md` (section 7). Verified: `check` for all 36 specs, `plan` + `--rollback` transaction tests on Chronp and Chrondh (nothing kept). Not yet exercised for real: the console mail part (`send items` + moving mailed artifacts into bags). **Owner asked earlier** for Light Speed + Fiending Dark on Chronp's relics: `python3 fill_character.py artifacts Chronp` (Chronp offline) does it and also fills the Holy/Disc artifacts.
 - **Live since the restart at 19:17 UTC (owner OK), worldserver 4d04709, changelog 1553848231895769119:** crash fix 4d04709 (FunctionProcessor::Update lock, crash 18:25 UTC); priest class hall scenario Balnazzar 111247 comes back down after the 75% add phase (`~/fix_priest_scenario_balnazzar.sql` / undo); the two extra Balnazzar spawns 146931246 / 146931248 deleted (owner OK, `sql/custom/fix_balnazzar_extra_spawns.sql`, undo = row dump `~/undo_balnazzar_extra_spawns.sql`); **shop -> Donate Vendor live**: `~/fix_shop_to_donate_vendor.sql` applied (853 gear products in 401-412, Premium 30/90/180 under Services), `Bpay.Enabled = 0` (conf backup `~/legion/etc/worldserver.conf.bak_bpay_20260927`, undo `~/undo_shop_to_donate_vendor.sql` + Bpay.Enabled = 1).
 - **Chronp (guid 25) artifact, owner request, done while offline (no restart needed):** Xal'atath 56336 rank 101, every trait filled (copy of Rxven's layout: 4th ranks, 7.2 traits, Concordance 50), tier 1. Backup tables `characters.bak_chronp_artifact*`, `~/fix_chronp_artifact.sql` / `~/undo_chronp_artifact.sql`.
 - **Rxven (guid 37, priest), owner request, done while offline:** 24 quests marked rewarded (artifact questlines 218 219 239 243 + Netherlight Crucible 372), T'uure mailed (mail 38), class hall talent Armed by Faith 456 (second legendary). Backups `characters.bak_rxven_*`, undo `~/undo_rxven_quests.sql`.
