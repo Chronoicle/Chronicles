@@ -1,23 +1,26 @@
 /*
  * Avenging Angel (500002): custom world boss, owner request 2026-09-27.
  * 2 billion health, plus PER_EXTRA_ATTACKER for every further player who damages it, so 10 players
- * need roughly 3-4 minutes. Casts paladin spells with fixed damage (a creature has no spell/attack power).
+ * need roughly 3-4 minutes. Casts paladin-style spells with fixed damage (a creature has no spell/attack power).
+ * NPC versions where the player spell has no visual for a creature caster (player Consecration only has player-only visuals).
  */
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
 #include "Player.h"
+#include "Spell.h"
+#include "SpellMgr.h"
 
 namespace avenging_angel
 {
 
 enum Spells : uint32
 {
-    SPELL_CONSECRATION          = 26573,    // ground visual
-    SPELL_CONSECRATION_DAMAGE   = 81297,    // 8 yd around a point
+    SPELL_CONSECRATION          = 43429,    // NPC Consecration: glowing ground, damage every 2 sec for 20 sec
     SPELL_SHIELD_OF_RIGHTEOUS   = 53600,
-    SPELL_BLINDING_LIGHT        = 115750,   // disorients nearby players (105421 via spell_linked_spell)
-    SPELL_JUDGMENT              = 20271,
+    SPELL_BLINDING_LIGHT_FLASH  = 33009,    // NPC Blinding Light: holy flash + damage around the caster
+    SPELL_BLINDING_LIGHT        = 105421,   // paladin Blinding Light disorient on nearby enemies
+    SPELL_JUDGMENT              = 66005,    // NPC Judgement (Trial of the Crusader champions)
 };
 
 enum Events : uint32
@@ -25,7 +28,6 @@ enum Events : uint32
     EVENT_JUDGMENT = 1,
     EVENT_SHIELD_OF_RIGHTEOUS,
     EVENT_CONSECRATION,
-    EVENT_CONSECRATION_TICK,
     EVENT_BLINDING_LIGHT,
 };
 
@@ -36,8 +38,8 @@ float const MELEE_MIN               = 400000.0f;
 float const MELEE_MAX               = 480000.0f;
 float const JUDGMENT_DAMAGE         = 800000.0f;
 float const SHIELD_DAMAGE           = 1200000.0f;
-float const CONSECRATION_TICK       = 150000.0f;
-uint8 const CONSECRATION_TICKS      = 12;
+float const CONSECRATION_TICK       = 300000.0f;   // every 2 sec
+float const BLINDING_LIGHT_DAMAGE   = 250000.0f;
 
 struct boss_avenging_angel : public ScriptedAI
 {
@@ -45,8 +47,6 @@ struct boss_avenging_angel : public ScriptedAI
 
     EventMap events;
     std::set<ObjectGuid> attackers;
-    Position consecrationPos;
-    uint8 consecrationTicks = 0;
 
     void Reset() override
     {
@@ -78,8 +78,31 @@ struct boss_avenging_angel : public ScriptedAI
         me->SetHealth(std::min(health + PER_EXTRA_ATTACKER, me->GetMaxHealth()));
     }
 
-    void EnterCombat(Unit* /*who*/) override
+    // Casts with fixed base points and logs the result (temporary server.angel log: the boss cast nothing in the first test)
+    void Cast(uint32 spellId, Unit* target, Position const* dest = nullptr, float const* bp0 = nullptr)
     {
+        SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+        if (!spellInfo)
+            return;
+
+        SpellCastTargets targets;
+        targets.SetCaster(me);
+        if (target)
+            targets.SetUnitTarget(target);
+        if (dest)
+            targets.SetDst(*dest);
+
+        CustomSpellValues values;
+        if (bp0)
+            values.AddSpellMod(SPELLVALUE_BASE_POINT0, *bp0);
+
+        SpellCastResult result = me->CastSpell(targets, spellInfo, &values, TRIGGERED_FULL_MASK);
+        TC_LOG_INFO("server.angel", "Avenging Angel: spell %u at %s, result %u", spellId, target ? target->GetName() : "a point", uint32(result));
+    }
+
+    void EnterCombat(Unit* who) override
+    {
+        TC_LOG_INFO("server.angel", "Avenging Angel: combat with %s", who ? who->GetName() : "nobody");
         events.RescheduleEvent(EVENT_JUDGMENT, 8000);
         events.RescheduleEvent(EVENT_SHIELD_OF_RIGHTEOUS, 12000);
         events.RescheduleEvent(EVENT_CONSECRATION, 15000);
@@ -102,29 +125,21 @@ struct boss_avenging_angel : public ScriptedAI
             {
                 case EVENT_JUDGMENT:
                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 30.0f, true))
-                        me->CastCustomSpell(target, SPELL_JUDGMENT, &JUDGMENT_DAMAGE, nullptr, nullptr, true);
+                        Cast(SPELL_JUDGMENT, target, nullptr, &JUDGMENT_DAMAGE);
                     events.RescheduleEvent(EVENT_JUDGMENT, 12000);
                     break;
                 case EVENT_SHIELD_OF_RIGHTEOUS:
                     if (Unit* victim = me->getVictim())
-                        me->CastCustomSpell(victim, SPELL_SHIELD_OF_RIGHTEOUS, &SHIELD_DAMAGE, nullptr, nullptr, true);
+                        Cast(SPELL_SHIELD_OF_RIGHTEOUS, victim, nullptr, &SHIELD_DAMAGE);
                     events.RescheduleEvent(EVENT_SHIELD_OF_RIGHTEOUS, 15000);
                     break;
                 case EVENT_CONSECRATION:
-                    me->CastSpell(me, SPELL_CONSECRATION, true);
-                    consecrationPos = me->GetPosition();
-                    consecrationTicks = CONSECRATION_TICKS;
-                    events.RescheduleEvent(EVENT_CONSECRATION_TICK, 1000);
+                    Cast(SPELL_CONSECRATION, me, nullptr, &CONSECRATION_TICK);
                     events.RescheduleEvent(EVENT_CONSECRATION, 25000);
                     break;
-                case EVENT_CONSECRATION_TICK:
-                    me->CastCustomSpell(consecrationPos.GetPositionX(), consecrationPos.GetPositionY(), consecrationPos.GetPositionZ(),
-                        SPELL_CONSECRATION_DAMAGE, &CONSECRATION_TICK, nullptr, nullptr, TRIGGERED_FULL_MASK);
-                    if (--consecrationTicks)
-                        events.RescheduleEvent(EVENT_CONSECRATION_TICK, 1000);
-                    break;
                 case EVENT_BLINDING_LIGHT:
-                    me->CastSpell(me, SPELL_BLINDING_LIGHT, true);
+                    Cast(SPELL_BLINDING_LIGHT_FLASH, me, nullptr, &BLINDING_LIGHT_DAMAGE);
+                    Cast(SPELL_BLINDING_LIGHT, me);
                     events.RescheduleEvent(EVENT_BLINDING_LIGHT, 40000);
                     break;
                 default:
