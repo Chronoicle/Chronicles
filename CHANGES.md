@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-27 (Oslo)
 
+- Claude (desktop session) — restart 19:17 UTC (owner OK), worldserver 4d04709: crash fix (FunctionProcessor::Update), priest scenario Balnazzar returns after the add phase, two extra Balnazzar spawns deleted, shop moved to the Donate Vendor (SQL + Bpay.Enabled = 0) — live, changelog 1553848231895769119 — `git revert 4d04709`, `~/undo_priest_scenario_balnazzar.sql`, `~/undo_balnazzar_extra_spawns.sql`, `~/undo_shop_to_donate_vendor.sql` + Bpay.Enabled = 1.
+- Claude (desktop session) — owner request: Chronp (guid 25) Xal'atath rank 101, all traits, tier 1 — live (character data, no restart) — `~/undo_chronp_artifact.sql`.
 - Claude (desktop session) — restart 17:31 UTC (owner OK), worldserver 2f83235: #30 Eonar garden door 273687 not clickable, one Focus NPC above each Focusing Crystal, temporary server.eonar reset logs — live — `git revert 2f83235`, `~/undo_eonar_30.sql`.
 - Claude (desktop session) — crash 17:05 UTC (XP::Gain null xp.txt row for a level-210 character in a group kill); fix 24d34bf live after the restart at 17:11 UTC (owner OK): kill and quest XP give 0 for levels without an xp.txt row — `git revert 24d34bf`.
 - Claude (desktop session) — restart 16:54 UTC (owner OK), worldserver 30b4ba2: #41 one tendril per proc + Acrid trinket rating multiplier (5eee31d); #44 Mindbender Mana Leech 123050 via creature_template_addon; #58 SPELLMOD_ACTIVATION_TIME applies from the first tick, Castigation -66 hack removed (30b4ba2); Avenging Angel v3 (c348fc2, 4145b23, live since 16:26) — live, changelog 1553812361251397835 — `git revert` the commits, `~/undo_mindbender_44.sql`.
