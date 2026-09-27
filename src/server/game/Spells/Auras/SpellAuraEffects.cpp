@@ -7736,6 +7736,17 @@ void AuraEffect::HandlePeriodicTriggerSpellAuraTick(Unit* target, Unit* caster, 
             }
             else if (target)
             {
+                // Channel bolts (Penance) ticking from an aura on the caster: name the channel target in the cast like the
+                // first bolt does, not the caster itself (bolts after the first animated choppy, #58)
+                SpellEffectInfo const* firstEffect = triggeredSpellInfo->GetEffect(EFFECT_0, m_diffMode);
+                if (target == triggerCaster && firstEffect && firstEffect->TargetA.GetTarget() == TARGET_UNIT_CHANNEL_TARGET)
+                    for (ObjectGuid const& channelTarget : triggerCaster->GetChannelObjects())
+                        if (Unit* channelUnit = ObjectAccessor::GetUnit(*triggerCaster, channelTarget))
+                        {
+                            target = channelUnit;
+                            break;
+                        }
+
                 SpellCastResult checkResult = triggeredSpellInfo->CheckExplicitTarget(triggerCaster, target);
                 if (checkResult == SPELL_CAST_OK)
                     triggerCaster->CastSpell(target, triggeredSpellInfo, true, castItem, this);
