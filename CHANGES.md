@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-27 (Oslo)
 
+- Claude (desktop session) — restart 15:30 UTC (owner OK), worldserver 4ec0c6c: #41 totem-type summons get IsSummonedBy (Void Tendrils attack), RPPM first-proc double proc fixed, Acrid Catalyst Injector item-scaled stats (a4c25b9, temporary server.acrid log); #58 periodic channel bolts (Penance) cast at the channel target (0b085c8); #27 RPPM trinket/trait/set procs only in combat (7948192); Codex #47 server.possession diagnostics (69cde61); Avenging Angel world boss 500002 in the core + DB, not spawned (1c76d95) — live, changelog 1553791361164116079 — `git revert` the commits, `~/undo_world_boss_avenging_angel.sql`.
 - Codex — #46 cooldown clock fix 0f3d61f: character saves preserve active spell cooldowns; save/load converts between steady and Unix time; client cooldown history uses steady time. Live after approved restart at 01:33 Oslo (23:33 UTC Sep 26). Regression + build/install passed; awaiting in-game retest. Undo: revert 0f3d61f code, rebuild and approved restart. Player-facing changelog pending Grok.
 
 ## 2026-09-26
