@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~14:40 UTC by Claude (desktop session). Previously: 2026-09-27 by Claude (monitoring) / Codex (#46, #47).
+Last updated: 2026-09-27 ~14:50 UTC by Claude (desktop session). Previously: ~14:40 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,7 +9,7 @@ Last updated: 2026-09-27 ~14:40 UTC by Claude (desktop session). Previously: 202
 
 ## Current state
 
-- **Staged, built + installed, needs a restart (Claude, 2026-09-27 ~14:35 UTC):** the installed worldserver has a4c25b9 (#41) on top of Codex 69cde61 (#47 `server.possession` diagnostics) and 7948192 (#27). #41: Totem::InitSummon now calls the base, so totem-type summons get IsSummonedBy (Void Tendrils pick a target; **watch other totem summons**); RPPM first-proc double proc fixed in Unit::RollProcResult (affects all RPPM procs); Acrid Catalyst Injector passes the item-scaled ratings, temporary `server.acrid` log. eru.01 told. After the restart: post Live on #41 + changelog, grep `server.acrid` after a test, then remove the log.
+- **Staged, built + installed, needs a restart (Claude, 2026-09-27 ~14:35 UTC):** the installed worldserver has 0b085c8 (#58: periodic channel bolts like Penance 2-4 are cast at the channel target instead of the caster, visual unverified, eru told) and the installed worldserver has a4c25b9 (#41) on top of Codex 69cde61 (#47 `server.possession` diagnostics) and 7948192 (#27). #41: Totem::InitSummon now calls the base, so totem-type summons get IsSummonedBy (Void Tendrils pick a target; **watch other totem summons**); RPPM first-proc double proc fixed in Unit::RollProcResult (affects all RPPM procs); Acrid Catalyst Injector passes the item-scaled ratings, temporary `server.acrid` log. eru.01 told. After the restart: post Live on #41 + changelog, grep `server.acrid` after a test, then remove the log.
 - **Discord (2026-09-27 ~14:30 UTC):** all reports up to 14:14 UTC are on the board and every reporter got an issue number. New: #55 Harpoon, #56 Terminus Signalling Beacon, #57 suggestion .challenge (needs-owner), #54 Eonar crystals suggestion (needs-owner). James (#13) wants the drummers back on their paths, going to the drum only for the drum cast (undo `~/fix_nl_drummers_13.sql` + new logic). xinkeg (#30): the bugged Eonar door is the outer garden door, not the encounter door.
 
 - **Monitoring (owner request, 2026-09-27, Claude):** owner's Raspberry Pi 5 at home (`raspberrypi`, Tailscale 100.100.104.31) runs Uptime Kuma (:3001, TCP checks on 1119/8081/8085/8086 + ping, Discord alerts) and the Beszel hub (:8090). VPS joined the owner's Tailscale (100.69.9.10, installed by the owner with sudo); Docker container `beszel-agent` (as `wow`, `--network host`, restart unless-stopped) listens only on 100.69.9.10:45876, nothing new is public. No worldserver restart involved. Remove with `docker rm -f beszel-agent`.
