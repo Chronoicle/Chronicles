@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~17:00 UTC by Claude (desktop session). Previously: ~16:55 UTC by Claude (desktop session).
+Last updated: 2026-09-27 ~17:10 UTC by Claude (desktop session). Previously: ~17:00 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,6 +9,7 @@ Last updated: 2026-09-27 ~17:00 UTC by Claude (desktop session). Previously: ~16
 
 ## Current state
 
+- **Crash 17:05:44 UTC (auto-restarted 17:05:54):** KillRewarder -> XP::Gain read a null xp.txt row: Rxven was level 210 (xp.txt ends at 123) and got XP from a group kill. Fix 24d34bf (BaseGain + quest XP return 0 for levels without a row) built + installed 17:09, **needs a restart**. Rxven is back at 110 (someone reset it). Backtrace `~/crashes/crash_2026-09-27_170544.log`.
 - **Live since the restart at 16:54 UTC (owner OK), changelog 1553812361251397835, eru told, cards in Needs testing:** #44 30b4ba2 Mindbender gets Mana Leech 123050 via creature_template_addon (DB applied, `~/fix_mindbender_44.sql` / undo); #58 30b4ba2 core: SPELLMOD_ACTIVATION_TIME applies to the period on the first calculation too, Castigation -66 hack removed (watch DoT tick timings). eru told.
 - **Live since the 16:54 UTC restart:** #41 5eee31d: Acrid values take the trinket rating multiplier (~234 per stack / ~2665 Cycle at ilvl 985, matches retail), Call to the Void one tendril per proc (spell_trigger row summons, script only caps). eru told. After a test: remove the temporary `server.acrid` log. Also open from eru: #44 Mindbender still no resources, #58 Penance still choppy with Castigation, #59 Command Map.
 - **Live since the restart at 16:26 UTC (owner OK):** Avenging Angel v3 (c348fc2, 4145b23): Witness the Void 207720 instead of Blinding Light, Crusader Strike 210370 tank stacks every 8 s (full 137%, ~4.8M holy, owner wants it), Frenzy 111730 +100% on the boss = all boss damage x2, base health 2.147B, two Monkes (500003, Hyrja look + weapons, 150M health) every 60 s with Expel Light (228029 now has an aura script casting 228030 from the marked player) and Shield of Light. Minion spells keep their raid values (not doubled).
