@@ -35,13 +35,14 @@
 
 enum DonateProductType : uint8
 {
-    PRODUCT_ITEM        = 0, // param1 = item entry, bonus = bonus list IDs separated by spaces (sold in the vendor window)
+    PRODUCT_ITEM        = 0, // param1 = item entry, bonus = bonus list IDs separated by spaces, or "ilvl:N" for item level N (sold in the vendor window)
     PRODUCT_CURRENCY    = 1, // param1 = currency ID, param2 = amount
     PRODUCT_TITLE       = 2, // param1 = CharTitles ID
     PRODUCT_ACHIEVEMENT = 3, // param1 = achievement ID
     PRODUCT_SPELL       = 4, // param1 = spell ID (mounts, pets, illusions, ...)
     PRODUCT_LEVEL       = 5, // param1 = target level
     PRODUCT_GOLD        = 6, // param1 = gold
+    PRODUCT_PREMIUM     = 7, // param1 = days of premium (auth.account_premium), extends a running premium
 };
 
 enum DonateSender : uint32
@@ -67,12 +68,22 @@ static uint32 FactionFilter(Player* player)
     return player->GetTeam() == ALLIANCE ? 1 : 2;
 }
 
-static std::vector<uint32> ParseBonuses(std::string const& bonus)
+static std::vector<uint32> ParseBonuses(std::string const& bonus, uint32 itemId)
 {
     std::vector<uint32> ids;
     std::istringstream in(bonus);
-    for (uint32 id; in >> id;)
-        ids.push_back(id);
+    for (std::string token; in >> token;)
+    {
+        // "ilvl:N": the bonus list that lifts this item to item level N, like the in-game shop did
+        if (token.compare(0, 5, "ilvl:") == 0)
+        {
+            if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId))
+                if (uint32 id = sDB2Manager.GetItemBonusListForItemLevelDelta(int16(atoi(token.c_str() + 5) - int32(proto->GetBaseItemLevel()))))
+                    ids.push_back(id);
+        }
+        else
+            ids.push_back(uint32(atoi(token.c_str())));
+    }
     return ids;
 }
 
@@ -206,7 +217,7 @@ private:
             do
             {
                 Field* f = result->Fetch();
-                items.AddItem(int32(f[0].GetUInt32()), 0, 0, 0, ITEM_VENDOR_TYPE_ITEM, uint64(f[2].GetUInt32()) * GOLD, 0, 0, ParseBonuses(f[1].GetString()));
+                items.AddItem(int32(f[0].GetUInt32()), 0, 0, 0, ITEM_VENDOR_TYPE_ITEM, uint64(f[2].GetUInt32()) * GOLD, 0, 0, ParseBonuses(f[1].GetString(), f[0].GetUInt32()));
             } while (result->NextRow());
         }
 
@@ -298,6 +309,16 @@ private:
                 if (!player->ModifyMoney(int64(param1) * GOLD))
                     return "You can't carry that much gold";
                 return "";
+            case PRODUCT_PREMIUM:
+            {
+                // same as the shop's battlepay_premium: extends a running premium, otherwise starts now
+                WorldSession* session = player->GetSession();
+                uint32 expires = std::max(uint32(time(nullptr)), session->GetPremiumExpires()) + param1 * DAY;
+                LoginDatabase.PExecute("REPLACE INTO account_premium (account_id, expires) VALUES (%u, %u)", session->GetAccountId(), expires);
+                session->SetPremiumExpires(expires);
+                ChatHandler(session).PSendSysMessage("Premium activated: %u days added. Type .prem to open the premium menu.", param1);
+                return "";
+            }
             default:
                 return "This product is not set up correctly";
         }
