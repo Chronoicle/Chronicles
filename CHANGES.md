@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-27 (Oslo)
 
+- Claude (desktop session) — restart 20:25 UTC (owner OK), worldserver 04c8c93: Voidform Shadow damage 20% -> 25% (50c7ec9, owner request); GM-made Mythic keystones keep their own affixes (04c8c93); Chron (guid 1) keystone Vault of the Wardens +27 Raging / Volcanic / Fortified (challenge_key + item 57637 in the backpack, done offline) — live, changelog 1553865328197501049 — `git revert 50c7ec9 04c8c93`, `~/undo_chron_keystone.sql`.
 - Claude (desktop session) — restart 19:17 UTC (owner OK), worldserver 4d04709: crash fix (FunctionProcessor::Update), priest scenario Balnazzar returns after the add phase, two extra Balnazzar spawns deleted, shop moved to the Donate Vendor (SQL + Bpay.Enabled = 0) — live, changelog 1553848231895769119 — `git revert 4d04709`, `~/undo_priest_scenario_balnazzar.sql`, `~/undo_balnazzar_extra_spawns.sql`, `~/undo_shop_to_donate_vendor.sql` + Bpay.Enabled = 1.
 - Claude (desktop session) — owner request: Chronp (guid 25) Xal'atath rank 101, all traits, tier 1 — live (character data, no restart) — `~/undo_chronp_artifact.sql`.
 - Claude (desktop session) — restart 17:31 UTC (owner OK), worldserver 2f83235: #30 Eonar garden door 273687 not clickable, one Focus NPC above each Focusing Crystal, temporary server.eonar reset logs — live — `git revert 2f83235`, `~/undo_eonar_30.sql`.
