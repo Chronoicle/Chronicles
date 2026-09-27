@@ -1877,8 +1877,21 @@ class spell_dk_marrowrend : public SpellScriptLoader
                 if (!caster)
                     return;
 
-                for (int i = 0; i < GetSpellInfo()->Effects[EFFECT_2]->BasePoints; i++)
+                // 3 stacks, plus 3 for every active rune weapon: Dancing Rune Weapon (buff 81256 lasts as long as the weapon),
+                // a second weapon with Mouth of Hell 192570. The rune weapons do not copy Marrowrend here.
+                // One stack change instead of 3 triggered casts, which did not always stack (#43)
+                int32 runeWeapons = caster->HasAura(81256) ? (caster->HasAura(192570) ? 2 : 1) : 0;
+                int32 stacks = GetSpellInfo()->Effects[EFFECT_2]->BasePoints * (1 + runeWeapons);
+
+                if (Aura* boneShield = caster->GetAura(SPELL_DK_BONE_SHIELD, caster->GetGUID()))
+                    boneShield->ModStackAmount(stacks);
+                else
+                {
                     caster->CastSpell(caster, SPELL_DK_BONE_SHIELD, true);
+                    if (stacks > 1)
+                        if (Aura* newShield = caster->GetAura(SPELL_DK_BONE_SHIELD, caster->GetGUID()))
+                            newShield->ModStackAmount(stacks - 1);
+                }
             }
 
             void Register() override
