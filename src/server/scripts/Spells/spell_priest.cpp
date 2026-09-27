@@ -456,6 +456,12 @@ class spell_pri_voidform : public AuraScript
         }
     }
 
+    // Owner request 2026-09-27: Shadow damage dealt +5% on top of the client data (20% -> 25%)
+    void CalculateAmount0(AuraEffect const* /*aurEff*/, float & amount, bool & /*canBeRecalculated*/)
+    {
+        amount += 5.0f;
+    }
+
     void CalculateAmount1(AuraEffect const* /*aurEff*/, float & amount, bool & /*canBeRecalculated*/)
     {
         if (status & LockInsanity)
@@ -490,6 +496,7 @@ class spell_pri_voidform : public AuraScript
         DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pri_voidform::CalculateAmount3, EFFECT_9, SPELL_AURA_ADD_PCT_MODIFIER);
         DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pri_voidform::CalculateAmount2, EFFECT_2, SPELL_AURA_MELEE_SLOW);
         DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pri_voidform::CalculateAmount1, EFFECT_1, SPELL_AURA_MOD_POWER_REGEN);
+        DoEffectCalcAmount += AuraEffectCalcAmountFn(spell_pri_voidform::CalculateAmount0, EFFECT_0, SPELL_AURA_MOD_DAMAGE_PERCENT_DONE);
         OnEffectPeriodic += AuraEffectPeriodicFn(spell_pri_voidform::OnTick, EFFECT_4, SPELL_AURA_PERIODIC_DUMMY);
         OnEffectRemove += AuraEffectRemoveFn(spell_pri_voidform::OnRemove, EFFECT_4, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
         OnEffectApply += AuraEffectApplyFn(spell_pri_voidform::OnApply, EFFECT_4, SPELL_AURA_PERIODIC_DUMMY, AURA_EFFECT_HANDLE_REAL);
