@@ -26,7 +26,7 @@ enum Spells : uint32
     SPELL_JUDGMENT              = 66005,    // NPC Judgement (Trial of the Crusader champions)
     SPELL_SACRED_GROUND         = 227789,   // Maiden of Virtue (Karazhan): holy pool at a player, damage over time while standing in it
     SPELL_WITNESS_THE_VOID      = 207720,   // Thing That Should Not Be (Nighthold): 4 sec cast, damages everyone, fears those facing it
-    SPELL_CRUSADER_STRIKE       = 210370,   // tank hit + 20% damage taken per stack (5 stacks, 30 sec)
+    SPELL_CRUSADER_STRIKE       = 210370,   // tank hit + 20% damage taken per stack (5 stacks, 30 sec); 137% weapon, holy: Frenzy counts twice (~4.8M, owner wants it)
 
     // Monke (Hyrja, Trial of Valor)
     SPELL_EXPEL_LIGHT           = 228029,   // 3 sec, then the marked player blasts nearby allies (228030)
@@ -63,7 +63,6 @@ float const MELEE_MAX               = 480000.0f;
 float const JUDGMENT_DAMAGE         = 800000.0f;
 float const SHIELD_DAMAGE           = 1200000.0f;
 float const CONSECRATION_TICK       = 300000.0f;   // every 2 sec
-float const CRUSADER_STRIKE_PCT     = 35.0f;       // % weapon damage (137 in the spell); holy weapon strikes get Frenzy twice (weapon + spell), ~1.2M
 uint8 const MONKES_PER_WAVE         = 2;
 uint64 const MONKE_HEALTH           = 150000000;
 float const MONKE_MELEE_MIN         = 150000.0f;
@@ -171,7 +170,7 @@ struct boss_avenging_angel : public ScriptedAI
             switch (eventId)
             {
                 case EVENT_CRUSADER_STRIKE:
-                    Cast(me, SPELL_CRUSADER_STRIKE, me->getVictim(), true, &CRUSADER_STRIKE_PCT);
+                    Cast(me, SPELL_CRUSADER_STRIKE, me->getVictim());
                     events.RescheduleEvent(EVENT_CRUSADER_STRIKE, 8000);
                     break;
                 case EVENT_JUDGMENT:
