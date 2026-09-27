@@ -164,6 +164,10 @@ namespace Trinity
             GtXpEntry const* xpPlayer = sXpGameTable.GetRow(pl_level);
             GtXpEntry const* xpMob = sXpGameTable.GetRow(mob_level);
 
+            // xp.txt ends at level 123: a GM-set level like 210 crashed every kill reward in their group
+            if (!xpPlayer || !xpMob)
+                return 0;
+
             if (mob_level >= pl_level)
             {
                 uint8 nLevelDiff = mob_level - pl_level;

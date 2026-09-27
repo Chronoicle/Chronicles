@@ -281,7 +281,14 @@ uint32 Quest::XPValue(Player* player) const
 
         auto multiplier = 1.0f;
         if (questLevel != playerLevel)
-            multiplier = sXpGameTable.GetRow(std::min(playerLevel, questLevel))->Divisor / sXpGameTable.GetRow(playerLevel)->Divisor;
+        {
+            // levels past the end of xp.txt (GM-set levels) have no row
+            GtXpEntry const* xpLow = sXpGameTable.GetRow(std::min(playerLevel, questLevel));
+            GtXpEntry const* xpPlayer = sXpGameTable.GetRow(playerLevel);
+            if (!xpLow || !xpPlayer)
+                return 0;
+            multiplier = xpLow->Divisor / xpPlayer->Divisor;
+        }
 
         auto diffFactor = 2 * (questLevel - playerLevel) + 20;
         if (diffFactor < 1)
