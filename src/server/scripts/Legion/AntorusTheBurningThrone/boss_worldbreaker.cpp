@@ -78,6 +78,12 @@ enum Spells
     SPELL_LURING_DESTRUCTION            = 246848,
 
     SPELL_DAILY_ESSENCE_WORLDBREAKER    = 305307,
+
+    // trash Garothi Annihilator 123398 (#52): its Annihilation stalker 123459 uses the same trigger script
+    NPC_ATBT_ANNIHILATION_TRIGGER       = 123459,
+    SPELL_ATBT_ANNIHILATION_AT          = 245812, // areatrigger 10793, the soak circle
+    SPELL_ATBT_ANNIHILATION_DMG         = 245810,
+    SPELL_ATBT_ANNIHILATION_BLAST       = 245811, // nobody soaked
 };
 
 enum eEvents
@@ -655,13 +661,15 @@ struct npc_worldbreaker_annihilation_trigger : public ScriptedAI
     {
         if (me->GetEntry() == NPC_WB_ANNIHILATION_TRIGGER)
             DoCast(me, SPELL_ANNIHILATION_AT, true);
+        else if (me->GetEntry() == NPC_ATBT_ANNIHILATION_TRIGGER) // trash Garothi Annihilator: soak circle (#52)
+            DoCast(me, SPELL_ATBT_ANNIHILATION_AT, true);
         else
             me->CastSpell(me, SPELL_HAYWIRE_ANNIHILATION_SHRAPNEL);
     }
 
     void SpellHit(Unit* caster, SpellInfo const* spell) override
     {
-        if (spell->Id == SPELL_ANNIHILATION_DMG)
+        if (spell->Id == SPELL_ANNIHILATION_DMG || spell->Id == SPELL_ATBT_ANNIHILATION_DMG)
             DespawnMe();
     }
 
@@ -773,6 +781,7 @@ struct npc_atbt_annihilator : ScriptedAI
             case EVENT_1:
             {
                 DoCast(245807);
+                positions.clear(); // only this cast's circles get the damage, not every earlier one (#52)
                 auto players = me->getThreatManager().getThreatList();
 
                 Trinity::Containers::RandomResizeList(players, 3);
@@ -818,7 +827,7 @@ class spell_worldbreaker_annihilation_dmg : public SpellScript
         targetCount = targets.size();
 
         if (GetExplTargetDest() && targets.empty())
-            GetCaster()->CastSpell(GetExplTargetDest(), SPELL_ANNIHILATION_BLAST, true);
+            GetCaster()->CastSpell(GetExplTargetDest(), GetSpellInfo()->Id == SPELL_ATBT_ANNIHILATION_DMG ? SPELL_ATBT_ANNIHILATION_BLAST : SPELL_ANNIHILATION_BLAST, true);
     }
 
     void HandleDamage(SpellEffIndex /*effectIndex*/)
