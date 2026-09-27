@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-27 ~15:50 UTC by Claude (desktop session). Previously: ~15:35 UTC by Claude (desktop session).
+Last updated: 2026-09-27 ~15:55 UTC by Claude (desktop session). Previously: ~15:50 UTC by Claude (desktop session).
 
 ## Who does what right now
 
@@ -9,7 +9,7 @@ Last updated: 2026-09-27 ~15:50 UTC by Claude (desktop session). Previously: ~15
 
 ## Current state
 
-- **Staged, built + installed (15:49), needs a restart:** Avenging Angel 500002 (spawned by the owner in the Gurubashi arena, guid 146929294, respawn 300 s) now uses NPC spell versions so the visuals show (player Consecration only has player-only visuals): Consecration 43429, Judgement 66005, Blinding Light flash 33009 + disorient 105421, plus Sacred Ground 227789 (Maiden of Virtue) every 23 s (009f40d, 68c3656). Temporary `server.angel` log of every cast result; remove after tuning.
+- **Live since the restart at 15:53 UTC (owner OK):** Avenging Angel 500002 (spawned by the owner in the Gurubashi arena, guid 146929294, respawn 300 s) now uses NPC spell versions so the visuals show (player Consecration only has player-only visuals): Consecration 43429, Judgement 66005, Blinding Light flash 33009 + disorient 105421, plus Sacred Ground 227789 (Maiden of Virtue) every 23 s (009f40d, 68c3656). Temporary `server.angel` log of every cast result; remove after tuning.
 - **Live since the restart at 15:30 UTC (owner OK), changelog 1553791361164116079, reporters told, #27/#41/#58 in Needs testing:** the worldserver (15:28 build) has the Avenging Angel world boss 500002 (1c76d95..: owner request, script world_boss_avenging_angel.cpp, 2 billion health +150 million per extra attacker, Judgment / Shield of the Righteous / Consecration / Blinding Light with fixed damage; DB already applied `~/fix_world_boss_avenging_angel.sql` / undo; NOT spawned: owner picks the spot, loot and respawn; numbers are first guesses, tune after a test), the installed worldserver has 0b085c8 (#58: periodic channel bolts like Penance 2-4 are cast at the channel target instead of the caster, visual unverified, eru told) and the installed worldserver has a4c25b9 (#41) on top of Codex 69cde61 (#47 `server.possession` diagnostics) and 7948192 (#27). #41: Totem::InitSummon now calls the base, so totem-type summons get IsSummonedBy (Void Tendrils pick a target; **watch other totem summons**); RPPM first-proc double proc fixed in Unit::RollProcResult (affects all RPPM procs); Acrid Catalyst Injector passes the item-scaled ratings, temporary `server.acrid` log. eru.01 told. After the restart: post Live on #41 + changelog, grep `server.acrid` after a test, then remove the log.
 - **Discord (2026-09-27 ~14:30 UTC):** all reports up to 14:14 UTC are on the board and every reporter got an issue number. New: #55 Harpoon, #56 Terminus Signalling Beacon, #57 suggestion .challenge (needs-owner), #54 Eonar crystals suggestion (needs-owner). James (#13) wants the drummers back on their paths, going to the drum only for the drum cast (undo `~/fix_nl_drummers_13.sql` + new logic). xinkeg (#30): the bugged Eonar door is the outer garden door, not the encounter door.
 
