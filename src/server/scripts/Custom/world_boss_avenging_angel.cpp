@@ -148,7 +148,7 @@ struct boss_avenging_angel : public ScriptedAI
                 case EVENT_SACRED_GROUND:
                     // with its cast bar, like Maiden
                     if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 60.0f, true))
-                        TC_LOG_INFO("server.angel", "Avenging Angel: spell %u at %s, result %u", SPELL_SACRED_GROUND, target->GetName(), uint32(me->CastSpell(target, SPELL_SACRED_GROUND, false)));
+                        TC_LOG_INFO("server.angel", "Avenging Angel: spell %u at %s, result %u", uint32(SPELL_SACRED_GROUND), target->GetName(), uint32(me->CastSpell(target, SPELL_SACRED_GROUND, false)));
                     events.RescheduleEvent(EVENT_SACRED_GROUND, 23000);
                     break;
                 default:
