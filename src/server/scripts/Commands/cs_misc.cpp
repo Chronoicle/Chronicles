@@ -4027,9 +4027,19 @@ public:
         item->SetState(ITEM_CHANGED, player);
 
         playerTarget->UpdateChallengeKey(item);
-        playerTarget->m_challengeKeyInfo.Affix = affix1;
-        playerTarget->m_challengeKeyInfo.Affix1 = affix2;
-        playerTarget->m_challengeKeyInfo.Affix2 = affix3;
+        // All three affixes given: the key keeps them (also after a relog, Player::InitChallengeKey), else the week's
+        if (affix1 && affix2 && affix3)
+        {
+            playerTarget->m_challengeKeyInfo.Affix = affix1;
+            playerTarget->m_challengeKeyInfo.Affix1 = affix2;
+            playerTarget->m_challengeKeyInfo.Affix2 = affix3;
+            if (level > 3)
+                item->SetModifier(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_1, affix1);
+            if (level > 6)
+                item->SetModifier(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_2, affix2);
+            if (level > 9)
+                item->SetModifier(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_3, affix3);
+        }
         playerTarget->m_challengeKeyInfo.needUpdate = false;
         playerTarget->m_challengeKeyInfo.needSave = true;
 

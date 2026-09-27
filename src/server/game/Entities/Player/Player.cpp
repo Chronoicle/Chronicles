@@ -38480,9 +38480,19 @@ bool Player::InitChallengeKey(Item* item)
     if (!m_challengeKeyInfo.IsActive())
         return false;
 
-    m_challengeKeyInfo.Affix = sWorld->getWorldState(WS_CHALLENGE_AFFIXE1_RESET_TIME);
-    m_challengeKeyInfo.Affix1 = sWorld->getWorldState(WS_CHALLENGE_AFFIXE2_RESET_TIME);
-    m_challengeKeyInfo.Affix2 = sWorld->getWorldState(WS_CHALLENGE_AFFIXE3_RESET_TIME);
+    // A saved key whose affixes differ from the week's was set by a GM (.addmythickey or DB): it keeps them.
+    // Normal keys always get the week's affixes and the weekly reset deletes every key (owner request 2026-09-27)
+    bool gmAffixes = m_challengeKeyInfo.Affix && m_challengeKeyInfo.Affix1 && m_challengeKeyInfo.Affix2 &&
+        (m_challengeKeyInfo.Affix != sWorld->getWorldState(WS_CHALLENGE_AFFIXE1_RESET_TIME) ||
+         m_challengeKeyInfo.Affix1 != sWorld->getWorldState(WS_CHALLENGE_AFFIXE2_RESET_TIME) ||
+         m_challengeKeyInfo.Affix2 != sWorld->getWorldState(WS_CHALLENGE_AFFIXE3_RESET_TIME));
+
+    if (!gmAffixes)
+    {
+        m_challengeKeyInfo.Affix = sWorld->getWorldState(WS_CHALLENGE_AFFIXE1_RESET_TIME);
+        m_challengeKeyInfo.Affix1 = sWorld->getWorldState(WS_CHALLENGE_AFFIXE2_RESET_TIME);
+        m_challengeKeyInfo.Affix2 = sWorld->getWorldState(WS_CHALLENGE_AFFIXE3_RESET_TIME);
+    }
 
     item->SetModifier(ITEM_MODIFIER_CHALLENGE_ID, m_challengeKeyInfo.ID);
     item->SetModifier(ITEM_MODIFIER_CHALLENGE_KEYSTONE_LEVEL, m_challengeKeyInfo.Level);
