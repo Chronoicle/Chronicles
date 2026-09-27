@@ -30,6 +30,10 @@ FunctionProcessor::~FunctionProcessor()
 
 void FunctionProcessor::Update(uint32 p_time)
 {
+    // A session changing map can be updated from two threads (crash 2026-09-27 18:25 in Map::UpdateSessions);
+    // recursive, so functions that add new functions still work
+    std::lock_guard<std::recursive_mutex> _update_lock(m_queue_lock);
+
     //move from queue
     AddFunctionsFromQueue();
 
@@ -50,9 +54,10 @@ void FunctionProcessor::Update(uint32 p_time)
     FunctionList::iterator i;
     while (((i = m_functions.begin()) != m_functions.end()) && i->first <= m_time)
     {
-        // get and remove event from queue
-        i->second();
+        // take it out before running it: the function may change this list
+        std::function<void()> function = std::move(i->second);
         m_functions.erase(i);
+        function();
     }
 }
 
