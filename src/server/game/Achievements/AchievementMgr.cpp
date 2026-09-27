@@ -3322,6 +3322,11 @@ bool AchievementMgr<T>::RequirementsSatisfied(CriteriaTree const* tree, Achievem
             if (!miscValue1 || miscValue2 != criteria->Asset)
                 return false;
             break;
+        case CRITERIA_TYPE_APPEARANCE_UNLOCKED_BY_SLOT:
+            // miscValue1 = transmog slot of the new appearance (head is 0): only that slot counts, e.g. 18 tabard for "Represent" (#53)
+            if (miscValue1 != uint32(criteria->Asset))
+                return false;
+            break;
         case CRITERIA_TYPE_COMPLETE_QUEST:
         {
             // if miscValues != 0, it contains the questID.
