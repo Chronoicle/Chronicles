@@ -27,6 +27,7 @@
 #include "SkillDiscovery.h"
 #include "SpellAuraEffects.h"
 #include "SpellScript.h"
+#include "GameTables.h"
 #include "PlayerDefines.h"
 
 // Generic script for handling item dummy effects which trigger another spell.
@@ -4490,6 +4491,14 @@ public:
 			// The buffs have 0 base points; the item-level-scaled ratings are effect 1 (per stack) and effect 2 (Cycle) of 253259 (#41)
 			float perStack = GetSpellInfo()->Effects[EFFECT_1]->CalcValue(caster, nullptr, nullptr, castItem);
 			float cycle = GetSpellInfo()->Effects[EFFECT_2]->CalcValue(caster, nullptr, nullptr, castItem);
+
+			// They are ratings, so they take the trinket rating multiplier like any rating aura (was ~3x too high, #41)
+			if (castItem)
+				if (GtCombatRatingsMultByILvl const* ratingMult = sCombatRatingsMultByILvlGameTable.GetRow(castItem->GetItemLevel(caster->GetEffectiveLevel())))
+				{
+					perStack *= ratingMult->TrinketMultiplier;
+					cycle *= ratingMult->TrinketMultiplier;
+				}
 
 			static std::vector<uint32> const stats = { Critical, Haste, Mastery };
 			uint32 spellId = Trinity::Containers::SelectRandomContainerElement(stats);

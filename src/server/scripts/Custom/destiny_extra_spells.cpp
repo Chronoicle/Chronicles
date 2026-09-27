@@ -38,6 +38,8 @@ enum DestinyExtraSpells : uint32
 
 // 193371 - Call to the Void
 // DestinyCore checked for the tendril's Mind Flay (193473), which a priest never casts, so it could never proc.
+// The summon itself (193470) comes from the spell_trigger row; this script only filters and caps. It used to cast
+// the summon too, so every proc made two tendrils (#41).
 class spell_arti_pri_call_of_the_void : public AuraScript
 {
     PrepareAuraScript(spell_arti_pri_call_of_the_void);
@@ -62,17 +64,9 @@ class spell_arti_pri_call_of_the_void : public AuraScript
         return count < 3;
     }
 
-    void HandleEffectProc(AuraEffect const* aurEff, ProcEventInfo& eventInfo)
-    {
-        if (Unit* caster = GetCaster())
-            if (Unit* target = eventInfo.GetProcTarget())
-                caster->CastSpell(target, SPELL_PRIEST_CALL_OF_THE_VOID_SUMMON, true, nullptr, aurEff);
-    }
-
     void Register() override
     {
         DoCheckProc += AuraCheckProcFn(spell_arti_pri_call_of_the_void::CheckProc);
-        OnEffectProc += AuraEffectProcFn(spell_arti_pri_call_of_the_void::HandleEffectProc, EFFECT_0, SPELL_AURA_DUMMY);
     }
 };
 
