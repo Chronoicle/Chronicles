@@ -404,6 +404,15 @@ public:
                                     cre->CastSpell(cre, 252787);
                                 });
                             }
+                        // a bridge pack that was already dead when the instance loaded (saved lockout) never
+                        // showed the teleport pod with its death, so show it now (#63)
+                        if (mobsForBridge.empty())
+                            for (const auto& guid : mobsFromBridge)
+                                if (Creature* cre = instance->GetCreature(guid))
+                                {
+                                    cre->SetVisible(true);
+                                    cre->CastSpell(cre, SPELL_SPAWN);
+                                }
                         break;
                     case DATA_ANTORAN:
                         if (auto go = instance->GetGameObject(GetGuidData(GO_PORTAL_TO_ELUNARIES)))

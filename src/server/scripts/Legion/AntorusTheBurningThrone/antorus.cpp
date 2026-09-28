@@ -480,6 +480,8 @@ public:
             }
             break;
         case 808:
+            if (instance->GetBossState(DATA_KINGAROTH) == DONE)   // no approach RP for a defeated boss (#63)
+                break;
             player->AddDelayedEvent(1000, [player]() -> void
             {
                 player->CastSpell(player, 249802);
@@ -494,6 +496,8 @@ public:
             break;      
         case 810:
         {
+            if (instance->GetBossState(DATA_VARIMATHRAS) == DONE)
+                break;
             player->AddDelayedEvent(1000, [player]() -> void
             {
                 player->CastSpell(player, 250797);
@@ -523,6 +527,8 @@ public:
             });
             break;
         case 812:
+            if (instance->GetBossState(DATA_AGGRAMAR) == DONE)
+                break;
             instance->instance->LoadGrid(-12633.20f, -2231.10f);
             player->AddDelayedEvent(1000, [player]() -> void
             {
