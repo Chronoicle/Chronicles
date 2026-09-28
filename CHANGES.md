@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — restart 16:45 UTC (owner OK, Chron + Chronp online, 60 s timer), worldserver b696452: 021ba95 #77 Broken Shore intro (English Khadgar option, smooth Dread Raven flight to the ship deck), #74 The Fallen Lion gryphon, #78 Recruiter Lee skip (account quest 42740), #75 Demons Among Us portal POIs, #71 Mind Trauma 8 stacks, #73 Purified Resolve without versatility; party bots (staff only): f8d5b35 target switching, fce9e6f + 8906e07 + b696452 line-of-sight positioning, dead bots resurrect again — live, changelog 1554173379073020088 — `git revert` the commits, `~/undo_broken_shore_intro_77.sql`, `~/undo_recruiter_lee_skip_78.sql`, `~/undo_demons_among_us_poi_75.sql`.
 - Claude (desktop session) — restart 15:26 UTC (owner OK), worldserver 02df53d: 0557c3d party bot sessions saved at shutdown; 66f761a party bots phase 2 (spell rotations per spec, `world.partybot_spells`); ace9ab1 bots learn the class hall talent for a second legendary (existing bots re-equip at next login, setup = 0) — live — `git revert` the commits, `DROP TABLE world.partybot_spells`.
 - Claude (desktop session) — restart 13:25 UTC (owner OK, Chrondh + Rxven + 4 stuck bots online, 60 s timer), worldserver 60d381d: party bot steps also run on the map (setup never ran), bots answer the Dungeon Finder role check and accept the proposal (#65) — live, staff only — `git revert 60d381d 7ea7d45 cd406ff`.
 
