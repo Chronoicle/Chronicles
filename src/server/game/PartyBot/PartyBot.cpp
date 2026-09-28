@@ -20,7 +20,6 @@ PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, Ob
         AT_AUTH_FLAG_NONE, std::unordered_map<uint8, int64>()),
     _botGuid(botGuid), _leaderGuid(leaderGuid)
 {
-    SetAddress("partybot");
 }
 
 bool PartyBotSession::Update(uint32 diff, Map* map)
