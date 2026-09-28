@@ -2779,6 +2779,11 @@ void World::KickAll()
     // session not removed at kick and will removed in next update tick
     for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
     {
+        // party bots have no socket to close: log them out (and save) now, while the database is still there;
+        // otherwise ~World saved them after the database was gone (crash at shutdown 2026-09-28)
+        if (itr->second->IsBotSession() && itr->second->GetPlayer())
+            itr->second->LogoutPlayer(true);
+
         itr->second->KickPlayer();
         itr->second->SetMap(nullptr);
     }
