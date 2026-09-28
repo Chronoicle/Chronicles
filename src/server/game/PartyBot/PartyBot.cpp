@@ -48,6 +48,12 @@ static bool GroupInCombat(Player* bot)
 
 bool PartyBotSession::Update(uint32 diff, Map* map)
 {
+    // logged out (dismissed, kicked at shutdown, or the login failed): removable in this very update. The shutdown runs
+    // only one session update after KickAll, and a session left over until ~World wrote to the closed login database
+    // (crash at every restart since the bots)
+    if (_loginStarted && !GetPlayer() && !PlayerLoading())
+        _done = true;
+
     // once the bot is on a map, the map updates its session (World::UpdateSessions skips it), so the bot steps run in
     // both: on the map for a bot in the world, in the world update while it is loading or between maps
     bool result = WorldSession::Update(diff, map);
