@@ -118,7 +118,7 @@ static bool StoreItem(Player* player, uint32 itemId, uint32 count, std::vector<u
     if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, count) != EQUIP_ERR_OK)
         return false;
 
-    if (Item* item = player->StoreNewItem(dest, itemId, true, 0, GuidSet(), bonuses))
+    if (Item* item = player->StoreNewItem(dest, itemId, true, Item::GenerateItemRandomPropertyId(itemId, player->GetLootSpecID()), GuidSet(), bonuses))
     {
         player->SendNewItem(item, count, true, false);
         return true;
