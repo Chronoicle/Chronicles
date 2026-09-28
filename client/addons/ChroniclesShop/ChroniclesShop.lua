@@ -1,21 +1,38 @@
 -- Chronicles Shop (#64): the shop window from the micro menu Shop button, /shop and ToggleStoreUI (the premium menu's
 -- Buy Premium). It talks to the server's donate_shop_addon script (many_in_one_donate.cpp) through addon messages with
 -- the prefix "SHOP"; the server checks and delivers everything, this addon only draws the shop.
--- One record per message, fields separated by spaces, the name last:
+-- One record per message, fields separated by spaces, the name last. Protocol v2 adds the fields after '#', so a v1
+-- server (no '#' fields) still parses:
 --   client -> server: OPEN | LIST <categoryId> | BUY <productId> <shownPrice> <reqId>
---   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> <name> ... CEND
---                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> <name> ... LEND <categoryId> <count>
---                     | OK <reqId> <productId> <tokens> | FAIL <reqId> <code> <tokens> | ERR <text>
+--   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> #<flags> <name> ... CEND
+--                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name> ... LEND <categoryId> <count>
+--                     | OK <reqId> <productId> <tokens> [MAIL] | FAIL <reqId> <code> <tokens> | ERR <text>
+--   flags: 1 = KNOWN (ITEM: the character has it already), 2 = NEW (ITEM: added lately; CAT: a new product in it or below)
+--   display = creature display ID of a mount or pet for the 3D preview (0 = none); MAIL = the bags were full, sent by mail
 local PREFIX = "SHOP"
 local ICON = "Interface\\Icons\\"
 local COIN = "|T" .. ICON .. "WoW_Token01:16:16:0:0:64:64:5:59:5:59|t"   -- after every price
 local STORE_ART = "Interface\\Store\\Store-Main"   -- Blizzard's store art, texcoords from Blizzard_StoreUIPatchwerk.xml
 local ROW_HEIGHT = 40
-local LIST_HEIGHT = 496   -- height of the right inset
-local TABS_WIDTH = 572
+local ROW_WIDTH = 516
+local LIST_HEIGHT = 496     -- height of the insets
+local PREVIEW_WIDTH = 230   -- the 3D preview on the right; the window stays within 1024 wide at UI scale 1
+local TABS_WIDTH = 540
+local FLAG_KNOWN, FLAG_NEW = 1, 2
+local NEW_TAG = "|cff20ff20NEW|r"   -- after a new product's name
+local NEW_MARK = "|cff20ff20!|r"    -- on a category or tab with a new product in it
+
+-- tabs with these names become paper doll slot icons (Blizzard's back slot uses the chest picture too)
+local SLOT_ART = "Interface\\PaperDoll\\UI-PaperDoll-Slot-"
+local SLOT_ICONS = {
+    head = "Head", neck = "Neck", shoulder = "Shoulder", shoulders = "Shoulder", back = "Chest", cloak = "Chest",
+    chest = "Chest", shirt = "Shirt", tabard = "Tabard", wrist = "Wrists", wrists = "Wrists", hands = "Hands",
+    waist = "Waist", legs = "Legs", feet = "Feet", finger = "Finger", rings = "Finger", trinket = "Trinket",
+    trinkets = "Trinket", ["main hand"] = "MainHand", ["off hand"] = "SecondaryHand", relic = "Relic", relics = "Relic",
+}
 
 -- DonateProductType in many_in_one_donate.cpp; items get their own icon from the client
-local TYPE_ITEM, TYPE_PREMIUM = 0, 7
+local TYPE_ITEM, TYPE_PREMIUM, TYPE_SERVICE = 0, 7, 8
 local TYPE_ICONS = {
     [1] = ICON .. "INV_Misc_Coin_17",           -- currency
     [2] = ICON .. "INV_Scroll_03",              -- title
@@ -24,8 +41,10 @@ local TYPE_ICONS = {
     [5] = ICON .. "Achievement_Level_110",      -- level
     [6] = ICON .. "INV_Misc_Coin_01",           -- gold
     [7] = ICON .. "INV_Crown_02",               -- premium days
+    [8] = ICON .. "INV_Misc_Note_01",           -- character service (rename, appearance, faction, race)
 }
 local UNKNOWN_ICON = ICON .. "INV_Misc_QuestionMark"
+local LOGOUT_TEXT = "Log out to the character screen to use it."
 
 local FAIL_TEXT = {
     NOFUNDS = "You don't have enough tokens.",
@@ -54,7 +73,8 @@ local shownCat                      -- category whose products are shown
 local listTop = 10                  -- y of the first row in the right inset, below the tabs
 local pending                       -- reqId of the BUY waiting for OK/FAIL
 local lastReqId = 0
-local Refresh, UpdateRows, ShowConfirm
+local previewed                     -- product in the preview panel
+local Refresh, UpdateRows, ShowConfirm, Preview
 
 RegisterAddonMessagePrefix(PREFIX)
 
@@ -86,6 +106,10 @@ local function Price(tokens)
     return tokens .. " " .. COIN
 end
 
+local function CatName(id)
+    return cats[id].new and cats[id].name .. " " .. NEW_MARK or cats[id].name
+end
+
 local function StoreTexture(parent, layer, left, right, top, bottom)
     local tex = parent:CreateTexture(nil, layer)
     tex:SetTexture(STORE_ART)
@@ -95,7 +119,7 @@ end
 
 -- ---------------------------------------------------------------- window
 local frame = CreateFrame("Frame", "ChroniclesShopFrame", UIParent, "PortraitFrameTemplate")
-frame:SetSize(800, 540)
+frame:SetSize(1000, 544)
 frame:SetPoint("CENTER")
 frame:SetFrameStrata("DIALOG")
 frame:SetToplevel(true)
@@ -111,18 +135,48 @@ SetPortraitToTexture(frame.portrait, ICON .. "WoW_Store")
 frame.TitleText:SetText("Shop")
 
 local balanceText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-balanceText:SetPoint("TOPRIGHT", -16, -25)
+balanceText:SetPoint("TOPRIGHT", -16, -27)
 
 local left = CreateFrame("Frame", "$parentLeftInset", frame, "InsetFrameTemplate")
-left:SetPoint("TOPLEFT", 4, -40)
+left:SetPoint("TOPLEFT", 4, -44)
 left:SetSize(192, LIST_HEIGHT)
 local leftArt = StoreTexture(left, "BACKGROUND", 0.00097656, 0.18261719, 0.46289063, 0.93652344)   -- store-category-bg
 leftArt:SetPoint("TOPLEFT", 3, -3)
 leftArt:SetPoint("BOTTOMRIGHT", -3, 3)
 
+local preview = CreateFrame("Frame", "$parentPreviewInset", frame, "InsetFrameTemplate")
+preview:SetPoint("TOPRIGHT", -6, -44)
+preview:SetSize(PREVIEW_WIDTH, LIST_HEIGHT)
+preview.name = preview:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+preview.name:SetPoint("TOPLEFT", 10, -12)
+preview.name:SetPoint("TOPRIGHT", -10, -12)
+preview.icon = preview:CreateTexture(nil, "ARTWORK")
+preview.icon:SetSize(64, 64)
+preview.icon:SetPoint("CENTER")
+
+-- your own character wearing the item, or the mount or pet; drag with the left button to turn it
+-- ponytail: no zoom or panning, add mouse wheel -> SetCamDistanceScale if players want a closer look
+local model = CreateFrame("DressUpModel", nil, preview)
+model:SetPoint("TOPLEFT", 4, -56)
+model:SetPoint("BOTTOMRIGHT", -4, 4)
+model:EnableMouse(true)
+model:Hide()
+model:SetScript("OnMouseDown", function(self, button)
+    if button == "LeftButton" then
+        self.dragX, self.dragFacing = GetCursorPosition(), self:GetFacing()
+    end
+end)
+model:SetScript("OnMouseUp", function(self) self.dragX = nil end)
+model:SetScript("OnHide", function(self) self.dragX = nil end)
+model:SetScript("OnUpdate", function(self)
+    if self.dragX then
+        self:SetFacing(self.dragFacing + (GetCursorPosition() - self.dragX) / 100)
+    end
+end)
+
 local right = CreateFrame("Frame", "$parentRightInset", frame, "InsetFrameTemplate")
-right:SetPoint("TOPLEFT", 198, -40)
-right:SetPoint("BOTTOMRIGHT", -6, 4)
+right:SetPoint("TOPLEFT", 198, -44)
+right:SetPoint("BOTTOMRIGHT", preview, "BOTTOMLEFT", -2, 0)
 
 local status = right:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 status:SetPoint("CENTER")
@@ -132,6 +186,23 @@ scroll:SetPoint("TOPLEFT", 0, -listTop)
 scroll:SetPoint("BOTTOMRIGHT", -30, 8)
 scroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, UpdateRows)
+end)
+
+-- filters the shown list by name as you type; Escape clears it (a second Escape closes the shop)
+-- ponytail: only the shown category's list, a shop-wide search needs a SEARCH command on the server
+local search = CreateFrame("EditBox", "$parentSearch", frame, "SearchBoxTemplate")
+search:SetSize(180, 20)
+search:SetPoint("BOTTOMRIGHT", right, "TOPRIGHT", -4, 1)
+search:SetAutoFocus(false)
+search:SetScript("OnEscapePressed", function(self)
+    self:SetText("")
+    self:ClearFocus()
+end)
+search:SetScript("OnEnterPressed", EditBox_ClearFocus)
+search:HookScript("OnTextChanged", function()
+    FauxScrollFrame_SetOffset(scroll, 0)
+    scroll.ScrollBar:SetValue(0)
+    UpdateRows()
 end)
 
 -- UpdateMicroButtons disables the Shop button while Blizzard's store is off (Bpay.Enabled = 0): turn it back on
@@ -159,7 +230,7 @@ local function Row(i)
     local row = rows[i]
     if row then return row end
     row = CreateFrame("Button", nil, right)   -- not in the scroll frame: FauxScrollFrame_Update hides it for short lists
-    row:SetSize(548, ROW_HEIGHT - 4)
+    row:SetSize(ROW_WIDTH, ROW_HEIGHT - 4)
     local bg = row:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(0, 0, 0, 0.5)
@@ -169,17 +240,22 @@ local function Row(i)
     row.icon:SetPoint("LEFT", 2, 0)
     row.name = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
-    row.name:SetWidth(240)
+    row.name:SetWidth(220)
     row.name:SetJustifyH("LEFT")
     row.ilvl = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-    row.ilvl:SetPoint("LEFT", 300, 0)
+    row.ilvl:SetPoint("LEFT", 270, 0)
     row.buy = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
     row.buy:SetSize(80, 22)
     row.buy:SetPoint("RIGHT", -6, 0)
     row.buy:SetText("Buy")
     row.buy:SetScript("OnClick", function(self) ShowConfirm(self:GetParent().product) end)
+    row.known = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")   -- instead of Buy: nothing to buy
+    row.known:SetPoint("CENTER", row.buy)
+    row.known:SetText("Already Known")
+    row.known:SetTextColor(0.1, 1, 0.1)
     row.price = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     row.price:SetPoint("RIGHT", row.buy, "LEFT", -12, 0)
+    row:SetScript("OnClick", function(self) Preview(self.product) end)
     row:SetScript("OnEnter", RowOnEnter)
     row:SetScript("OnLeave", GameTooltip_Hide)
     rows[i] = row
@@ -188,6 +264,16 @@ end
 
 UpdateRows = function()
     local items = shownCat and lists[shownCat] or {}
+    local query = search:GetText():lower()
+    if query ~= "" then
+        local found = {}
+        for _, p in ipairs(items) do
+            if select(2, Describe(p)):lower():find(query, 1, true) then
+                found[#found + 1] = p
+            end
+        end
+        items = found
+    end
     local visible = math.floor((LIST_HEIGHT - listTop - 8) / ROW_HEIGHT)
     FauxScrollFrame_Update(scroll, #items, visible, ROW_HEIGHT)
     local offset = FauxScrollFrame_GetOffset(scroll)
@@ -198,10 +284,13 @@ UpdateRows = function()
             local icon, name, r, g, b = Describe(p)
             row.product = p
             row.icon:SetTexture(icon)
-            row.name:SetText(name)
+            row.name:SetText(p.new and name .. " " .. NEW_TAG or name)
             row.name:SetTextColor(r, g, b)
             row.ilvl:SetText(p.ilvl > 0 and "Item level " .. p.ilvl or "")
             row.price:SetText(Price(p.price))
+            row.buy:SetShown(not p.known)
+            row.known:SetShown(p.known)
+            if previewed and previewed.id == p.id then row:LockHighlight() else row:UnlockHighlight() end
             row:SetPoint("TOPLEFT", 10, -listTop - (i - 1) * ROW_HEIGHT)
             row:Show()
         elseif rows[i] then
@@ -209,12 +298,40 @@ UpdateRows = function()
         end
     end
     status:SetText(STATUS_TEXT[state] or not shownCat and "There is nothing in the shop for you yet."
-        or not lists[shownCat] and STATUS_TEXT.loading or #items == 0 and "Nothing to buy here." or "")
+        or not lists[shownCat] and STATUS_TEXT.loading or #items == 0 and (query == "" and "Nothing to buy here." or "No results.") or "")
+end
+
+-- a click on a row: equipment with a look on your own character (on top of what you wear), a mount or pet with a
+-- display ID as its model, anything else as its icon
+-- ponytail: rings, trinkets and necks have no look (IsDressableItem is false), they show the icon
+Preview = function(p)
+    previewed = p
+    local icon, name, r, g, b = UNKNOWN_ICON, "Click a product to preview it.", HIGHLIGHT_FONT_COLOR.r, HIGHLIGHT_FONT_COLOR.g, HIGHLIGHT_FONT_COLOR.b
+    if p then
+        icon, name, r, g, b = Describe(p)
+    end
+    preview.name:SetText(name)
+    preview.name:SetTextColor(r, g, b)
+    preview.icon:SetTexture(icon)
+    local dress = p and p.link and IsDressableItem(p.link)
+    local display = p and p.display or 0
+    preview.waiting = p and p.link and not GetItemInfo(p.link) and p.param1   -- previewed again when the item arrives
+    model:SetShown(dress or display > 0)
+    preview.icon:SetShown(p ~= nil and not model:IsShown())
+    if dress then
+        model:SetUnit("player")
+        model:TryOn(p.link)
+        model:SetFacing(0)
+    elseif display > 0 then
+        model:SetDisplayInfo(display)
+        model:SetFacing(-0.6)
+    end
+    UpdateRows()
 end
 
 -- ---------------------------------------------------------------- confirmation
 local popup = CreateFrame("Frame", nil, frame)
-popup:SetSize(360, 190)
+popup:SetSize(360, 200)
 popup:SetPoint("CENTER")
 popup:SetFrameStrata("FULLSCREEN_DIALOG")
 popup:EnableMouse(true)
@@ -236,6 +353,8 @@ question:SetPoint("TOP", 0, -80)
 question:SetText("Are you sure you want to buy this?")
 popup.price = popup:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 popup.price:SetPoint("TOP", question, "BOTTOM", 0, -12)
+popup.note = popup:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+popup.note:SetPoint("TOP", popup.price, "BOTTOM", 0, -8)
 popup.buy = CreateFrame("Button", nil, popup, "UIPanelButtonTemplate")
 popup.buy:SetSize(120, 24)
 popup.buy:SetPoint("BOTTOMRIGHT", popup, "BOTTOM", -6, 20)
@@ -253,6 +372,7 @@ local function FillPopup()
     popup.name:SetText(name)
     popup.name:SetTextColor(r, g, b)
     popup.price:SetText(Price(p.price))
+    popup.note:SetText(p.type == TYPE_SERVICE and LOGOUT_TEXT or "")
 end
 
 ShowConfirm = function(p)
@@ -346,7 +466,7 @@ local function CategoryButton(i)
     return b
 end
 
-local tabs = {}
+local tabs, slotTabs = {}, {}   -- text tabs, paper doll slot icon tabs
 
 local function TabOnClick(self)
     if self.level == 1 then
@@ -357,39 +477,82 @@ local function TabOnClick(self)
     Refresh()
 end
 
--- lines = { { ids, selectedId }, ... }, one per tab level; returns the height they take
+local function SlotTabOnEnter(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetText(self.name)
+    GameTooltip:Show()
+end
+
+local function Tab(i)
+    local b = tabs[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, right, "UIPanelButtonTemplate")
+    b:SetHeight(22)
+    b:SetScript("OnClick", TabOnClick)
+    tabs[i] = b
+    return b
+end
+
+local function SlotTab(i)
+    local b = slotTabs[i]
+    if b then return b end
+    b = CreateFrame("Button", nil, right)
+    b:SetSize(32, 32)
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b.new = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    b.new:SetPoint("TOPRIGHT", 2, 2)
+    b.new:SetText(NEW_MARK)
+    b:SetScript("OnClick", TabOnClick)
+    b:SetScript("OnEnter", SlotTabOnEnter)
+    b:SetScript("OnLeave", GameTooltip_Hide)
+    slotTabs[i] = b
+    return b
+end
+
+-- lines = { { ids, selectedId }, ... }, one per tab level; returns the height they take. Slot names (Head, Rings, ...)
+-- are icons, the other tabs text buttons (centred in a line that has icons)
 local function LayoutTabs(lines)
-    local n, x, y = 0, 0, 0
+    local nText, nSlot, x, y, height = 0, 0, 0, 0, 0
     for level, line in ipairs(lines) do
         if level > 1 then
-            x, y = 0, y + 24
+            x, y = 0, y + height + 2
+        end
+        height = 22
+        for _, id in ipairs(line[1]) do
+            if SLOT_ICONS[cats[id].name:lower()] then height = 32 end
         end
         for _, id in ipairs(line[1]) do
-            n = n + 1
-            local b = tabs[n]
-            if not b then
-                b = CreateFrame("Button", nil, right, "UIPanelButtonTemplate")
-                b:SetHeight(22)
-                b:SetScript("OnClick", TabOnClick)
-                tabs[n] = b
+            local slot, b = SLOT_ICONS[cats[id].name:lower()]
+            if slot then
+                nSlot = nSlot + 1
+                b = SlotTab(nSlot)
+                b:SetNormalTexture(SLOT_ART .. slot)
+                b.name = cats[id].name
+                b.new:SetShown(cats[id].new)
+            else
+                nText = nText + 1
+                b = Tab(nText)
+                b:SetText(CatName(id))
+                b:SetWidth(b:GetTextWidth() + 24)
             end
-            b:SetText(cats[id].name)
-            local width = b:GetTextWidth() + 24
+            local width = b:GetWidth()
             if x > 0 and x + width > TABS_WIDTH then
-                x, y = 0, y + 24
+                x, y = 0, y + height + 2
             end
-            b:SetWidth(width)
-            b:SetPoint("TOPLEFT", 12 + x, -10 - y)
+            b:SetPoint("TOPLEFT", 12 + x, -10 - y - (height - b:GetHeight()) / 2)
             x = x + width + 4
             b.id, b.level = id, level
             if id == line[2] then b:LockHighlight() else b:UnlockHighlight() end
             b:Show()
         end
     end
-    for i = n + 1, #tabs do
+    for i = nText + 1, #tabs do
         tabs[i]:Hide()
     end
-    return n > 0 and y + 30 or 0
+    for i = nSlot + 1, #slotTabs do
+        slotTabs[i]:Hide()
+    end
+    return nText + nSlot > 0 and y + height + 8 or 0
 end
 
 -- all leaf categories under id, in order
@@ -413,7 +576,7 @@ Refresh = function()
     for i, id in ipairs(tops) do
         local b = CategoryButton(i)
         b.id = id
-        b.text:SetText(cats[id].name)
+        b.text:SetText(CatName(id))
         b.selected:SetShown(id == selTop)
         b:Show()
     end
@@ -445,7 +608,7 @@ frame:SetScript("OnShow", function()
     newCats = {}
     wipe(lists)
     wipe(requested)
-    UpdateRows()
+    Preview(nil)   -- also draws the rows
     UpdateMicroButton()
     Send("OPEN")
     C_Timer.After(5, function()
@@ -458,6 +621,7 @@ end)
 
 frame:SetScript("OnHide", function()
     popup:Hide()
+    search:ClearFocus()
     UpdateMicroButton()
 end)
 
@@ -475,7 +639,9 @@ local function OnMessage(msg)
     elseif command == "CAT" then
         local id, parent, order, name = rest:match("^(%d+) (%d+) (%d+) (.*)$")
         if id then
-            newCats[tonumber(id)] = { parent = tonumber(parent), order = tonumber(order), name = name }
+            local flags, v2name = name:match("^#(%d+) ?(.*)$")   -- v1: no flags
+            newCats[tonumber(id)] = { parent = tonumber(parent), order = tonumber(order), name = v2name or name,
+                new = bit.band(tonumber(flags) or 0, FLAG_NEW) > 0 }
         end
     elseif command == "CEND" then
         cats, newCats = newCats, {}
@@ -499,7 +665,10 @@ local function OnMessage(msg)
     elseif command == "ITEM" then
         local id, ptype, param1, price, ilvl, bonuses, name = rest:match("^(%d+) (%d+) (%d+) (%d+) (%-?%d+) ([%d,%-]+) (.*)$")
         if id then
-            local p = { id = tonumber(id), type = tonumber(ptype), param1 = tonumber(param1), price = tonumber(price), ilvl = tonumber(ilvl), name = name }
+            local flags, display, v2name = name:match("^#(%d+) (%d+) ?(.*)$")   -- v1: no flags, no display
+            flags = tonumber(flags) or 0
+            local p = { id = tonumber(id), type = tonumber(ptype), param1 = tonumber(param1), price = tonumber(price), ilvl = tonumber(ilvl),
+                name = v2name or name, known = bit.band(flags, FLAG_KNOWN) > 0, new = bit.band(flags, FLAG_NEW) > 0, display = tonumber(display) or 0 }
             if p.type == TYPE_ITEM then
                 p.link = ItemLink(p.param1, bonuses)
             end
@@ -516,11 +685,18 @@ local function OnMessage(msg)
             UpdateRows()
         end
     elseif command == "OK" then
-        local reqId, id, tokens = rest:match("^(%d+) (%d+) (%d+)")
+        local reqId, id, tokens, mail = rest:match("^(%d+) (%d+) (%d+) ?(%u*)")
         if not reqId then return end
         local p = products[tonumber(id)]
+        local name = p and select(2, Describe(p)) or id
         SetBalance(tokens)
-        UIErrorsFrame:AddMessage("Purchased: " .. (p and select(2, Describe(p)) or id), 0.1, 1, 0.1)
+        if mail == "MAIL" then
+            UIErrorsFrame:AddMessage("Your bags were full: " .. name .. " was sent to your mailbox.", 0.1, 1, 0.1)
+        elseif p and p.type == TYPE_SERVICE then
+            UIErrorsFrame:AddMessage("Purchased: " .. name .. ". " .. LOGOUT_TEXT, 0.1, 1, 0.1)
+        else
+            UIErrorsFrame:AddMessage("Purchased: " .. name, 0.1, 1, 0.1)
+        end
         if p and p.type == TYPE_PREMIUM then
             SendAddonMessage("PREM", "HELLO", "WHISPER", UnitName("player"))   -- the premium menu shows the new time
         end
@@ -552,10 +728,11 @@ local events = CreateFrame("Frame")
 events:RegisterEvent("CHAT_MSG_ADDON")
 events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 events:SetScript("OnEvent", function(self, event, prefix, msg, channel, sender)
-    if event == "GET_ITEM_INFO_RECEIVED" then
+    if event == "GET_ITEM_INFO_RECEIVED" then   -- prefix = the item ID
         if frame:IsShown() then
             UpdateRows()
             if popup:IsShown() then FillPopup() end
+            if preview.waiting and preview.waiting == prefix then Preview(previewed) end
         end
     -- only the server can whisper SHOP to us: the core never forwards SHOP addon messages from players
     elseif prefix == PREFIX and channel == "WHISPER" and msg and sender and sender:match("^[^-]*") == UnitName("player") then
