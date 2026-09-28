@@ -327,7 +327,7 @@ uint32 PartyBotAI::EnemiesNear(Unit* center, float range) const
     std::list<Unit*> units;
     Trinity::AnyUnfriendlyUnitInObjectRangeCheck check(center, me, range);
     Trinity::UnitListSearcher<Trinity::AnyUnfriendlyUnitInObjectRangeCheck> searcher(center, units, check);
-    Trinity::VisitNearbyObject(center, range, searcher);
+    center->VisitNearbyObject(range, searcher);
     uint32 count = 0;
     for (Unit* unit : units)
         if (unit->isInCombat() && me->IsValidAttackTarget(unit))
@@ -401,7 +401,7 @@ bool PartyBotAI::CastRotation(Unit* target)
 bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
 {
     SpellInfo const* info = sSpellMgr->GetSpellInfo(entry.Spell);
-    if (!info || !me->HasSpell(entry.Spell) || me->HasSpellCooldown(entry.Spell) || me->HasGlobalCooldown(info))
+    if (!info || !me->HasSpell(entry.Spell) || me->HasSpellCooldown(entry.Spell) || me->GetGlobalCooldownMgr().HasGlobalCooldown(info))
         return false;
 
     uint32 aura = entry.Aura ? entry.Aura : entry.Spell;
