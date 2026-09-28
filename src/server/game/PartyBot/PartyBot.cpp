@@ -269,14 +269,17 @@ void PartyBotAI::UpdateAI(uint32 diff)
     // fight what the leader fights (tanks also pick up what attacks the group)
     if (Unit* target = PickTarget(leader))
     {
-        if (me->getVictim() != target)
-        {
+        bool newTarget = me->getVictim() != target;
+        if (newTarget)
             me->Attack(target, !IsRanged());
-            if (healer)
-                FollowLeader(leader);       // healers stay with the group
-            else
-                me->GetMotionMaster()->MoveChase(target, IsRanged() ? 25.0f : 0.0f);
-        }
+
+        if (healer)
+            PositionHealer(leader);
+        else if (IsRanged())
+            PositionRanged(target);
+        else if (newTarget)
+            me->GetMotionMaster()->MoveChase(target);
+
         CastRotation(target);
         return;
     }
@@ -367,13 +370,66 @@ uint32 PartyBotAI::EnemiesNear(Unit* center, float range) const
     return std::max<uint32>(count, 1);  // the center itself
 }
 
-// the group member (bot included) with the lowest health below belowPct, in range and sight; withoutAura: skip those with it
-Unit* PartyBotAI::LowestGroupMember(int32 belowPct, uint32 withoutAura) const
+// ---------------------------------------------------------------- AI: positioning (owner report: casters stood behind a
+// wall or at the top of stairs doing nothing). The chase movement stops as soon as the bot is within its distance, even
+// without line of sight, so ranged bots and healers walk towards whoever they cannot see until they can.
+
+// in range and in line of sight
+bool PartyBotAI::InSight(Unit* unit, float range) const
+{
+    return me->IsWithinDistInMap(unit, range) && me->IsWithinLOSInMap(unit);
+}
+
+// walk to the unit (pathfinding goes around walls and up stairs)
+void PartyBotAI::Approach(Unit* unit)
+{
+    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE && _approachGuid == unit->GetGUID())
+        return;
+    me->GetMotionMaster()->MoveChase(unit);
+    _approachGuid = unit->GetGUID();
+}
+
+void PartyBotAI::StandStill()
+{
+    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == IDLE_MOTION_TYPE)
+        return;
+    me->GetMotionMaster()->Clear();
+    me->StopMoving();
+    _approachGuid.Clear();
+}
+
+// ranged damage: stand still with the target in sight within 30 yd; move when it is out of sight or beyond 38 yd
+// (the gap keeps them from stopping and starting all the time)
+void PartyBotAI::PositionRanged(Unit* target)
+{
+    if (!InSight(target, 38.0f))
+        Approach(target);
+    else if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE || InSight(target, 30.0f))
+        StandStill();
+}
+
+// healers: go to whoever needs healing but is out of sight, else keep the leader in sight, else stand and heal
+void PartyBotAI::PositionHealer(Player* leader)
+{
+    Unit* patient = LowestGroupMember(95, 0, false);
+    if (patient && patient != me && !InSight(patient, 38.0f))
+        Approach(patient);
+    else if (!InSight(leader, 30.0f))
+        FollowLeader(leader);
+    else if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
+        StandStill();
+}
+
+// the group member (bot included) with the lowest health below belowPct within 40 yd (60 yd when sight is not
+// required), inSightOnly: in line of sight; withoutAura: skip those with it
+Unit* PartyBotAI::LowestGroupMember(int32 belowPct, uint32 withoutAura, bool inSightOnly) const
 {
     Unit* lowest = nullptr;
     auto consider = [&](Unit* unit)
     {
-        if (!unit || !unit->IsAlive() || unit->GetMap() != me->GetMap() || !me->IsWithinDistInMap(unit, 40.0f) || !me->IsWithinLOSInMap(unit))
+        if (!unit || !unit->IsAlive() || unit->GetMap() != me->GetMap())
+            return;
+        if (inSightOnly ? !InSight(unit, 40.0f) : !me->IsWithinDistInMap(unit, 60.0f))
             return;
         if (unit->GetHealthPct() >= float(belowPct))
             return;

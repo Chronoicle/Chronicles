@@ -69,7 +69,12 @@ private:
     uint32 EnemiesNear(Unit* center, float range) const;
     bool CastRotation(Unit* target);                       // true when a spell was cast
     bool TryCast(PartyBotSpell const& entry, Unit* target);
-    Unit* LowestGroupMember(int32 belowPct, uint32 withoutAura) const;
+    Unit* LowestGroupMember(int32 belowPct, uint32 withoutAura, bool inSightOnly = true) const;
+    bool InSight(Unit* unit, float range) const;
+    void Approach(Unit* unit);
+    void StandStill();
+    void PositionRanged(Unit* target);
+    void PositionHealer(Player* leader);
     uint32 GroupMembersBelow(int32 pct) const;
     Unit* TauntTarget() const;
     bool IsRanged() const;
@@ -77,6 +82,7 @@ private:
     ObjectGuid _leaderGuid;
     uint8 _slot;                        // position around the leader
     uint32 _checkTimer = 0;
+    ObjectGuid _approachGuid;           // who the bot is walking to (positioning)
 };
 
 class TC_GAME_API PartyBotMgr
