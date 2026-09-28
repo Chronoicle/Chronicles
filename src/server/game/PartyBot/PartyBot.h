@@ -71,7 +71,7 @@ private:
     bool TryCast(PartyBotSpell const& entry, Unit* target);
     Unit* LowestGroupMember(int32 belowPct, uint32 withoutAura, bool inSightOnly = true) const;
     bool InSight(Unit* unit, float range) const;
-    void Approach(Unit* unit);
+    bool Approach(Unit* unit);                             // false: gave up (no path, or too long)
     void StandStill();
     void PositionRanged(Unit* target, Player* leader);
     void PositionHealer(Player* leader);

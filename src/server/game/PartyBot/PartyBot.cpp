@@ -23,6 +23,7 @@
 #include "CellImpl.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
+#include "PathGenerator.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <sstream>
 
@@ -65,6 +66,17 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
 
     if (!_setupDone && !_dismissed)
         Setup(bot);
+
+    // dead: come back when the leader is alive and out of combat (here, as Player::Update only runs the AI while
+    // the bot is alive)
+    if (_setupDone && !_dismissed && bot->isDead(false) && !bot->IsBeingTeleported())
+        if (Player* leader = ObjectAccessor::FindPlayer(_leaderGuid))
+            if (leader->IsInWorld() && leader->IsAlive() && !leader->isInCombat() && !leader->IsBeingTeleported())
+            {
+                bot->ResurrectPlayer(0.5f);
+                bot->SpawnCorpseBones();
+                bot->TeleportTo(leader->GetMapId(), leader->GetPositionX(), leader->GetPositionY(), leader->GetPositionZ(), leader->GetOrientation());
+            }
 
     // the leader logged out: wait a moment (reconnects, loading screens), then go too
     if (!_dismissed)
@@ -239,18 +251,6 @@ void PartyBotAI::UpdateAI(uint32 diff)
     if (!leader || !leader->IsInWorld() || me->IsBeingTeleported())
         return;
 
-    // dead: come back when the leader is alive and out of combat
-    if (me->isDead())
-    {
-        if (leader->IsAlive() && !leader->isInCombat())
-        {
-            me->ResurrectPlayer(0.5f);
-            me->SpawnCorpseBones();
-            me->TeleportTo(leader->GetMapId(), leader->GetPositionX(), leader->GetPositionY(), leader->GetPositionZ(), leader->GetOrientation());
-        }
-        return;
-    }
-
     // other map or far away (portals, summons, the leader's hearthstone): teleport to the leader
     if (me->GetMapId() != leader->GetMapId() || !me->IsWithinDistInMap(leader, 100.0f))
     {
@@ -286,6 +286,8 @@ void PartyBotAI::UpdateAI(uint32 diff)
 
     if (me->getVictim())
         me->AttackStop();
+    _approachGuid.Clear();
+    _approachTicks = 0;
 
     CastRotation(nullptr);                  // out of combat: heals, buffs, pets
     FollowLeader(leader);
@@ -382,19 +384,36 @@ bool PartyBotAI::InSight(Unit* unit, float range) const
 
 // walk to the unit (pathfinding goes around walls and up stairs). The core's chase only follows the bot's victim
 // (ChaseMovementGenerator::HasLostTarget), so anyone else (a healer's patient) gets a pathed point move, renewed
-// every tick while the unit stays out of sight.
-void PartyBotAI::Approach(Unit* unit)
+// every tick while the unit stays out of sight. Returns false when the bot gives up: no path (off the navmesh:
+// the point move would walk straight through walls) or still out of sight after ~6 s of walking (flying, on a
+// boat); it tries again ~14 s later.
+bool PartyBotAI::Approach(Unit* unit)
 {
+    MotionMaster* motion = me->GetMotionMaster();
+    if (_approachGuid != unit->GetGUID())
+    {
+        _approachGuid = unit->GetGUID();
+        _approachTicks = 0;
+    }
+    // ticks feared, stunned or rooted don't count
+    if (!me->HasUnitState(UNIT_STATE_NOT_MOVE) && motion->GetMotionSlotType(MOTION_SLOT_CONTROLLED) == NULL_MOTION_TYPE)
+        if (++_approachTicks > 40)
+            _approachTicks = 0;
+    if (_approachTicks > 12)
+        return false;
+
     if (unit != me->getVictim())
     {
-        me->GetMotionMaster()->MovePoint(0, unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), true);
-        _approachGuid = unit->GetGUID();
-        return;
+        PathGenerator path(me);
+        path.CalculatePath(unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ());
+        if (path.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORT))
+            return false;
+        motion->MovePoint(0, unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), true);
+        return true;
     }
-    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE && _approachGuid == unit->GetGUID())
-        return;
-    me->GetMotionMaster()->MoveChase(unit);
-    _approachGuid = unit->GetGUID();
+    if (motion->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
+        motion->MoveChase(unit);
+    return true;
 }
 
 // stop the bot's own movement (following, chasing, walking to a point). Never while fear, confuse or a jump/charge
@@ -406,27 +425,17 @@ void PartyBotAI::StandStill()
         return;
     motion->Clear();
     me->StopMoving();
-    _approachGuid.Clear();
 }
 
 // ranged damage: stand still with the target in sight within 30 yd; move when it is out of sight or beyond 38 yd
-// (the gap keeps them from stopping and starting all the time). A target the bot still can't see after ~6 s
-// (off the navmesh, flying, on a boat): give up and stay with the group.
+// (the gap keeps them from stopping and starting all the time). A target the bot can't reach: stay with the group.
 void PartyBotAI::PositionRanged(Unit* target, Player* leader)
 {
     MovementGeneratorType type = me->GetMotionMaster()->GetCurrentMovementGeneratorType();
     if (!InSight(target, 38.0f))
     {
-        if (_approachGuid != target->GetGUID())
-            _approachTicks = 0;
-        if (_approachTicks <= 12)
-            ++_approachTicks;
-        if (_approachTicks > 12)
-        {
+        if (!Approach(target))
             FollowLeader(leader);
-            return;
-        }
-        Approach(target);
         return;
     }
 
@@ -435,8 +444,9 @@ void PartyBotAI::PositionRanged(Unit* target, Player* leader)
         StandStill();
 }
 
-// healers: walk to the most hurt group member they cannot see (not themselves), else keep the leader in sight,
-// else stand and heal
+// healers: walk to the most hurt group member (not themselves) when they cannot see them, else keep the leader in
+// sight, else stand and heal. A more hurt member in sight (or the healer itself) keeps them standing: cast-time
+// heals fail while moving.
 void PartyBotAI::PositionHealer(Player* leader)
 {
     Unit* patient = nullptr;
@@ -446,16 +456,21 @@ void PartyBotAI::PositionHealer(Player* leader)
             Player* member = ref->getSource();
             if (!member || member == me || !member->IsAlive() || member->GetMap() != me->GetMap() || !me->IsWithinDistInMap(member, 60.0f))
                 continue;
-            if (member->GetHealthPct() >= 95.0f || InSight(member, 38.0f))
+            if (member->GetHealthPct() >= 95.0f)
                 continue;
             if (!patient || member->GetHealthPct() < patient->GetHealthPct())
                 patient = member;
         }
 
     MovementGeneratorType type = me->GetMotionMaster()->GetCurrentMovementGeneratorType();
-    if (patient)
-        Approach(patient);
-    else if (!InSight(leader, 30.0f))
+    if (patient && me->GetHealthPct() >= patient->GetHealthPct() && !InSight(patient, 38.0f))
+    {
+        if (Approach(patient))
+            return;
+    }
+    else
+        _approachTicks = 0;
+    if (!InSight(leader, 30.0f))
         FollowLeader(leader);
     else if (type == CHASE_MOTION_TYPE || type == POINT_MOTION_TYPE)
         StandStill();
