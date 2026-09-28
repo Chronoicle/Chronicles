@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — patch.chronicles-wow.com (patch server, http + https) and the domain launcher (patch server + portal = domain) published on both patch servers after the owner's test; website download link -> patch.chronicles-wow.com — live — undo: put back `~/launcher/Launcher_prev_ip.exe` + `manifest_prev_ip.json` (new server) / `~/Launcher_before_domain.exe` + `~/manifest_before_domain.json` (old server).
+
 - Claude (desktop session) — **domain chronicles-wow.com** (owner bought it, Namecheap, A @ + www -> 184.174.37.33): nginx website block `server_name chronicles-wow.com www.chronicles-wow.com _`, Let's Encrypt certificate (owner OK for the ToS, no e-mail, certbot.timer renews), http -> https, the IP / other names on port 80 -> https://chronicles-wow.com, ufw 443. Old server redirect -> https://chronicles-wow.com. Patch server stays on 184-174-37-33.nip.io (port 80 -> 8099) — live — nginx backup `/root/nginx_chronicles.bak_*` on the new server.
 
 - Claude (desktop session) — restart 12:15 UTC (owner OK, Chrondh online, 60 s timer), worldserver 5d51583: Gear-Up NPC own class hall upgrade option (creates the class hall when missing) — live, no changelog (staff only) — `git revert 5d51583`.
