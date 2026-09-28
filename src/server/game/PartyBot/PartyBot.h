@@ -73,7 +73,7 @@ private:
     bool InSight(Unit* unit, float range) const;
     void Approach(Unit* unit);
     void StandStill();
-    void PositionRanged(Unit* target);
+    void PositionRanged(Unit* target, Player* leader);
     void PositionHealer(Player* leader);
     uint32 GroupMembersBelow(int32 pct) const;
     Unit* TauntTarget() const;
@@ -83,6 +83,7 @@ private:
     uint8 _slot;                        // position around the leader
     uint32 _checkTimer = 0;
     ObjectGuid _approachGuid;           // who the bot is walking to (positioning)
+    uint8 _approachTicks = 0;           // AI ticks spent walking to an unseen target
 };
 
 class TC_GAME_API PartyBotMgr
