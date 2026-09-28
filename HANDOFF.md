@@ -7,6 +7,7 @@ Last updated: 2026-09-28 ~14:40 UTC by Claude (desktop session), transfer to the
 Read this block first; the "Current state" list below has the details per change.
 
 **Staged, needs "restart now" (built + installed, owner OK needed):**
+- ace9ab1: party bots learn the class hall talent for a second legendary before equipping (Garrison::LearnSecondLegendaryTalent, shared with the Gear Master); the 5 bots set up so far each miss one legendary slot. **Apply right before the restart, not earlier:** `mysql < ~/LegionCore/sql/custom/fix_partybot_second_legendary.sql` (setup = 0: their next login re-equips them).
 - 66f761a (+ build fix): **party bots phase 2** (#65): spell rotations per spec from `world.partybot_spells` (applied, 282 entries, 36 specs, generator `tools/partybot/gen_partybot_spells.py`); tanks taunt, healers heal, ranged keep 25 yd. Built + installed 14:54 UTC (16:54 server time). Test after the restart: `.partybot add tank` / `healer` / `dps`, pull something.
 - 0557c3d: party bot sessions are logged out and saved in `World::KickAll` at shutdown. The restart that installs it still runs the OLD shutdown: ask the owner to `.partybot remove` first (or accept the known harmless shutdown crash, see below).
 
