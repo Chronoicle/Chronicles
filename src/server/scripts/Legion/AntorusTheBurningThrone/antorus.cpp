@@ -406,6 +406,9 @@ public:
             });
             break;
         case 802:
+            // Hasabel's intro yell: her dead creature is still loaded on a saved lockout and would yell anyway (#63)
+            if (instance->GetBossState(DATA_HASABEL) == DONE)
+                break;
             player->AddDelayedEvent(8000, [player, instance]() -> void
             {
                 instance->instance->LoadGrid(-3705.06f, 1357.21f);
@@ -422,6 +425,8 @@ public:
             eo->SummonCreature(NPC_IMAGE_OF_EONAR, eo->GetPosition(), TEMPSUMMON_TIMED_DESPAWN, 21000);
             break;
         case 804:
+            if (instance->GetBossState(DATA_EONAR) == DONE)
+                break;
             if (Creature* eonar = eo->SummonCreature(NPC_EONAR_EVENT, -4299.92f, -11179.68f, 817.63f, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 40000))
             {
                 player->CreateConversation(5703);
