@@ -13,7 +13,7 @@ Background that is not obvious from the code. Rules are in `AGENTS.md`, current 
 
 - Base values come from the gt tables in `~/data/gt` (same as the client). At level 98-113 all NpcTotalHp tables are equal, but NpcDamageByClass (classic, 1,231 at 110) vs NpcDamageByClassExp6 (32,836) differ 27x, so creatures with HealthScalingExpansion 0 hit like Classic mobs. Fixed 2026-09-26: 4,922 Legion creatures set to 6 (undo `~/undo_hse_legion.sql`).
 - Core difficulty multipliers (StatSystem.cpp, Mythic x10/x15 etc.) assume the Legion table. Karazhan matched UWOW damage.
-- The 10 launch dungeons: the ×2.068 on 354 entries (2026-09-26) was one correction too many (the HealthScalingExpansion 7 -> 6 fix already closed the gap); reverted on 2026-09-28 after the owner compared VotW +26/+27 with UWOW (2.07x before, equal after). Undo of the revert: `~/undo_hp_launch_dungeons_revert.sql`.
+- The 10 launch dungeons: the ×2.068 on 354 entries (2026-09-26) was one correction too many (the HealthScalingExpansion 7 -> 6 fix already closed the gap); reverted on 2026-09-28 in two steps: HpMulti (Normal) and `creature_difficulty_stat` (Heroic/Mythic/Keystone use its HealthModifier instead of HpMulti!), plus Mythic = keystone multiplier for 94 entries; checked against UWOW VotW M0 and +25. Undo files `~/undo_hp_launch_dungeons_revert.sql`, `~/undo_hp_launch_dungeons_diffstat.sql`.
 - The owner compares against UWOW (a LegionCore server with retail-like numbers). When "mobs too weak/strong" comes up, compare against these tables before touching rates.
 - Missing waypoint paths are common (`MovementType=2` without `creature_addon.path_id`): mobs stand still.
 
