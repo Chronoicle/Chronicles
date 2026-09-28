@@ -294,9 +294,13 @@ private:
         RecordRefund(player, item, price);   // before the mail takes the item
 
         CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+        item->RemoveFromUpdateQueueOf(player);   // a random property queued it for the player's save; the mail owns it now
         item->SaveToDB(trans);
-        MailDraft("Chronicles Shop", "Your bags were full, so the shop sent your purchase by mail.").AddItem(item)
-            .SendMailTo(trans, MailReceiver(player), MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+        // from the player himself and marked returned, like battlepay_services: the client offers Delete, not Return
+        // (a return to a missing sender would delete the item), and nothing can be sent back to anyone
+        MailDraft("Chronicles Shop", "Your bags were full, so the shop sent your purchase by mail. Take it out within 30 days: "
+            "mail left longer is deleted with the item.").AddItem(item)
+            .SendMailTo(trans, MailReceiver(player), MailSender(player, MAIL_STATIONERY_GM), MailCheckMask(MAIL_CHECK_MASK_COPIED | MAIL_CHECK_MASK_RETURNED));
         CharacterDatabase.CommitTransaction(trans);
         return "";
     }
@@ -315,7 +319,8 @@ public:
                     return "Item not found";
                 ItemPosCountVec dest;
                 InventoryResult canStore = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, param1, 1);
-                if (canStore == EQUIP_ERR_INV_FULL && mailed)
+                // heirlooms are not mailed: the collection only learns them from the bags (Player::StoreNewItem)
+                if (canStore == EQUIP_ERR_INV_FULL && mailed && !sDB2Manager.GetHeirloomByItemId(param1))
                 {
                     std::string error = MailItem(player, param1, bonus, price);
                     *mailed = error.empty();
