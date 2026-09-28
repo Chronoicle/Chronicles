@@ -4503,7 +4503,6 @@ public:
 			static std::vector<uint32> const stats = { Critical, Haste, Mastery };
 			uint32 spellId = Trinity::Containers::SelectRandomContainerElement(stats);
 			caster->CastCustomSpell(caster, spellId, &perStack, nullptr, nullptr, true, castItem, aurEff, caster->GetGUID());
-			TC_LOG_INFO("server.acrid", "Acrid Catalyst Injector: %s gets %u (+%.0f per stack), Cycle %.0f, item %s", caster->GetName(), spellId, perStack, cycle, castItem ? "found" : "missing");
 
 			if (Aura* stack = caster->GetAura(spellId))
 				if (stack->GetStackAmount() >= 5)
