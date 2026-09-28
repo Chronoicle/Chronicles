@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — restarts 00:45 and 00:48 UTC on the new server (owner OK, no timer), worldserver cee3f74: #50 Sharpen Blade replaces Mortal Wounds (66dd6e4, `~/fix_sharpen_blade_50.sql`), #51 player jumps use the retail arc (39ad2bd, Heroic Leap), #59 Adventure Map option on the Command/Scouting Maps (f0b4366), temporary server.acrid log removed (a31f4e4); **launch-dungeon health ÷2.068** (354 entries, the 2026-09-26 x2.068 was one too many; owner comparison with UWOW VotW +26/+27) — live, changelog 1553932390647468074 — `git revert` the commits, `~/undo_sharpen_blade_50.sql`, `~/undo_hp_launch_dungeons_revert.sql`.
 - Claude (desktop session) — **server moved** from Kamatera 194.146.39.126 to Contabo 184.174.37.33 (owner OK), down 00:17:46-00:19:33 UTC after a 5 min countdown (`~/cutover.sh`, log `~/cutover.log` on the new server). New launcher (default server + writes `SET portal`) and client exe (patch URLs) handed out by both patch servers; old server forwards port 1119 and redirects the website. Website DB password changed. Went live with it: #60 e1a1999, #53 87f2584, #55 0af33c4, #43 307df20 (+ `~/fix_marrowrend_43.sql`), #52 ecc6f09 (+ `~/fix_garothi_annihilator_52.sql`), keystone reset/GM affixes 841b5b1 — live, changelog 1553924854070124657 — rollback: header of `~/cutover.sh`; code `git revert` the commits, SQL undo files next to the fixes.
 
 ## 2026-09-27 (Oslo)

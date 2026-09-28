@@ -86,7 +86,7 @@ Issue body format: **Reporter** (Discord name + message link) · **Where** (zone
 ## Database notes
 
 - Hotfix tables (item, item_sparse, char_titles, hotfix_data) are edited through `WorldDatabase` with a `hotfixes.` prefix; the HotfixDatabase connection crashes at runtime.
-- Creature health/damage: base values come from `~/data/gt/NpcTotalHp*.txt` / `NpcDamageByClass*.txt` by `creature_template.HealthScalingExpansion`. Legion creatures must use 6 (fixed for 4,922 entries on 2026-09-26). Launch dungeons had 7.0 health; ×2.068 applied (see CHANGES.md). Karazhan/Cathedral data already matched retail/UWOW.
+- Creature health/damage: base values come from `~/data/gt/NpcTotalHp*.txt` / `NpcDamageByClass*.txt` by `creature_template.HealthScalingExpansion`. Legion creatures must use 6 (fixed for 4,922 entries on 2026-09-26). Launch dungeons: a ×2.068 on 2026-09-26 was reverted on 2026-09-28 (it doubled the HealthScalingExpansion fix; owner compared VotW +26/+27 with UWOW: now equal). Karazhan/Cathedral data already matched retail/UWOW.
 - Many creatures with `MovementType=2` have no waypoint path (they stand still); build paths into `waypoint_data` + `creature_addon.path_id`.
 - The client's own spell data can be read with `~/client_parts/wdc1.py` (e.g. SpellEffect.db2) to see what a spell really does.
 
