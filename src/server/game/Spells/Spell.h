@@ -549,7 +549,7 @@ class TC_GAME_API Spell
         void AddEffectTarget (ObjectGuid const& targetGuid) { m_effect_targets.push_back(targetGuid); }
         void RemoveEffectTarget(ObjectGuid const& targetGuid) { m_effect_targets.remove(targetGuid); }
         void ClearEffectTarget () { m_effect_targets.clear(); }
-        ObjectGuid GetRndEffectTarget () { return Trinity::Containers::SelectRandomContainerElement(m_effect_targets); }
+        ObjectGuid GetRndEffectTarget () { return m_effect_targets.empty() ? ObjectGuid::Empty : Trinity::Containers::SelectRandomContainerElement(m_effect_targets); }
         AuraEffect const* GetTriggeredAuraEff() const { return m_triggeredByAura; }
         void AddDestTarget(SpellDestination const& dest, uint32 effIndex);
         SpellDestination getDestTarget(uint32 effIndex) { return m_destTargets[effIndex]; }

@@ -80,6 +80,9 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
 
     FinishBotLogin();
 
+    if (_dismissRequested && !_dismissed)
+        Dismiss();
+
     if (!_setupDone && !_dismissed)
         Setup(bot);
 
@@ -837,7 +840,7 @@ std::string PartyBotMgr::RemoveBot(Player* leader, std::string const& name)
         Player* bot = session->GetPlayer();
         if (!name.empty() && (!bot || !boost::iequals(std::string(bot->GetName()), name)))
             continue;
-        session->Dismiss();
+        session->RequestDismiss();
         ++removed;
     }
 

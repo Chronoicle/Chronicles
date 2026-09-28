@@ -233,7 +233,7 @@ class TC_GAME_API Aura
         void AddEffectTarget(ObjectGuid const& targetGuid) { m_effect_targets.push_back(targetGuid); }
         void RemoveEffectTarget(ObjectGuid const& targetGuid) { m_effect_targets.remove(targetGuid); }
         void ClearEffectTarget() { m_effect_targets.clear(); }
-        ObjectGuid GetRndEffectTarget() { return Trinity::Containers::SelectRandomContainerElement(m_effect_targets); }
+        ObjectGuid GetRndEffectTarget() { return m_effect_targets.empty() ? ObjectGuid::Empty : Trinity::Containers::SelectRandomContainerElement(m_effect_targets); }
 
         // Helpers for targets
         ApplicationMap const & GetApplicationMap();

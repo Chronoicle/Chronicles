@@ -1004,6 +1004,9 @@ class spell_warr_ravager_t20 : public SpellScriptLoader
 
             void FilterTargets(std::list<WorldObject*>& targets)
             {
+                if (targets.empty())
+                    return;
+
                 if (Unit* caster = GetCaster())
                 {
                     Unit* owner = caster->GetAnyOwner();
@@ -1021,9 +1024,6 @@ class spell_warr_ravager_t20 : public SpellScriptLoader
 
                             if (WorldObject* object = Trinity::Containers::SelectRandomContainerElement(targets))
                             {
-                                if (targets.empty())
-                                    return;
-
                                 if (Unit* unit = object->ToUnit())
                                     owner->CastSpell(unit, 12294, true, nullptr, eff);
                             }

@@ -10,6 +10,7 @@
 #define PARTYBOT_H
 
 #include "WorldSession.h"
+#include <atomic>
 #include "UnitAI.h"
 
 struct ChrSpecializationEntry;
@@ -25,8 +26,9 @@ public:
 
     ObjectGuid GetBotGuid() const { return _botGuid; }
     ObjectGuid GetLeaderGuid() const { return _leaderGuid; }
-    void Dismiss();                     // leave the group and log out
-    bool IsDismissed() const { return _dismissed; }
+    void Dismiss();                     // leave the group and log out (the bot's own thread only)
+    void RequestDismiss() { _dismissRequested = true; }  // any thread (.partybot remove): the bot's session update dismisses
+    bool IsDismissed() const { return _dismissed || _dismissRequested; }
 
 private:
     void Setup(Player* bot);
@@ -39,6 +41,7 @@ private:
     bool _loginStarted = false;
     bool _setupDone = false;
     bool _dismissed = false;
+    std::atomic<bool> _dismissRequested{ false };
     bool _done = false;
     uint32 _leaderGoneTimer = 0;
     uint32 _groupGoneTimer = 0;         // not in the leader's group (kicked)

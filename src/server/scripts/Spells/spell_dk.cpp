@@ -1320,9 +1320,15 @@ class spell_dk_blood_mirror : public SpellScriptLoader
 
             void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
             {
-                if(Unit* caster = GetCaster())
-                    if (Unit* target = caster->ToPlayer()->GetSelectedUnit())
-                        GetAura()->AddEffectTarget(target->GetGUID());
+                if (Unit* caster = GetCaster())
+                    if (Player* player = caster->ToPlayer())
+                    {
+                        Unit* target = player->GetSelectedUnit();
+                        if (!target)
+                            target = caster->getVictim();       // no selection: party bots, focus macros
+                        if (target)
+                            GetAura()->AddEffectTarget(target->GetGUID());
+                    }
             }
 
             void Register() override
