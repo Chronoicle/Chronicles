@@ -19024,6 +19024,15 @@ void Player::AddQuest(Quest const* quest, Object* questGiver)
 
     SetQuestSlot(log_slot, quest_id, qtime);
 
+    // the provided item was counted above, before the quest had its log slot (SetQuestSlot zeroes the counters): the
+    // client showed 0/1 and no turn-in marker (#84)
+    for (QuestObjective const& obj : quest->GetObjectives())
+    {
+        auto data = status_q.ObjectiveData.find(obj.StorageIndex);
+        if (obj.StorageIndex >= 0 && data != status_q.ObjectiveData.end() && data->second)
+            SetQuestSlotCounter(log_slot, obj.StorageIndex, uint16(data->second));
+    }
+
     m_QuestStatusSave[quest_id] = QUEST_DEFAULT_SAVE_TYPE;
 
     m_achievementMgr->StartTimedAchievement(CRITERIA_TIMED_TYPE_ITEM, quest_id);

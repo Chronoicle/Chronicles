@@ -73,6 +73,10 @@ enum Spells
     SPELL_ANNIHILATION_AT               = 246667,
     SPELL_ANNIHILATION_IN_AT            = 246670,
 
+    // trash Garothi Annihilator 127230 before Kin'garoth (spell_atbt_anihilation 252740): impact and unsoaked blast (#82)
+    SPELL_ATBT_ANNIHILATION_DMG         = 252743,
+    SPELL_ATBT_ANNIHILATION_BLAST       = 252744,
+
     // NPC_GAROTHI_DECIMATOR
     SPELL_DECIMATION_FILTER             = 246686,
     SPELL_DECIMATION_MARK               = 246687,
@@ -902,15 +906,23 @@ class spell_kingaroth_diabolic_bomb_dmg : public SpellScript
     }
 };
 
-//246664, 249455
+//246664, 249455, 252743 (trash, #82)
 class spell_kingaroth_annihilation_dmg : public SpellScript
 {
     PrepareSpellScript(spell_kingaroth_annihilation_dmg);
 
     void FilterTargets(std::list<WorldObject*>& targets)
     {
-        if (GetCaster() && GetExplTargetDest() && targets.empty())
-            GetCaster()->CastSpell(GetExplTargetDest(), GetSpellInfo()->Id == SPELL_ANNIHILATION_DMG ? SPELL_ANNIHILATION_BLAST : SPELL_RUINATION_BLAST, true);
+        if (!GetCaster() || !GetExplTargetDest() || !targets.empty())
+            return;
+
+        uint32 blast = SPELL_RUINATION_BLAST;
+        if (GetSpellInfo()->Id == SPELL_ANNIHILATION_DMG)
+            blast = SPELL_ANNIHILATION_BLAST;
+        else if (GetSpellInfo()->Id == SPELL_ATBT_ANNIHILATION_DMG) // trash: nobody soaked, raid-wide blast with the shockwave (#82)
+            blast = SPELL_ATBT_ANNIHILATION_BLAST;
+
+        GetCaster()->CastSpell(GetExplTargetDest(), blast, true);
     }
 
     void Register()

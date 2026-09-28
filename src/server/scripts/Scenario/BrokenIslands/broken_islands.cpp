@@ -659,6 +659,42 @@ public:
     }
 };
 
+//! 199357 Intro Scene (movie 486 + 217781). #79: spell_area casts it in areas 8290 / 8455 on every area update that
+//! enters them (and every near teleport, resurrect and relog inside them re-runs the update), and it has no aura to
+//! stop the recast, so the intro movie replayed over and over during the scenario (after the Stage 2 teleport, after
+//! a death, ...). It belongs to the scenario's first step only.
+class spell_bi_intro_scene : public SpellScriptLoader
+{
+public:
+    spell_bi_intro_scene() : SpellScriptLoader("spell_bi_intro_scene") { }
+
+    class spell_bi_intro_scene_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_bi_intro_scene_SpellScript);
+
+        SpellCastResult CheckCast()
+        {
+            if (Unit* caster = GetCaster())
+                if (caster->GetMapId() == 1460)
+                    if (InstanceScript* script = caster->GetInstanceScript())
+                        if (script->getScenarionStep() != 0)
+                            return SPELL_FAILED_DONT_REPORT;
+
+            return SPELL_CAST_OK;
+        }
+
+        void Register() override
+        {
+            OnCheckCast += SpellCheckCastFn(spell_bi_intro_scene_SpellScript::CheckCast);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_bi_intro_scene_SpellScript();
+    }
+};
+
 class sceneTrigger_part1 : public SceneTriggerScript
 {
 public:
@@ -3437,6 +3473,7 @@ void AddSC_brokenIslands()
     new npc_q42740();
     new npc_q40518();
     new spell_bi_enter_stage1();
+    new spell_bi_intro_scene();
     new sceneTrigger_enterBrockenShores();
     new spell_q42740();
     new sceneTrigger_part1();

@@ -1319,7 +1319,14 @@ float AuraEffect::CalculateAmount(Unit* caster)
 
                     Unit::AuraEffectList const& mAbsorbAmount = caster->GetAuraEffectsByType(SPELL_AURA_MOD_ABSORB_AMOUNT);
                     for (Unit::AuraEffectList::const_iterator i = mAbsorbAmount.begin(); i != mAbsorbAmount.end(); ++i)
+                    {
+                        // Purified Resolve 196440: only the honor talents' absorb bonuses (Vim and Vigor 195488, Archangel 197862).
+                        // The Light's Wrath traits Forbidden Flame 214925 (+5%) and Will of the Conclave 241148 (+10%) made it
+                        // 5 x 1.05 x 1.1 = 5.77% and 6 x 1.155 = 6.93% with Vim and Vigor (#73)
+                        if (m_spellInfo->Id == 196440 && (*i)->GetId() != 195488 && (*i)->GetId() != 197862)
+                            continue;
                         AddPct(amount, (*i)->GetAmount());
+                    }
 
                     if (target)
                     {

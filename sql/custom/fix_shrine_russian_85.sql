@@ -1,0 +1,5 @@
+-- #85 Shrine of Dath'Remar (Claude 2026-09-28). Undo: undo_shrine_russian_85.sql
+-- The shrine (gameobject 180516, goober, Data7 = page 2936) shows page_text 2936, whose base (English) Text held the
+-- Russian translation (already in the LegionCore 2024-10-23 dump). English text from AzerothCore's page_text 2936
+-- (the original TBC/WotLK text; $B replaced by line breaks). The ruRU copy in page_text_locale stays.
+UPDATE world.page_text SET Text = 'You have discovered the location of the shrine!  Upon further examination, you sense a stronger pulse of the strange power that has gripped the Isle.  You feel a bit uncomfortable standing by the shrine... and perhaps a little disturbed.\n\nThe bronze placard along the side of the shrine reads:\n\n"Here stands the Shrine of Dath''Remar, a fitting tribute to a noble elf.  Let all who gaze on this monument remember his sacrifice against the Scourge and his dedication to the cause of our continued survival.  All who prosper in Quel''Thalas do so thanks to him."' WHERE ID = 2936;

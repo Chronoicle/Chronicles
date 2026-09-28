@@ -394,11 +394,24 @@ struct boss_imonar : BossAI
         }
     }
 
+    void MovementInform(uint32 type, uint32 /*pointId*/) override
+    {
+        // Creature::UpdateMovementFlags clears the fly flags on every update (no creature_template_movement row), so the
+        // jetpack path went out as ground splines that the client smoothed through the bridge. Set them again right before
+        // each leg starts, so every leg is sent as a flying spline (#81)
+        if (type == WAYPOINT_MOTION_TYPE && switchPhase)
+            SetFlyMode(true);
+    }
+
     void LastWPReached() override
     {
-        if (!me->isInCombat())
+        // The finished path stays in the idle motion slot and reports its last point again on every update: that flipped
+        // curPlatformId back and forth, so the platform check saw him ~190 yards from "his" platform and reset the fight
+        // right after the landing (#81). Land once and replace the path.
+        if (!me->isInCombat() || !switchPhase)
             return;
 
+        me->GetMotionMaster()->MoveIdle();
         curPlatformId = curPlatformId ? 0 : 1;
         SetFlyMode(false);
         switchPhase = false;
