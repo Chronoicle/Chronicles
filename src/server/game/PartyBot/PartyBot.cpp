@@ -12,6 +12,7 @@
 #include "Chat.h"
 #include "GlobalFunctional.h"
 #include "CharacterPackets.h"
+#include "LFGMgr.h"
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
 #include <boost/algorithm/string/predicate.hpp>
@@ -212,6 +213,15 @@ void PartyBotAI::UpdateAI(uint32 diff)
         return;
     }
     _checkTimer = 500;
+
+    // Dungeon Finder: answer the role check with the spec's role and accept the "dungeon ready" proposal
+    if (Group* group = me->GetGroup())
+    {
+        uint8 role = PLAYER_ROLE_DAMAGE;
+        if (ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(me->GetSpecializationId()))
+            role = spec->Role == 0 ? PLAYER_ROLE_TANK : spec->Role == 1 ? PLAYER_ROLE_HEALER : PLAYER_ROLE_DAMAGE;
+        sLFGMgr->AnswerForBot(group->GetGUID(), me->GetGUID(), role);
+    }
 
     Player* leader = ObjectAccessor::FindPlayer(_leaderGuid);
     if (!leader || !leader->IsInWorld() || me->IsBeingTeleported())

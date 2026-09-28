@@ -3020,3 +3020,37 @@ void LFGMgr::SendLfgUpdateQueue(ObjectGuid guid)
 
 
 } // namespace lfg
+
+void LFGMgr::AnswerForBot(ObjectGuid gguid, ObjectGuid guid, uint8 role)
+{
+    std::vector<uint32> proposals;
+    bool roleCheck = false;
+    {
+        std::lock_guard<std::recursive_mutex> _lock(m_lock);
+
+        auto itRoleCheck = RoleChecksStore.find(gguid);
+        if (!gguid.IsEmpty() && itRoleCheck != RoleChecksStore.end())
+        {
+            auto itRoles = itRoleCheck->second.roles.find(guid);
+            roleCheck = itRoles != itRoleCheck->second.roles.end() && itRoles->second == PLAYER_ROLE_NONE;
+        }
+
+        for (auto const& itr : ProposalsStore)
+        {
+            auto itPlayer = itr.second.players.find(guid);
+            if (itPlayer != itr.second.players.end() && itPlayer->second.accept != LFG_ANSWER_AGREE)
+                proposals.push_back(itr.first);
+        }
+    }
+
+    if (roleCheck)
+        UpdateRoleCheck(gguid, guid, role);
+
+    for (uint32 id : proposals)
+    {
+        WorldPackets::LFG::ProposalResponse response;
+        response.ProposalID = id;
+        response.Accepted = true;
+        UpdateProposal(response, guid);
+    }
+}

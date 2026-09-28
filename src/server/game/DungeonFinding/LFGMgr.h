@@ -367,6 +367,8 @@ public:
     void UpdateBoot(ObjectGuid gguid, ObjectGuid guid, bool accept);
     void UpdateProposal(WorldPackets::LFG::ProposalResponse response, ObjectGuid RequesterGuid);
     void UpdateRoleCheck(ObjectGuid gguid, ObjectGuid guid = ObjectGuid::Empty, uint8 roles = PLAYER_ROLE_NONE, uint8 partyIndex = 0);
+    // party bots (PartyBot.cpp): what a client would click, the role check with this role and every open proposal
+    void AnswerForBot(ObjectGuid gguid, ObjectGuid guid, uint8 role);
     void SetRoles(ObjectGuid guid, uint8 roles, uint32 queueId);
     void JoinLfg(Player* player, uint8 roles, LfgDungeonSet& dungeons);
     void LeaveLfg(ObjectGuid guid, uint32 queueId = 0);
