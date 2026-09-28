@@ -2167,6 +2167,15 @@ void Spell::SearchChainTargets(std::list<WorldObject*>& targets, uint32 chainTar
 
 void Spell::UpdateSpellCastDataTargets(WorldPackets::Spells::SpellCastData& data)
 {
+    // the packet lists at most 255 hit and 255 missed targets and push_back throws past that; the exception kicked
+    // the caster (#66: 192145 hits every unit of the Ret artifact scenario). Extra targets are still hit, just not listed.
+    std::size_t const maxTargets = decltype(data.HitTargets)::max_capacity::value;
+    auto addHit = [&data, maxTargets](ObjectGuid const& guid)
+    {
+        if (data.HitTargets.size() < maxTargets)
+            data.HitTargets.push_back(guid);
+    };
+
     for (auto& targetInfo : m_UniqueTargetInfo)
     {
         if (!targetInfo->effectMask)
@@ -2174,10 +2183,10 @@ void Spell::UpdateSpellCastDataTargets(WorldPackets::Spells::SpellCastData& data
 
         if (targetInfo->missCondition == SPELL_MISS_NONE)
         {
-            data.HitTargets.push_back(targetInfo->targetGUID);
+            addHit(targetInfo->targetGUID);
             m_channelTargetEffectMask |= targetInfo->effectMask;
         }
-        else
+        else if (data.MissTargets.size() < maxTargets)
         {
             data.MissTargets.push_back(targetInfo->targetGUID);
             data.MissStatus.push_back(WorldPackets::Spells::SpellMissStatus(targetInfo->missCondition, targetInfo->missCondition == SPELL_MISS_REFLECT ? targetInfo->reflectResult : 0));
@@ -2185,13 +2194,13 @@ void Spell::UpdateSpellCastDataTargets(WorldPackets::Spells::SpellCastData& data
     }
 
     for (auto const& targetInfo : m_VisualHitTargetInfo)
-        data.HitTargets.push_back(targetInfo->targetGUID);
+        addHit(targetInfo->targetGUID);
 
     for (GOTargetInfo const& targetInfo : m_UniqueGOTargetInfo)
-        data.HitTargets.push_back(targetInfo.targetGUID);
+        addHit(targetInfo.targetGUID);
 
     for (ItemTargetInfo const& targetInfo : m_UniqueItemInfo)
-        data.HitTargets.push_back(targetInfo.item->GetGUID());
+        addHit(targetInfo.item->GetGUID());
 
     if (!m_spellInfo->IsChanneled())
         m_channelTargetEffectMask = 0;
