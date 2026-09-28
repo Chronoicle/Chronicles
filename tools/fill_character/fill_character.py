@@ -111,6 +111,13 @@ def ids(values):
 
 # ---------------------------------------------------------------- game data (client DB2s)
 
+def gt_rows(name):
+    """~/data/gt/<name> as {first column: {header: value}}."""
+    with open(os.path.join(HOME, "data/gt", name)) as f:
+        head = f.readline().rstrip("\n").split("\t")
+        return {int(float(v[0])): dict(zip(head, map(float, v))) for v in (l.rstrip("\n").split("\t") for l in f) if v[0]}
+
+
 def strings(path):
     d = open(path, "rb").read()
     h = struct.unpack_from(wdc1.HEADER, d, 0)
@@ -183,6 +190,10 @@ class Data:
         je = wdc1.read(DBC + "JournalEncounter.db2")
         encounters = {k for k, v in je.items() if v[6] == ANTORUS}
         self.antorus = sorted({v[0] for v in wdc1.read(DBC + "JournalEncounterItem.db2").values() if v[1] in encounters})
+        # tertiary stats: RandPropPoints (epic) per item level, rating multiplier per item level, rating per 1% at 110
+        self.randprop = {k: v[2] for k, v in wdc1.read(DBC + "RandPropPoints.db2").items()}
+        self.rating_mult = gt_rows("CombatRatingsMultByILvl.txt")
+        self.rating_pct = gt_rows("CombatRatings.txt").get(110, {})
 
     # item helpers
     def name(self, iid):
@@ -339,12 +350,60 @@ def pick_gear(d, cls, spec, presets, ilvl, all_legendaries=False):
         if slot in chosen:
             bonus, lvl = d.bonus_for(chosen[slot], ilvl, defaults)
             gear.append((slot, chosen[slot], bonus, lvl))
+    gear = add_perks(d, gear, defaults.get("perks", {}))
     if all_legendaries:
         have = {g[1] for g in gear}
         for iid in sorted(i for i in d.sparse if d.is_legendary(i) and d.usable(i, cls) and i not in have):
             bonus, lvl = d.bonus_for(iid, ilvl, defaults)
             gear.append(("extra", iid, bonus, lvl))
     return gear
+
+
+# ItemBonus lists: tertiary stat (type 2, allocation 3000) and prismatic socket; stat column in CombatRatings.txt
+TERTIARY = {"leech": (41, "Lifesteal"), "avoidance": (40, "Avoidance"), "speed": (42, "Speed")}
+PRISMATIC_SOCKET = 1808
+PROP_INDEX = {1: 0, 5: 0, 20: 0, 7: 0, 3: 1, 6: 1, 8: 1, 10: 1, 12: 1, 2: 2, 9: 2, 11: 2, 16: 2}  # InventoryType -> RandPropPoints column
+
+
+def tertiary_rating(d, iid, lvl):
+    """Rating one tertiary bonus gives on this item (Item::GetItemStatValue x Player::_ApplyItemBonuses multiplier)."""
+    inv = d.sparse[iid][46]
+    points = d.randprop.get(lvl, [0] * 5)[PROP_INDEX.get(inv, 0)]
+    mult = d.rating_mult.get(lvl, {}).get("Jewelry Multiplier" if inv in (2, 11) else "Armor Multiplier", 1.0)
+    # -1: the core multiplies with the float32 game table value, so count one rating low to never land just under
+    return int(int(points * 3000 * 0.0001 + 0.5) * mult) - 1
+
+
+def add_perks(d, gear, perks):
+    """presets defaults.perks: {"leech": 20, "avoidance": 20, "speed": 20, "socket": true} (owner request 2026-09-28).
+    Tertiary stats go on the fewest armor/jewelry pieces that reach the % (the core caps each at 20%, so more is wasted);
+    every armor/jewelry piece gets a prismatic socket. Not on trinkets or legendaries (retail never has them there)."""
+    if not perks:
+        return gear
+    eligible = [n for n, (slot, iid, _, _) in enumerate(gear) if slot not in ("trinket1", "trinket2", "extra")
+                and not d.is_legendary(iid) and d.sparse[iid][46] in PROP_INDEX]
+    extra = {n: [] for n in range(len(gear))}
+    for stat, (bonus_id, column) in TERTIARY.items():
+        want = perks.get(stat, 0) * d.rating_pct.get(column, 0)
+        if not want:
+            continue
+        rating = {n: tertiary_rating(d, gear[n][1], gear[n][3]) for n in eligible}
+        best = None
+        for mask in range(1, 1 << len(eligible)):
+            pick = [eligible[i] for i in range(len(eligible)) if mask >> i & 1]
+            total = sum(rating[n] for n in pick)
+            if total >= want and (best is None or (total, len(pick)) < best[0]):
+                best = ((total, len(pick)), pick)
+        pick = best[1] if best else eligible
+        total = sum(rating[n] for n in pick)
+        log("  %-9s %4d rating on %d pieces = %.1f%% (target %d%%, capped at 20%%)" % (
+            stat, total, len(pick), total / d.rating_pct[column], perks[stat]))
+        for n in pick:
+            extra[n].append(str(bonus_id))
+    if perks.get("socket"):
+        for n in eligible:
+            extra[n].append(str(PRISMATIC_SOCKET))
+    return [(slot, iid, " ".join([b for b in [bonus] if b] + extra[n]), lvl) for n, (slot, iid, bonus, lvl) in enumerate(gear)]
 
 
 def full_rank(p, tier_unlocked=True):

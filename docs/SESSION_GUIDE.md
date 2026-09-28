@@ -167,6 +167,9 @@ python3 fill_character.py check                           # validate presets.jso
 - **gear:** 14 slots by mail (`send items` console) at ilvl 985 (legendaries 1000): preset legendaries + trinkets,
   T21 in the free tier slots, best Antorus piece for the rest by the spec's stat priority. `--all-legendaries` adds
   every class legendary. Missing artifacts (+ off-hands) are mailed too and moved straight into free bag slots.
+  **Perks (owner 2026-09-28, `defaults.perks`):** Leech / Avoidance / Speed tertiary bonuses (ItemBonus 41 / 40 / 42) on
+  the fewest armor/jewelry pieces that reach 20% each (the core caps each at 20%), and a prismatic socket (1808) on every
+  armor/jewelry piece; not on trinkets or legendaries. `"perks": {}` turns it off. The plan prints the % reached.
 - **quests:** level 110, class campaign + artifact questlines + Legionfall/Argus/Crucible (`CLASS_QUESTLINES`),
   third relic slot quest, class hall row if missing, class hall talent for the second legendary.
 - **artifacts:** every artifact the character holds: rank 101 (all traits, 4th ranks, Concordance 50), tier 2,

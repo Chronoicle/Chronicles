@@ -6,12 +6,14 @@
     "relics: optional item IDs per artifact socket (else the script picks Antorus relics of the right type). relic_traits: preferred relic traits by name.",
     "crucible: tier 2 Netherlight Crucible pick (Light: Light Speed, Refractive Shell, Shocklight, Infusion of Light, Secure in the Light, Light's Embrace;",
     "  Shadow: Master of Shadows, Murderous Intent, Shadowbind, Chaotic Darkness, Torment the Weak, Dark Sorrows). crucible_trait: tier 3 artifact trait by name.",
-    "Legendary choices are the common 7.3.5 picks; change them freely."
+    "Legendary choices are the common 7.3.5 picks; change them freely.",
+    "defaults.perks: % Leech / Avoidance / Speed to reach with tertiary bonuses (core cap 20) and a prismatic socket on every armor/jewelry piece; {} turns it off."
   ],
   "defaults": {
     "ilvl": 985,
     "legendary_bonus": "3630",
     "legendary_ilvl": 1000,
+    "perks": {"leech": 20, "avoidance": 20, "speed": 20, "socket": true},
     "trinkets": {
       "int_dps": [154172, 151955],
       "agi_dps": [154172, 151968],
