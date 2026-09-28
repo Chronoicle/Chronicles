@@ -236,8 +236,9 @@ WorldPacket const* WorldPackets::BattlePay::ProductListResponse::Write()
         _worldPacket.WriteBits(productGroupData.Name.length(), 8);
         _worldPacket.WriteBits(productGroupData.IsAvailableDescription.length() + 1, 24);
         _worldPacket.WriteString(productGroupData.Name);
+        // the length sent is length + 1: a non-empty description goes with its NUL, an empty one (1) sends no bytes
         if (!productGroupData.IsAvailableDescription.empty())
-            _worldPacket.WriteString(productGroupData.IsAvailableDescription);
+            _worldPacket << productGroupData.IsAvailableDescription;
     }
 
     for (BattlePayShopEntry const& shopData : ProductList.Shop)
@@ -249,10 +250,13 @@ WorldPacket const* WorldPackets::BattlePay::ProductListResponse::Write()
         _worldPacket << shopData.VasServiceType;
         _worldPacket << shopData.StoreDeliveryType;
 
-        if (_worldPacket.WriteBit(shopData.DisplayInfo.has_value()))
-            _worldPacket << *shopData.DisplayInfo;
-
+        // the client reads the display info bits from a fresh byte: packing them behind this bit put it one byte
+        // ahead, it read a Visuals count of 0xD1000000 from the icon FileDataID and crashed allocating 1.8 TB
+        _worldPacket.WriteBit(shopData.DisplayInfo.has_value());
         _worldPacket.FlushBits();
+
+        if (shopData.DisplayInfo)
+            _worldPacket << *shopData.DisplayInfo;
     }
 
     return &_worldPacket;

@@ -78,8 +78,10 @@ BattlePayCurrency BattlepayManager::GetShopCurrency() const
 
 bool BattlepayManager::IsAvailable() const
 {
-    // Bpay.Enabled = 0 hides the shop for GM accounts too: it was always on for them, and opening it crashes the client
-    // (the shop moved to the Donate Vendor, owner request 2026-09-27; crash reported by the owner 2026-09-28)
+    // GM accounts always see the shop, so it can be tested while Bpay.Enabled = 0 hides it from players
+    if (AccountMgr::IsModeratorAccount(_session->GetSecurity()))
+        return true;
+
     return sWorld->getBoolConfig(CONFIG_FEATURE_SYSTEM_BPAY_STORE_ENABLED);
 }
 
