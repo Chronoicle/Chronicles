@@ -324,6 +324,7 @@ public:
     //Advancement
     bool hasLegionFall() const;
     bool hasLegendLimitUp() const;
+    bool LearnSecondLegendaryTalent();     // false when the class has none or it is already known
     std::map<uint32 /*garrPlotInstanceId*/, Plot> _plots;
 
     void DecrementTroopCount(uint32 id) { --_troopCount[id]; }

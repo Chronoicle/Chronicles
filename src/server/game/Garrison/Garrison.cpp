@@ -3383,36 +3383,24 @@ bool Garrison::hasLegionFall() const
 }
 
 //! Increase the number of Legendary items you can equip by 1.
+// class hall talent that allows a second Legion legendary, by class
+static uint32 const SecondLegendaryTalent[MAX_CLASSES] = { 0, 412, 401, 379, 445, 456, 434, 42, 390, 368, 258, 357, 423 };
+
 bool Garrison::hasLegendLimitUp() const
 {
-    switch (_owner->getClass())
-    {
-        case CLASS_DEMON_HUNTER:
-            return hasTallent(423);
-        case CLASS_DRUID:
-            return hasTallent(357);
-        case CLASS_MONK:
-            return hasTallent(258);
-        case CLASS_WARLOCK:
-            return hasTallent(368);
-        case CLASS_SHAMAN:
-            return hasTallent(42);
-        case CLASS_DEATH_KNIGHT:
-            return hasTallent(434);
-        case CLASS_PRIEST:
-            return hasTallent(456);
-        case CLASS_ROGUE:
-            return hasTallent(445);
-        case CLASS_HUNTER:
-            return hasTallent(379);
-        case CLASS_PALADIN:
-            return hasTallent(401);
-        case CLASS_WARRIOR:
-            return hasTallent(412);
-        case CLASS_MAGE:
-            return hasTallent(390);
-        default:
-            break;
-    }
-    return false;
+    uint8 cls = _owner->getClass();
+    return cls < MAX_CLASSES && SecondLegendaryTalent[cls] && hasTallent(SecondLegendaryTalent[cls]);
+}
+
+// Gear Master NPC and party bots: the talent, researched long ago (ready at once); creates the class hall first
+// when the character has none (the talent lives there), without the teleport into it
+bool Garrison::LearnSecondLegendaryTalent()
+{
+    uint8 cls = _owner->getClass();
+    if (cls >= MAX_CLASSES || !SecondLegendaryTalent[cls] || hasLegendLimitUp())
+        return false;
+
+    _owner->CreateGarrison(_owner->GetTeam() == ALLIANCE ? SITE_ID_CLASS_ORDER_ALLIANCE : SITE_ID_CLASS_ORDER_HORDE, true);
+    AddTalentToStore(SecondLegendaryTalent[cls], uint32(GameTime::GetGameTime()) - 10 * DAY, 0, DB_STATE_NEW);
+    return true;
 }

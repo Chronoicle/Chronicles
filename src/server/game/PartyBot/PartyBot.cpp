@@ -16,6 +16,7 @@
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
 #include "SpellMgr.h"
+#include "Garrison.h"
 #include "SpellInfo.h"
 #include "CellImpl.h"
 #include "GridNotifiers.h"
@@ -100,6 +101,10 @@ void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId)
         bot->GiveLevel(110);
     if (bot->GetSpecializationId() != specId)
         bot->ActivateTalentGroup(spec);
+
+    // the class hall talent for a second legendary first, or the set's second legendary is refused (empty slot)
+    if (Garrison* garrison = bot->GetGarrisonPtr())
+        garrison->LearnSecondLegendaryTalent();
 
     // starting gear out, the spec's set in
     for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)

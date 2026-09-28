@@ -65,16 +65,12 @@ static GearUpProfession const Professions[] =
     { 356, 210829, false, "Fishing" },
 };
 
-// class hall talent that allows a second Legion legendary (Garrison::hasLegendLimitUp), by class
-static uint32 const SecondLegendaryTalent[MAX_CLASSES] = { 0, 412, 401, 379, 445, 456, 434, 42, 390, 368, 258, 357, 423 };
-
 // Without this talent only one legendary fits; Aman'Thul's Vision is a Pantheon trinket (limit category 362) and never counted.
 // Characters without a class hall get one first (the talent lives in the class hall), like fill_character's quests step.
 static void GrantSecondLegendary(Player* player, ChatHandler& chat)
 {
-    uint32 talent = player->getClass() < MAX_CLASSES ? SecondLegendaryTalent[player->getClass()] : 0;
     Garrison* garrison = player->GetGarrisonPtr();
-    if (!talent || !garrison)
+    if (!garrison)
         return;
     if (garrison->hasLegendLimitUp())
     {
@@ -82,11 +78,8 @@ static void GrantSecondLegendary(Player* player, ChatHandler& chat)
         return;
     }
 
-    // no-op when the class hall exists; skip the teleport into it
-    player->CreateGarrison(player->GetTeam() == ALLIANCE ? SITE_ID_CLASS_ORDER_ALLIANCE : SITE_ID_CLASS_ORDER_HORDE, true);
-
-    // researched long ago = ready at once (replaces the other talent of that tier)
-    garrison->AddTalentToStore(talent, uint32(GameTime::GetGameTime()) - 10 * DAY, 0, DB_STATE_NEW);
+    if (!garrison->LearnSecondLegendaryTalent())
+        return;
     chat.SendSysMessage("Gear-Up: class hall upgrade learned, you can equip a second legendary. Log out and back in once so your client knows it too.");
 }
 
