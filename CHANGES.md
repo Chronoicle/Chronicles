@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — restart 13:14 UTC (owner OK, Chrondh + Rxven online, 60 s timer), worldserver 0e8f276: party bots phase 1 (#65: `.partybot create/add/remove/list`, GM only; 50 bot accounts partybot1..50@bot made by the owner) — live, no changelog (staff only) — `git revert 0e8f276 1bd27b8`, `sql/custom/undo_partybot_*.sql`.
+
 - Claude (desktop session) — patch.chronicles-wow.com (patch server, http + https) and the domain launcher (patch server + portal = domain) published on both patch servers after the owner's test; website download link -> patch.chronicles-wow.com — live — undo: put back `~/launcher/Launcher_prev_ip.exe` + `manifest_prev_ip.json` (new server) / `~/Launcher_before_domain.exe` + `~/manifest_before_domain.json` (old server).
 
 - Claude (desktop session) — **domain chronicles-wow.com** (owner bought it, Namecheap, A @ + www -> 184.174.37.33): nginx website block `server_name chronicles-wow.com www.chronicles-wow.com _`, Let's Encrypt certificate (owner OK for the ToS, no e-mail, certbot.timer renews), http -> https, the IP / other names on port 80 -> https://chronicles-wow.com, ufw 443. Old server redirect -> https://chronicles-wow.com. Patch server stays on 184-174-37-33.nip.io (port 80 -> 8099) — live — nginx backup `/root/nginx_chronicles.bak_*` on the new server.
