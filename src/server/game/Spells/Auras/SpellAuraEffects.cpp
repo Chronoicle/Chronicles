@@ -1312,8 +1312,10 @@ float AuraEffect::CalculateAmount(Unit* caster)
 
                 if (!(GetSpellInfo()->HasAttribute(SPELL_ATTR6_NO_DONE_PCT_DAMAGE_MODS)))
                 {
+                    // Purified Resolve 196440 is a flat % of health (5%, 6% with Vim and Vigor); versatility made it 6.2 / 7.41% (#73)
                     if (Player* modOwner = caster->GetSpellModOwner())
-                        amount += CalculatePct(amount, modOwner->GetFloatValue(PLAYER_FIELD_VERSATILITY) + modOwner->GetFloatValue(PLAYER_FIELD_VERSATILITY_BONUS));
+                        if (m_spellInfo->Id != 196440)
+                            amount += CalculatePct(amount, modOwner->GetFloatValue(PLAYER_FIELD_VERSATILITY) + modOwner->GetFloatValue(PLAYER_FIELD_VERSATILITY_BONUS));
 
                     Unit::AuraEffectList const& mAbsorbAmount = caster->GetAuraEffectsByType(SPELL_AURA_MOD_ABSORB_AMOUNT);
                     for (Unit::AuraEffectList::const_iterator i = mAbsorbAmount.begin(); i != mAbsorbAmount.end(); ++i)

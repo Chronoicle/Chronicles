@@ -7,6 +7,7 @@
 #include "CreatureTextMgr.h"
 #include "GameObjectAI.h"
 #include "QuestData.h"
+#include "MoveSplineInit.h"
 #include "ObjectVisitors.hpp" 
 
 // + Smart: 122105 120515 118444 119130
@@ -328,24 +329,53 @@ public:
             summoner->CastSpell(me, 52391, true); //Ride Veh
         }
         
+        // #77: path 11322708 never existed in waypoint_data, so the raven stuttered in place / was dragged along the
+        // ground and dropped its rider under the map. Now one smooth flight from the Kirin Tor ship over the sea to the
+        // landing next to the Kirin Tor mage on the shore, every point at least 30 yd above the ground.
         void PassengerBoarded(Unit* who, int8 /*seatId*/, bool apply) override
         {
+            if (!apply)
+                return;
+
             bool isPlayer = who->IsPlayer();
             me->AddDelayedEvent(4000, [this, isPlayer]() -> void
             {
-                if (isPlayer)
-                    me->GetMotionMaster()->MovePath(11322708, false);
-                else
-                    me->GetMotionMaster()->MovePath(11322708, false, irand(-15, 15), irand(-15, 15));
+                float offX = isPlayer ? 0.0f : float(irand(-15, 15));
+                float offY = isPlayer ? 0.0f : float(irand(-15, 15));
+                static G3D::Vector3 const route[] =
+                {
+                    { -900.0f, 4050.0f, 800.0f }, { -1100.0f, 3700.0f, 780.0f }, { -1300.0f, 3400.0f, 600.0f },
+                    { -1450.0f, 3200.0f, 300.0f }, { -1510.0f, 3110.0f, 130.0f }, { -1528.0f, 3075.0f, 72.0f },
+                };
+
+                Movement::PointsArray path;
+                path.push_back(G3D::Vector3(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ()));
+                path.push_back(G3D::Vector3(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ() + 20.0f));
+                for (uint8 i = 0; i < sizeof(route) / sizeof(route[0]); ++i)
+                {
+                    G3D::Vector3 point(route[i].x + offX, route[i].y + offY, route[i].z);
+                    bool landing = i + 1 == sizeof(route) / sizeof(route[0]);
+                    float ground = me->GetMap()->GetHeight(me->GetPhases(), point.x, point.y, point.z + 200.0f, true, 400.0f);
+                    if (ground > INVALID_HEIGHT)
+                        point.z = std::max(point.z, ground + (landing ? 2.0f : 30.0f));
+                    path.push_back(point);
+                }
+
+                Movement::MoveSplineInit init(*me);
+                init.MovebyPath(path);
+                init.SetFly();
+                init.SetSmooth();
+                init.SetUncompressed();
+                init.SetVelocity(35.0f);
+                int32 duration = init.Launch();
+
+                me->AddDelayedEvent(uint32(std::max(duration, 1000)), [this]() -> void { Landed(); });
             });
         }
-        
-        void MovementInform(uint32 moveType, uint32 pointId) override
-        {
-            if (moveType != WAYPOINT_MOTION_TYPE)
-                return;
 
-            if (pointId == 20 && me->GetAnyOwner())
+        void Landed()
+        {
+            if (me->GetAnyOwner())
             {
                 if (me->GetAnyOwner()->IsPlayer())
                 {

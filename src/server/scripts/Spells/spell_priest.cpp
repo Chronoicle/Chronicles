@@ -1831,12 +1831,17 @@ class spell_pri_mind_flay : public AuraScript
             {
                 if (caster->HasAura(199445)) // Mind Trauma	(Honor Talent)
                 {
+                    // #71: each new stack on an enemy (max 4 per enemy) adds one to the priest's buff (max 8). The buff
+                    // used to copy the enemy's stack count, so it never passed 4.
+                    Aura* debuff = target->GetAura(247777, caster->GetGUID());
+                    uint8 before = debuff ? debuff->GetStackAmount() : 0;
                     caster->CastSpell(target, 247777, true);
-                    if (Aura* aura = target->GetAura(247777, caster->GetGUID()))
+                    debuff = target->GetAura(247777, caster->GetGUID());
+                    if (debuff && debuff->GetStackAmount() > before)
                     {
                         if (Aura* aur = caster->GetAura(247776))
                         {
-                            aur->SetStackAmount(aura->GetStackAmount());
+                            aur->ModStackAmount(1);
                             aur->RefreshDuration();
                         }
                         else

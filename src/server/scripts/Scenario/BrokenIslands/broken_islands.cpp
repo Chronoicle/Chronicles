@@ -12,6 +12,7 @@ The Broken Islands Scenario
 #include "MiscPackets.h"
 #include "GameObjectAI.h"
 #include "QuestData.h"
+#include "MoveSplineInit.h"
 #include "CreatureGroups.h"
 // #include "PrecompiledHeaders/ScriptPCH.h"
 
@@ -2576,15 +2577,14 @@ public:
         VEHICLE_SPELL_RIDE_HARDCODED = 125684,
     };
 
-    struct npc_q40517_p1AI : public npc_escortAI
+    // #74: the escort flew the path point by point (stuttering, slow) and took movement control away from the player
+    // (SetClientControl(me, 0)) without ever giving it back, so after the drop-off at the Keep they could only jump.
+    // Now one smooth flight over the same points; at the Keep the player gets off and gets control back.
+    struct npc_q40517_p1AI : public ScriptedAI
     {
-        npc_q40517_p1AI(Creature* creature) : npc_escortAI(creature) {}
+        npc_q40517_p1AI(Creature* creature) : ScriptedAI(creature) {}
 
-        bool PlayerOn;
-        void Reset() override
-        {
-            PlayerOn = false;
-        }
+        ObjectGuid playerGuid;
 
         void OnCharmed(bool /*apply*/) override
         {
@@ -2598,41 +2598,51 @@ public:
 
         void PassengerBoarded(Unit* who, int8 /*seatId*/, bool apply) override
         {
-            if (!apply || who->GetTypeId() != TYPEID_PLAYER)
+            if (!apply || who->GetTypeId() != TYPEID_PLAYER || !playerGuid.IsEmpty())
                 return;
 
-            who->ToPlayer()->KilledMonsterCredit(100696);
+            Player* player = who->ToPlayer();
+            playerGuid = player->GetGUID();
+            player->KilledMonsterCredit(100696);
+            player->PlayDistanceSound(16422, player);
+            player->SetClientControl(me, false);    // no steering during the flight
 
-            PlayerOn = true;
-            Start(false, true, who->GetGUID());
-            who->ToPlayer()->PlayDistanceSound(16422, who->ToPlayer());
+            static G3D::Vector3 const route[] =
+            {
+                { -8389.01f, 1356.74f, 136.404f }, { -8387.71f, 1331.25f, 136.949f }, { -8388.00f, 1276.64f, 136.949f },
+                { -8394.79f, 1234.05f, 136.949f }, { -8422.32f, 1168.42f, 136.949f }, { -8454.29f, 1049.01f, 136.949f },
+                { -8507.18f, 983.802f, 136.949f }, { -8544.52f, 931.611f, 142.362f }, { -8573.88f, 895.201f, 136.949f },
+                { -8601.33f, 858.684f, 136.949f }, { -8630.59f, 817.844f, 136.949f }, { -8634.53f, 789.677f, 136.949f },
+                { -8653.88f, 752.198f, 140.626f }, { -8689.17f, 716.826f, 142.876f }, { -8697.11f, 660.427f, 136.949f },
+                { -8696.37f, 587.007f, 136.949f }, { -8640.24f, 551.757f, 136.949f }, { -8583.79f, 509.368f, 123.235f },
+                { -8541.48f, 459.236f, 108.580f },
+            };
+
+            Movement::PointsArray path;
+            path.push_back(G3D::Vector3(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ()));
+            for (G3D::Vector3 const& point : route)
+                path.push_back(point);
+
+            Movement::MoveSplineInit init(*me);
+            init.MovebyPath(path);
+            init.SetFly();
+            init.SetSmooth();
+            init.SetUncompressed();
+            init.SetVelocity(20.0f);
+            int32 duration = init.Launch();
+
+            me->AddDelayedEvent(uint32(std::max(duration, 1000)), [this]() -> void { Arrived(); });
         }
 
-        void WaypointReached(uint32 i) override
+        void Arrived()
         {
-            switch (i)
+            if (Player* player = ObjectAccessor::GetPlayer(*me, playerGuid))
             {
-                case 21:
-                    if (Player* player = GetPlayerForEscort())
-                    {
-                        SetEscortPaused(true);
-                        player->ExitVehicle();
-                        sCreatureTextMgr->SendChat(me, TEXT_GENERIC_0, player->GetGUID());
-                    }
-                    break;
+                player->ExitVehicle();
+                player->SetClientControl(player, true);
+                sCreatureTextMgr->SendChat(me, TEXT_GENERIC_0, player->GetGUID());
             }
-        }
-
-        void UpdateAI(uint32 diff) override
-        {
-            npc_escortAI::UpdateAI(diff);
-
-            if (PlayerOn)
-            {
-                if (Player* player = GetPlayerForEscort())
-                    player->SetClientControl(me, 0);
-                PlayerOn = false;
-            }
+            me->DespawnOrUnsummon(3000);
         }
     };
 };
@@ -2644,7 +2654,9 @@ public:
 
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
-        if (!player->HasAccountQuest(60008)) //check for account-wide quest complete before player can skip legion scenario
+        // #78: another character of the account finished the Broken Shore scenario (The Battle for Broken Shore); quest 60008
+        // used before is never rewarded on this server, so the skip never worked
+        if (!player->HasAccountQuest(42740))
             return false;
 
         player->PlayerTalkClass->SendCloseGossip();
