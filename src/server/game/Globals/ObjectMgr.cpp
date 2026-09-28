@@ -5165,12 +5165,13 @@ void ObjectMgr::SetHighestGuids()
 
 uint64 ObjectMgr::GenerateReportComplaintID()
 {
-    if (_reportComplaintID >= std::numeric_limits<uint64>::max())
+    uint64 id = _reportComplaintID++;
+    if (id >= std::numeric_limits<uint64>::max())
     {
         TC_LOG_ERROR("misc", "_reportComplaintID overflow!! Can't continue, shutting down server. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
-    return _reportComplaintID++;
+    return id;
 }
 
 MailLevelReward const* ObjectMgr::GetMailLevelReward(uint32 level, uint32 raceMask)
@@ -5214,32 +5215,36 @@ CellObjectGuidsMap const* ObjectMgr::GetMapObjectGuids(uint16 mapid, uint8 spawn
 
 uint32 ObjectMgr::GenerateAuctionID()
 {
-    if (_auctionId >= std::numeric_limits<uint32>::max())
+    uint32 id = _auctionId++;
+    if (id >= std::numeric_limits<uint32>::max())
     {
         TC_LOG_ERROR("misc", "Auctions ids overflow!! Can't continue, shutting down server. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
-    return _auctionId++;
+    return id;
 }
 
 uint64 ObjectMgr::GenerateEquipmentSetGuid()
 {
-    if (_equipmentSetGuid >= std::numeric_limits<uint64>::max())
+    uint64 id = _equipmentSetGuid++;
+    if (id >= std::numeric_limits<uint64>::max())
     {
         TC_LOG_ERROR("misc", "EquipmentSetInfo guid overflow!! Can't continue, shutting down server. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
-    return _equipmentSetGuid++;
+    return id;
 }
 
 uint32 ObjectMgr::GenerateMailID()
 {
-    if (_mailId >= std::numeric_limits<uint32>::max())
+    // one atomic fetch_add: map threads send mail in parallel (quest rewards, shop, battlepay)
+    uint32 id = _mailId++;
+    if (id >= std::numeric_limits<uint32>::max())
     {
         TC_LOG_ERROR("misc", "Mail ids overflow!! Can't continue, shutting down server. ");
         World::StopNow(ERROR_EXIT_CODE);
     }
-    return _mailId++;
+    return id;
 }
 
 void ObjectMgr::LoadGameObjectLocales()

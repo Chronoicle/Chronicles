@@ -500,27 +500,29 @@ ByteBuffer& operator<<(ByteBuffer& buf, ObjectGuid const& guid)
 template<HighGuid high>
 ObjectGuid::LowType ObjectGuidGenerator<high>::Generate()
 {
-    if (_nextGuid >= ObjectGuid::GetMaxCounter(high) - 1)
+    ObjectGuid::LowType guid = _nextGuid++;
+    if (guid >= ObjectGuid::GetMaxCounter(high) - 1)
     {
         //TC_LOG_ERROR("server.loading", "%s guid overflow!! Can't continue, shutting down server. ", ObjectGuid::GetTypeName(high));
         World::StopNow(ERROR_EXIT_CODE);
     }
 
-    ObjectAccessor::SetGuidSize(high, _nextGuid + 1);
+    ObjectAccessor::SetGuidSize(high, guid + 1);
 
-    return _nextGuid++;
+    return guid;
 }
 
 template<HighGuid high>
 uint32 ObjectGuidGenerator<high>::GenerateLow()
 {
-    if (_nextGuid >= ObjectGuid::GetMaxCounter(high) - 1)
+    ObjectGuid::LowType guid = _nextGuid++;
+    if (guid >= ObjectGuid::GetMaxCounter(high) - 1)
     {
         //TC_LOG_ERROR("server.loading", "%s guid overflow!! Can't continue, shutting down server. ", ObjectGuid::GetTypeName(high));
         World::StopNow(ERROR_EXIT_CODE);
     }
 
-    return static_cast<uint32>(_nextGuid++);
+    return static_cast<uint32>(guid);
 }
 
 ByteBuffer& operator>>(ByteBuffer& buf, ObjectGuid& guid)

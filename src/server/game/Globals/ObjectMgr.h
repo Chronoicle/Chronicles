@@ -33,6 +33,7 @@
 #include "ObjectAccessor.h"
 #include "ObjectDefines.h"
 #include "VehicleDefines.h"
+#include <atomic>
 #include <limits>
 #include <utility>
 #include "ConditionMgr.h"
@@ -907,13 +908,14 @@ class TC_GAME_API ObjectMgr
 
     private:
         // first free id for selected id type
-        uint32 _auctionId;
-        uint64 _equipmentSetGuid;
+        // atomic: the Generate*() calls come from every map thread at once (duplicate mail ids)
+        std::atomic<uint32> _auctionId;
+        std::atomic<uint64> _equipmentSetGuid;
         uint32 _itemTextId;
-        uint32 _mailId;
-        uint32 _hiPetNumber;
-        ObjectGuid::LowType _voidItemId;
-        uint64 _reportComplaintID;
+        std::atomic<uint32> _mailId;
+        std::atomic<uint32> _hiPetNumber;
+        std::atomic<ObjectGuid::LowType> _voidItemId;
+        std::atomic<uint64> _reportComplaintID;
 
         // first free low guid for selected guid type
         ObjectGuidGenerator<HighGuid::Player> _playerGuidGenerator;

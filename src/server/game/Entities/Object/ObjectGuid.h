@@ -21,6 +21,7 @@
 
 #include "ByteBuffer.h"
 #include "ObjectDefines.h"
+#include <atomic>
 #include <deque>
 #include <list>
 #include <set>
@@ -256,7 +257,7 @@ class TC_GAME_API ObjectGuidGenerator
         ObjectGuid::LowType GetNextAfterMaxUsed() const { return _nextGuid; }
 
     private:
-        uint64 _nextGuid;
+        std::atomic<uint64> _nextGuid; // Generate() runs on every map thread at once
 };
 
 TC_GAME_API ByteBuffer& operator<<(ByteBuffer& buf, ObjectGuid const& guid);
