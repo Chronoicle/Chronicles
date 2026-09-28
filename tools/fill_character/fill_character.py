@@ -767,6 +767,14 @@ def export_gear_npc(d, presets, path):
         for slot, iid, bonus, _ in pick_gear(d, d.specs[spec][0], spec, presets, presets["defaults"]["ilvl"]):
             out.append("INSERT INTO gear_npc_items VALUES (%d, '%s', %d, '%s');" % (spec, slot, iid, bonus))
             rows += 1
+        # the spec's artifact (+ off-hand part): party bots equip it, the Gear Master skips these rows
+        if spec in d.spec_artifact:
+            art_item = d.spec_artifact[spec][1]
+            out.append("INSERT INTO gear_npc_items VALUES (%d, 'artifact', %d, '');" % (spec, art_item))
+            rows += 1
+            if art_item in d.children:
+                out.append("INSERT INTO gear_npc_items VALUES (%d, 'artifact2', %d, '');" % (spec, d.children[art_item]))
+                rows += 1
     with open(path, "w") as f:
         f.write("\n".join(out) + "\n")
     print("%d rows -> %s  (apply: mysql world < %s)" % (rows, path, path))

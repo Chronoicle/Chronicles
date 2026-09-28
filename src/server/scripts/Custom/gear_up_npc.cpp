@@ -170,7 +170,7 @@ static void GiveBags(Player* player)
 static void GiveGear(Player* player, uint32 specId)
 {
     ChatHandler chat(player->GetSession());
-    QueryResult result = WorldDatabase.PQuery("SELECT item, bonus FROM gear_npc_items WHERE spec = %u", specId);
+    QueryResult result = WorldDatabase.PQuery("SELECT item, bonus FROM gear_npc_items WHERE spec = %u AND slot NOT LIKE 'artifact%%'", specId);
     if (!result)
     {
         chat.SendSysMessage("Gear-Up: no gear set for this spec (run fill_character.py export and apply gear_npc_items.sql).");

@@ -12,6 +12,8 @@
 #include "WorldSession.h"
 #include "UnitAI.h"
 
+struct ChrSpecializationEntry;
+
 class PartyBotSession : public WorldSession
 {
 public:
@@ -28,6 +30,7 @@ public:
 
 private:
     void Setup(Player* bot);
+    void FirstLoginSetup(Player* bot, uint32 specId);
     void AckTeleports(Player* bot);
 
     ObjectGuid _botGuid;
@@ -61,6 +64,11 @@ public:
 
     // returns an error text, empty on success
     std::string AddBot(Player* leader, std::string name);
+    // name, "tank" / "healer" / "dps", a spec ("holy") or a class ("paladin"): a free bot of the leader's faction
+    std::string AddBotByRole(Player* leader, std::string const& what);
+    // a new bot character for this spec on the next free partybot account, on the creator's faction
+    std::string CreateBot(Player* creator, uint32 specId, std::string& name);
+    static ChrSpecializationEntry const* FindSpec(std::string const& className, std::string const& specName);
     std::string RemoveBot(Player* leader, std::string const& name);   // empty name = all of the leader's bots
     std::vector<std::shared_ptr<PartyBotSession>> GetBots(ObjectGuid leaderGuid);
     uint8 CountBots(ObjectGuid leaderGuid);
@@ -72,6 +80,7 @@ private:
 
     std::mutex _lock;
     std::vector<std::weak_ptr<PartyBotSession>> _bots;
+    std::set<uint32> _usedAccounts;     // bot accounts given a character this run (the character save is asynchronous)
 };
 
 #define sPartyBotMgr PartyBotMgr::instance()
