@@ -31294,7 +31294,8 @@ void Player::SetClientControl(Unit* target, bool allowMove)
     ASSERT(target);
 
     // still affected by some aura that shouldn't allow control, only allow on last such aura to be removed
-    if (target->HasUnitState(UNIT_STATE_CONTROLLED))
+    // (not stuns: SetStunned roots instead and never gives control back, so a grant during a stun was lost for good, #49)
+    if (target->HasUnitState(UNIT_STATE_FLEEING | UNIT_STATE_CONFUSED))
         allowMove = false;
 
     // Temporary #47 diagnostics: player possession movement handoff.
