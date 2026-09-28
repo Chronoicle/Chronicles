@@ -36,6 +36,16 @@ PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, Ob
 {
 }
 
+static bool GroupInCombat(Player* bot)
+{
+    if (Group* group = bot->GetGroup())
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->getSource())
+                if (member->IsAlive() && member->isInCombat())
+                    return true;
+    return false;
+}
+
 bool PartyBotSession::Update(uint32 diff, Map* map)
 {
     // once the bot is on a map, the map updates its session (World::UpdateSessions skips it), so the bot steps run in
@@ -67,15 +77,19 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
     if (!_setupDone && !_dismissed)
         Setup(bot);
 
-    // dead: come back when the leader is alive and out of combat (here, as Player::Update only runs the AI while
-    // the bot is alive)
+    // dead: come back when the leader is alive and the group out of combat (here, as Player::Update only runs the
+    // AI while the bot is alive): go to the leader, then resurrect there
     if (_setupDone && !_dismissed && bot->isDead(false) && !bot->IsBeingTeleported())
         if (Player* leader = ObjectAccessor::FindPlayer(_leaderGuid))
-            if (leader->IsInWorld() && leader->IsAlive() && !leader->isInCombat() && !leader->IsBeingTeleported())
+            if (leader->IsInWorld() && leader->IsAlive() && !leader->IsBeingTeleported() && !leader->isInFlight() && !GroupInCombat(bot))
             {
-                bot->ResurrectPlayer(0.5f);
-                bot->SpawnCorpseBones();
-                bot->TeleportTo(leader->GetMapId(), leader->GetPositionX(), leader->GetPositionY(), leader->GetPositionZ(), leader->GetOrientation());
+                if (bot->GetMapId() != leader->GetMapId() || !bot->IsWithinDistInMap(leader, 30.0f))
+                    bot->TeleportTo(leader->GetMapId(), leader->GetPositionX(), leader->GetPositionY(), leader->GetPositionZ(), leader->GetOrientation());
+                else
+                {
+                    bot->ResurrectPlayer(0.5f);
+                    bot->SpawnCorpseBones();
+                }
             }
 
     // the leader logged out: wait a moment (reconnects, loading screens), then go too
@@ -390,7 +404,8 @@ bool PartyBotAI::InSight(Unit* unit, float range) const
 bool PartyBotAI::Approach(Unit* unit)
 {
     MotionMaster* motion = me->GetMotionMaster();
-    if (_approachGuid != unit->GetGUID())
+    bool newUnit = _approachGuid != unit->GetGUID();
+    if (newUnit)
     {
         _approachGuid = unit->GetGUID();
         _approachTicks = 0;
@@ -411,7 +426,7 @@ bool PartyBotAI::Approach(Unit* unit)
         motion->MovePoint(0, unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), true);
         return true;
     }
-    if (motion->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
+    if (newUnit || motion->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
         motion->MoveChase(unit);
     return true;
 }
@@ -421,9 +436,12 @@ bool PartyBotAI::Approach(Unit* unit)
 void PartyBotAI::StandStill()
 {
     MotionMaster* motion = me->GetMotionMaster();
-    if (motion->GetMotionSlotType(MOTION_SLOT_CONTROLLED) != NULL_MOTION_TYPE || motion->GetCurrentMovementGeneratorType() == IDLE_MOTION_TYPE)
+    if (motion->GetMotionSlotType(MOTION_SLOT_CONTROLLED) != NULL_MOTION_TYPE)
         return;
-    motion->Clear();
+    if (motion->GetCurrentMovementGeneratorType() != IDLE_MOTION_TYPE)
+        motion->Clear();
+    // also a follow run: a player's follow generator expires on its first update (the core's DoUpdate returns
+    // false) and leaves its spline running under IDLE. No packet when nothing moves.
     me->StopMoving();
 }
 
@@ -440,7 +458,7 @@ void PartyBotAI::PositionRanged(Unit* target, Player* leader)
     }
 
     _approachTicks = 0;
-    if (type == FOLLOW_MOTION_TYPE || (type == CHASE_MOTION_TYPE && InSight(target, 30.0f)))
+    if (type != CHASE_MOTION_TYPE || InSight(target, 30.0f))
         StandStill();
 }
 
@@ -462,17 +480,13 @@ void PartyBotAI::PositionHealer(Player* leader)
                 patient = member;
         }
 
-    MovementGeneratorType type = me->GetMotionMaster()->GetCurrentMovementGeneratorType();
-    if (patient && me->GetHealthPct() >= patient->GetHealthPct() && !InSight(patient, 38.0f))
-    {
-        if (Approach(patient))
-            return;
-    }
-    else
+    if (patient && InSight(patient, 38.0f))
         _approachTicks = 0;
+    else if (patient && me->GetHealthPct() >= patient->GetHealthPct() && Approach(patient))
+        return;
     if (!InSight(leader, 30.0f))
         FollowLeader(leader);
-    else if (type == CHASE_MOTION_TYPE || type == POINT_MOTION_TYPE)
+    else
         StandStill();
 }
 
@@ -601,7 +615,16 @@ bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
         return false;
 
     if (castTarget != me)
-        me->SetFacingToObject(castTarget);
+    {
+        me->SetInFront(castTarget);                         // server-side facing (the facing check)
+        if (me->IsStopped())
+        {
+            // clients see the turn; the facing spline sets MOVEMENTFLAG_FORWARD, which would fail every cast-time
+            // spell with SPELL_FAILED_MOVING
+            me->SetFacingToObject(castTarget);
+            me->RemoveUnitMovementFlag(MOVEMENTFLAG_FORWARD);
+        }
+    }
 
     // ground-targeted spells (Death and Decay, Flamestrike, ...) go to the target's position
     if (info->GetExplicitTargetMask() & TARGET_FLAG_DEST_LOCATION)
