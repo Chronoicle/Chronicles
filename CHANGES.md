@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — restart 15:26 UTC (owner OK), worldserver 02df53d: 0557c3d party bot sessions saved at shutdown; 66f761a party bots phase 2 (spell rotations per spec, `world.partybot_spells`); ace9ab1 bots learn the class hall talent for a second legendary (existing bots re-equip at next login, setup = 0) — live — `git revert` the commits, `DROP TABLE world.partybot_spells`.
 - Claude (desktop session) — restart 13:25 UTC (owner OK, Chrondh + Rxven + 4 stuck bots online, 60 s timer), worldserver 60d381d: party bot steps also run on the map (setup never ran), bots answer the Dungeon Finder role check and accept the proposal (#65) — live, staff only — `git revert 60d381d 7ea7d45 cd406ff`.
 
 - Claude (desktop session) — restart 13:14 UTC (owner OK, Chrondh + Rxven online, 60 s timer), worldserver 0e8f276: party bots phase 1 (#65: `.partybot create/add/remove/list`, GM only; 50 bot accounts partybot1..50@bot made by the owner) — live, no changelog (staff only) — `git revert 0e8f276 1bd27b8`, `sql/custom/undo_partybot_*.sql`.
