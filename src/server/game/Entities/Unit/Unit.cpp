@@ -16166,17 +16166,17 @@ Unit* Creature::SelectVictim()
         if (!tauntAuras.empty())
         {
             // We do not have last taunt aura caster but we have more taunt auras,
-            // so find first available target
-            do
+            // so find first available target. (The old do/while stepped past the last aura and read end(): crash
+            // 2026-09-28 18:13 UTC when a taunting party bot died.)
+            while (++aura != tauntAuras.end())
             {
-                ++aura;
                 caster = (*aura)->GetCaster();
                 if (caster && canSeeOrDetect(caster, true) && IsValidAttackTarget(caster) && caster->isInAccessiblePlaceFor(ToCreature()))
                 {
                     target = caster;
                     break;
                 }
-            } while (aura != tauntAuras.end());
+            }
         }
         else
             target = getVictim();
