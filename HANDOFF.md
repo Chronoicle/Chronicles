@@ -1,6 +1,26 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-28 ~01:36 UTC by Claude (desktop session), restart 01:34 (shop crash fix). Previously: ~01:35 UTC.
+Last updated: 2026-09-28 ~14:25 UTC by Claude (desktop session), transfer to the owner's other Claude session. Previously: ~13:40 UTC.
+
+## Transfer 2026-09-28 ~14:25 UTC (desktop session -> the owner's other Claude session)
+
+Read this block first; the "Current state" list below has the details per change.
+
+**Staged, needs "restart now" (built + installed, owner OK needed):**
+- 0557c3d: party bot sessions are logged out and saved in `World::KickAll` at shutdown. The restart that installs it still runs the OLD shutdown: ask the owner to `.partybot remove` first (or accept the known harmless shutdown crash, see below).
+
+**Just built this session (all live unless noted):**
+- **Party bots (#65), phase 1, GM only:** `game/PartyBot/` (PartyBotSession = WorldSession without socket, PartyBotAI, PartyBotMgr), `scripts/Commands/cs_partybot.cpp`, WorldSession hooks (`IsBotSession`, `BotCanBeRemoved`, virtual `Update`, `LoginAsBot`, `FinishBotLogin`), `LFGMgr::AnswerForBot` (role check + proposal). Bot accounts `partybot1@bot`..`partybot50@bot` (auth ids 10-59) were made by the owner; 36 Alliance bot characters (guid 46-81, one per spec, accounts 10-45) in `characters.partybot_characters`. Commands: `.partybot create <class> <spec>|all`, `.partybot add <name|tank|healer|dps|spec|class>`, `.partybot remove [name]`, `.partybot list`. Bots: level 110 + spec + gear set + artifact at first login, join the leader's group, follow, teleport after the leader, auto attack the leader's target, resurrect next to the leader, accept Dungeon Finder. Confirmed working in game at 13:37 (4 bots logged in at 110, setup done). NOT done: spells (phase 2: Legion rotations per spec - tank threat, healer heals, DPS), dungeon behaviour (phase 3), players using bots (owner decision). Analysis of normalzero/LegionPlayerBot on #65 (cloned on the server: `~/LegionPlayerBot`, upstream base `~/LegionCore-upstream`).
+- **Domain https://chronicles-wow.com** (+ www + `patch.chronicles-wow.com`), Let's Encrypt (certbot timer, owner accepted the ToS, no e-mail), bare IP -> website; domain launcher published on both patch servers (owner tested). Details below.
+- **Gear Master NPC 500010** (staff only): bags, gear per spec, class hall upgrade (second legendary; creates the class hall if missing), max professions. Owner spawns it with `.npc add 500010`.
+- **fill_character perks:** 20% Leech/Avoidance/Speed + prismatic sockets on generated gear; `fill_character.py export` writes `world.gear_npc_items` (also used by the NPC and the bots).
+- Paladin reports: #67/#68/#69 live (Needs testing), #70 Concordance: temporary `server.concordance` log is on (remove after James's test), #66 Ashbringer disconnect: waiting for James (disconnect message or client crash + Errors file), #43 closed-worthy (Rattling Bones).
+
+**Known issue:** crash 13:26:49 UTC was the shutdown of the 13:25 restart (bots saved after the DB closed). Fixed by 0557c3d (staged above). The server itself has been stable since 13:26:58.
+
+**Waiting for the owner:** "restart now" for 0557c3d; party bot next steps (spells phase); #64 new in-game shop (UWOW screenshots in `~/reference/uwow_shop/`, plan on #64, no Battle Royal; questions: categories, Donate Vendor, prices); inactive-nickname rules for the shop; Karazhan health vs UWOW; #54/#57/#62 suggestions; Kamatera cancel later; root SSH password login still on (suggested key-only).
+
+**Notes for the next session:** Python 3.12 is installed on the owner's desktop (`$LOCALAPPDATA/Programs/Python/Python312/python.exe`). Long inline heredocs with odd single quotes break the Bash tool: write a script file to the scratchpad instead. Server Go for the launcher: `GOROOT=$HOME/go GOPATH=$HOME/go PATH=$HOME/go/bin:$PATH`, build flags `-H windowsgui -X main.server=http://patch.chronicles-wow.com -X main.portal=chronicles-wow.com` in `~/launcher`. Account names on this server must contain `@`, passwords max 16 characters.
 
 ## Who does what right now
 
@@ -13,7 +33,7 @@ Last updated: 2026-09-28 ~01:36 UTC by Claude (desktop session), restart 01:34 (
 
 - **Domain live (13:05 UTC): https://chronicles-wow.com** (+ www, + **patch.chronicles-wow.com** = patch server, http and https, port 80 proxies to 8099 like the nip.io name), Let's Encrypt via certbot (auto renew, one cert for all three), http and the bare IP redirect to the website; old server redirects there too. Website download link -> https://patch.chronicles-wow.com/launcher/Launcher.exe. **Domain launcher published ~13:25 UTC (owner tested):** Launcher.exe md5 27fb7b3a on both patch servers (new + old Kamatera, launcher_md5 in manifest.json), server http://patch.chronicles-wow.com, portal chronicles-wow.com; every launcher updates itself. Previous: `~/launcher/Launcher_prev_ip.exe` + `manifest_prev_ip.json` (new server), `~/Launcher_before_domain.exe` + `~/manifest_before_domain.json` (old server). Client exe patch URLs unchanged (IP). Realm address stays the IP. #6 closed.
 
-- **Live since the restart at 13:27 UTC (owner OK), untested:** cd406ff party bot fix (the bot steps never ran once the bot was on a map: World::UpdateSessions skips sessions on a map, the map updates them with map != nullptr; owner saw level-1 bots in Northshire, not grouped) + 7ea7d45/60d381d bots answer the Dungeon Finder role check (spec role) and accept the proposal (LFGMgr::AnswerForBot). 36 bot characters exist (guid 46-81, accounts 10-45, Alliance), still level 1, setup = 0: they get level/spec/gear at their next login.
+- **Live since the restart at 13:27 UTC (owner OK), works in game:** cd406ff party bot fix (the bot steps never ran once the bot was on a map: World::UpdateSessions skips sessions on a map, the map updates them with map != nullptr; owner saw level-1 bots in Northshire, not grouped) + 7ea7d45/60d381d bots answer the Dungeon Finder role check (spec role) and accept the proposal (LFGMgr::AnswerForBot). 36 bot characters exist (guid 46-81, accounts 10-45, Alliance); the ones added so far got level 110/spec/gear at their first login (setup = 1), the rest get it when first added.
 - **Live since the restart at 13:15 UTC (owner OK):** party bots phase 1 (#65, 1bd27b8, 0e8f276), GM commands: `.partybot create <class> <spec>` / `create all` (bot character on the next free account partybot1..50@bot, owner made them; race of your faction; first login: level 110, spec, gear set + artifact from world.gear_npc_items; table characters.partybot_characters), `.partybot add <name|tank|healer|dps|spec|class>`, `remove [name]`, `list`. Bots join your group, follow, teleport after you, auto attack your target, resurrect next to you, leave 60 s after you log out. No spells yet (phase 2). SQL applied: fix_partybot_commands, fix_partybot_characters, gear_npc_items (with artifacts).
 
 - **Live since the restart at 12:16 UTC (owner OK):** 5d51583 Gear-Up NPC own option "Class hall upgrade: second legendary"; creates the class hall (site 161/163, no teleport) when missing, then the talent (Chrondh had no class hall, so 0288346 could not help him).
