@@ -1753,7 +1753,7 @@ class spell_pri_psyflay_pvp : public SpellScript
                         }
                     }
                 }
-                targetList.push_back(owner);
+                // no marked target (211522 didn't land, e.g. an immune target): nothing, not the priest himself (#48)
             }
         }
     }

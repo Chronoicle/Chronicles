@@ -6611,6 +6611,13 @@ void SpellMgr::LoadSpellCustomAttr()
         spellInfo->Effects[EFFECT_2]->Effect = 0;
     });
 
+    // Psyflay (Psyfiend): a 1-hour channel aura without the PvP limit (#48); a target that leaves the map ends the
+    // channel with finish(), which leaves target auras, so the aura must drop by itself
+    ApplySpellFix({ 199845 }, [](SpellInfo* spellInfo)
+    {
+        spellInfo->AuraInterruptFlags[0] |= AURA_INTERRUPT_FLAG_CHANGE_MAP;
+    });
+
     ApplySpellFix({ 192635 }, [](SpellInfo* spellInfo)
     {
         spellInfo->AuraInterruptFlags[0] |= AURA_INTERRUPT_FLAG_CHANGE_MAP;
