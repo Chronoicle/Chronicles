@@ -7859,6 +7859,21 @@ void Spell::SummonGuardian(uint32 i, uint32 entry, SummonPropertiesEntry const* 
                 summon->SetDisplayId(1126);
         }
 
+        // Ravager (227876 from 152277 Arms / 228920 Prot, #51): display 56304 is an empty rig that only draws the item in
+        // its right hand and has no sheath points; the all-zero creature_template_addon row left it sheathed (unarmed), so
+        // nothing showed. Retail spins the warrior's own main hand. Rooted: guardians get MoveFollow below.
+        if (summon->GetEntry() == 76168)
+        {
+            if (Player* warrior = caster->ToPlayer())
+            {
+                uint16 field = PLAYER_FIELD_VISIBLE_ITEMS + EQUIPMENT_SLOT_MAINHAND * 2;
+                if (uint32 weapon = warrior->GetUInt32Value(field))
+                    summon->SetVirtualItem(0, weapon, warrior->GetUInt16Value(field + 1, 0), warrior->GetUInt16Value(field + 1, 1));
+            }
+            summon->SetSheath(SHEATH_STATE_MELEE);
+            summon->SetControlled(true, UNIT_STATE_ROOT);
+        }
+
         // TODO: fix spirit wolf in waycrest manor
 //        if (summon->GetEntry() == 100820 && m_caster->IsPlayer())
 //        {
