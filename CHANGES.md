@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — **domain chronicles-wow.com** (owner bought it, Namecheap, A @ + www -> 184.174.37.33): nginx website block `server_name chronicles-wow.com www.chronicles-wow.com _`, Let's Encrypt certificate (owner OK for the ToS, no e-mail, certbot.timer renews), http -> https, the IP / other names on port 80 -> https://chronicles-wow.com, ufw 443. Old server redirect -> https://chronicles-wow.com. Patch server stays on 184-174-37-33.nip.io (port 80 -> 8099) — live — nginx backup `/root/nginx_chronicles.bak_*` on the new server.
+
 - Claude (desktop session) — restart 12:15 UTC (owner OK, Chrondh online, 60 s timer), worldserver 5d51583: Gear-Up NPC own class hall upgrade option (creates the class hall when missing) — live, no changelog (staff only) — `git revert 5d51583`.
 
 - Claude (desktop session) — restart 12:07 UTC (owner OK, nobody online, 60 s timer), worldserver 0288346: Gear-Up NPC gear option also learns the class hall talent for a second legendary — live, no changelog (staff only) — `git revert 0288346`.

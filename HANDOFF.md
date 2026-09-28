@@ -9,6 +9,8 @@ Last updated: 2026-09-28 ~01:36 UTC by Claude (desktop session), restart 01:34 (
 
 ## Current state
 
+- **Domain live (13:05 UTC): https://chronicles-wow.com** (+ www), Let's Encrypt via certbot (auto renew), http and the bare IP redirect there; old server redirects there too. Patch server/launcher downloads still on `184-174-37-33.nip.io` (next: `patch.chronicles-wow.com` needs an A record from the owner, then launcher + client patch URLs). Realm address stays the IP. #6 closed.
+
 - **Built + installed ~13:40 UTC, NOT live (needs "restart now"):** party bots phase 1 (#65, 1bd27b8, 0e8f276), GM commands: `.partybot create <class> <spec>` / `create all` (bot character on the next free account partybot1..50@bot, owner made them; race of your faction; first login: level 110, spec, gear set + artifact from world.gear_npc_items; table characters.partybot_characters), `.partybot add <name|tank|healer|dps|spec|class>`, `remove [name]`, `list`. Bots join your group, follow, teleport after you, auto attack your target, resurrect next to you, leave 60 s after you log out. No spells yet (phase 2). SQL applied: fix_partybot_commands, fix_partybot_characters, gear_npc_items (with artifacts).
 
 - **Live since the restart at 12:16 UTC (owner OK):** 5d51583 Gear-Up NPC own option "Class hall upgrade: second legendary"; creates the class hall (site 161/163, no teleport) when missing, then the talent (Chrondh had no class hall, so 0288346 could not help him).
