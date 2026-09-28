@@ -227,21 +227,15 @@ uint64 GossipMenu::GetRequiredNpcFlagForOption(GossipOptionNpc optionNpc)
         case GossipOptionNpc::GarrisonMission:
             requiredNpcFlag = UNIT_NPC_FLAG2_GARRISON_MISSION_NPC;
             break;
+        // Player::PrepareGossipMenu checks against UNIT_FIELD_NPC_FLAGS only, so a UNIT_NPC_FLAG2 requirement always hid
+        // these options: Adventure Map (Command Map, Scouting Maps, #59), class hall troop recruiters (work orders, #67)
+        // and class hall upgrade NPCs (#68). Only the gossip flag; the option handlers do their own npcflag2/garrison checks.
         case GossipOptionNpc::ShipmentCrafter:
-            requiredNpcFlag = UNIT_NPC_FLAG2_SHIPMENT_CRAFTER;
-            break;
         case GossipOptionNpc::GarrisonTradeskill:
-            requiredNpcFlag = UNIT_NPC_FLAG2_TRADESKILL_NPC;
-            break;
-        // Adventure Map (class hall Command Map, Scouting Maps): only the gossip flag. Player::PrepareGossipMenu checks
-        // against UNIT_FIELD_NPC_FLAGS only, so a UNIT_NPC_FLAG2 requirement always hid the option (#59). The other FLAG2
-        // options below have the same problem but work through the client's own npcflag2 handling.
         case GossipOptionNpc::AdventureMap:
-            requiredNpcFlag = UNIT_NPC_FLAG_GOSSIP;
-            break;
         case GossipOptionNpc::GarrisonRecruitment:
         case GossipOptionNpc::GarrisonTalent:
-            requiredNpcFlag = UNIT_NPC_FLAG2_CLASS_HALL_UPGRADE;
+            requiredNpcFlag = UNIT_NPC_FLAG_GOSSIP;
             break;
 //        case GossipOptionNpc::ContributionCollector:
 //            requiredNpcFlag = UNIT_NPC_FLAG_2_CONTRIBUTION_COLLECTOR;

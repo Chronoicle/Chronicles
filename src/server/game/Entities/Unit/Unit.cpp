@@ -21709,6 +21709,11 @@ bool Unit::RollProcResult(Unit* victim, Aura* aura, WeaponAttackType attType, bo
             double cooldown = plr->GetRPPMSpellCooldownDelay(spellInfo->Id, castItemGUID); //base cap
             bool procked = plr->GetRPPMProcChance(cooldown, spellRPPM, spellInfo, castItemGUID);
 
+            // TEMP #70: does Concordance get proc rolls from heals (Protection paladin)? Remove after the test.
+            if (spellInfo->Id == 239042)
+                TC_LOG_INFO("server.concordance", "Concordance roll: %s spell %u procFlag 0x%X procEx 0x%X rppm %.2f -> %u",
+                    plr->GetName(), procSpell ? procSpell->Id : 0, procFlag, procExtra, spellRPPM, uint32(procked));
+
             if (procked)
             {
                 // Create the entry before setting the times: the setters only update an existing entry, so the
