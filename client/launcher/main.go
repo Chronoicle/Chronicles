@@ -3,7 +3,8 @@
 // On every start: ask the server which build is current (manifest.json). If this client is not on it yet, download
 // the build's files and add them to this client's own local storage (a new data.NNN archive, one index version up
 // for each touched bucket, shmem pointing at those versions, the build config, .build.info). Then start the game with
-// Wow-64_Custom.exe (downloaded if missing or outdated). "Launcher.exe restore" puts the original .build.info and
+// Wow-64_Custom.exe (downloaded if missing or outdated) and the loose addon files the manifest lists (the in-game
+// shop). "Launcher.exe restore" puts the original .build.info and
 // shmem back (the first backups it made), which makes the client use its original build again.
 package main
 
@@ -19,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -49,6 +51,14 @@ type Manifest struct {
 	Launcher    string `json:"launcher"`     // path of the current Launcher.exe on the server
 	LauncherMD5 string `json:"launcher_md5"` // its md5: a different one replaces this launcher
 	Message     string `json:"message"`      // shown to the player, optional
+	Files       []File `json:"files"`        // loose files under Interface/AddOns (older launchers ignore this)
+}
+
+// File is a loose file in the WoW folder, served from /launcher/files/<Path>; downloaded when its md5 differs.
+type File struct {
+	Path string `json:"path"` // relative to the WoW folder, "/" separated, under Interface/AddOns/
+	MD5  string `json:"md5"`
+	Size int64  `json:"size"`
 }
 
 type Blob struct {
@@ -85,6 +95,7 @@ func prepare(root string, test bool) bool {
 	}
 	needBuild := info.buildKey != man.Build || !configExists(root, man.Build)
 	needExe := !test && !exeOK(root, man)
+	files := staleFiles(root, man)
 	t := &tracker{start: time.Now()}
 	if needBuild {
 		for _, bl := range man.Blobs {
@@ -94,12 +105,16 @@ func prepare(root string, test bool) bool {
 	if needExe {
 		t.total += man.ExeSize
 	}
+	for _, f := range files {
+		t.total += f.Size
+	}
 	if needBuild {
 		update(root, info, man, t)
 	}
 	if needExe {
 		downloadExe(root, man, t)
 	}
+	downloadFiles(root, files, t)
 	setPortal(root)
 	if man.Message != "" {
 		say(man.Message)
@@ -258,6 +273,47 @@ func downloadExe(root string, man Manifest, t *tracker) {
 		panic(gameExe + " download is corrupt")
 	}
 	must(os.WriteFile(filepath.Join(root, gameExe), b, 0755))
+}
+
+// addonPath turns a manifest path into a path in root, or "" when it is not a plain file under Interface/AddOns
+// (the server must not be able to write anywhere else in the WoW folder).
+func addonPath(root, p string) string {
+	clean := filepath.Clean(filepath.FromSlash(p))
+	prefix := filepath.Join("Interface", "AddOns") + string(filepath.Separator)
+	if filepath.IsAbs(clean) || filepath.VolumeName(clean) != "" || !strings.HasPrefix(clean, prefix) || strings.Contains(p, "..") {
+		return ""
+	}
+	return filepath.Join(root, clean)
+}
+
+// staleFiles returns the manifest files that are missing here or have another md5.
+func staleFiles(root string, man Manifest) []File {
+	var stale []File
+	for _, f := range man.Files {
+		dst := addonPath(root, f.Path)
+		if dst == "" {
+			panic("bad file path from the server: " + f.Path)
+		}
+		if b, err := os.ReadFile(dst); err != nil || hex.EncodeToString(md5sum(b)) != f.MD5 {
+			stale = append(stale, f)
+		}
+	}
+	return stale
+}
+
+// ponytail: files the manifest stops listing stay on disk; add a delete list if an addon is ever retired.
+func downloadFiles(root string, files []File, t *tracker) {
+	for _, f := range files {
+		t.label = "Downloading " + path.Base(f.Path)
+		say(t.label)
+		b := download("/launcher/files/"+f.Path, t)
+		if hex.EncodeToString(md5sum(b)) != f.MD5 {
+			panic(f.Path + " download is corrupt")
+		}
+		dst := addonPath(root, f.Path)
+		must(os.MkdirAll(filepath.Dir(dst), 0755))
+		must(os.WriteFile(dst, b, 0644))
+	}
 }
 
 // A newer launcher on the server replaces this one: the running exe is renamed (Windows allows that), the new one
