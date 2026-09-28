@@ -17,6 +17,8 @@
 #include "DB2Stores.h"
 #include "SpellMgr.h"
 #include "Garrison.h"
+#include "ThreatManager.h"
+#include "HostileRefManager.h"
 #include "SpellInfo.h"
 #include "CellImpl.h"
 #include "GridNotifiers.h"
@@ -307,22 +309,47 @@ Unit* PartyBotAI::PickTarget(Player* leader) const
         return unit && unit->IsAlive() && me->IsValidAttackTarget(unit) && me->IsWithinDistInMap(unit, 60.0f);
     };
 
-    if (valid(leader->getVictim()))
-        return leader->getVictim();
+    auto isTank = [](Player* player)
+    {
+        ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(player->GetSpecializationId());
+        return spec && spec->Role == 0;
+    };
 
-    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(me->GetSpecializationId());
-    if (spec && spec->Role == 0)
+    // tanks first pick up what hits someone else
+    if (isTank(me))
         if (Unit* loose = TauntTarget())
             return loose;
 
+    if (valid(leader->getVictim()))
+        return leader->getVictim();
+
+    // the leader has no target (it died, or the leader just heals): keep fighting what the group fights (owner report)
+    std::vector<Player*> members;
+    if (Group* group = me->GetGroup())
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->getSource())
+                if (member->IsInWorld() && member->GetMap() == me->GetMap() && member->IsAlive())
+                    members.push_back(member);
+
+    // 1. the tank's target
+    for (Player* member : members)
+        if (member != me && isTank(member) && valid(member->getVictim()))
+            return member->getVictim();
+
+    // 2. the bot's own target while still in combat
     if (valid(me->getVictim()) && me->isInCombat())
         return me->getVictim();
 
-    // something attacks the leader or the bot while the leader has no target
-    for (Unit* unit : { static_cast<Unit*>(leader), static_cast<Unit*>(me) })
-        for (Unit* attacker : *unit->getAttackers())
+    // 3. whatever hits a group member, 4. any enemy in combat with the group (has a member on its threat list)
+    for (Player* member : members)
+        for (Unit* attacker : *member->getAttackers())
             if (valid(attacker))
                 return attacker;
+    for (Player* member : members)
+        for (HostileReference* ref = member->getHostileRefManager().getFirst(); ref; ref = ref->next())
+            if (Unit* enemy = ref->getSource()->getOwner())
+                if (valid(enemy))
+                    return enemy;
 
     return nullptr;
 }
