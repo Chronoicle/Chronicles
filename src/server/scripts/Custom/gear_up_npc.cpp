@@ -5,7 +5,8 @@
  *  2. <your class> gear: one option per spec, gives the same best-in-slot set as tools/fill_character (item level 985,
  *     legendaries 1000, 20% Leech / Avoidance / Speed via tertiary bonuses, a prismatic socket on armor and jewelry).
  *     The sets come from world.gear_npc_items, written by `fill_character.py export` (sql/custom/gear_npc_items.sql).
- *  3. Max professions: learn a profession at its Legion maximum with every recipe.
+ *  3. Class hall upgrade: the class hall talent for a second legendary (also given with the gear).
+ *  4. Max professions: learn a profession at its Legion maximum with every recipe.
  */
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
@@ -33,6 +34,7 @@ enum GearUpNpc
     ACTION_BAGS               = 2,
     ACTION_GEAR_MENU          = 3,
     ACTION_PROFESSION_MENU    = 4,
+    ACTION_SECOND_LEGENDARY   = 5,
     ACTION_GEAR_SPEC          = 1000,   // + ChrSpecialization ID
     ACTION_PROFESSION         = 2000,   // + index in Professions
 };
@@ -67,21 +69,25 @@ static GearUpProfession const Professions[] =
 static uint32 const SecondLegendaryTalent[MAX_CLASSES] = { 0, 412, 401, 379, 445, 456, 434, 42, 390, 368, 258, 357, 423 };
 
 // Without this talent only one legendary fits; Aman'Thul's Vision is a Pantheon trinket (limit category 362) and never counted.
+// Characters without a class hall get one first (the talent lives in the class hall), like fill_character's quests step.
 static void GrantSecondLegendary(Player* player, ChatHandler& chat)
 {
     uint32 talent = player->getClass() < MAX_CLASSES ? SecondLegendaryTalent[player->getClass()] : 0;
     Garrison* garrison = player->GetGarrisonPtr();
     if (!talent || !garrison)
+        return;
+    if (garrison->hasLegendLimitUp())
     {
-        chat.SendSysMessage("Gear-Up: no class hall yet, so only one legendary can be equipped until you have the class hall talent.");
+        chat.SendSysMessage("Gear-Up: you already have the class hall upgrade for a second legendary.");
         return;
     }
-    if (garrison->hasLegendLimitUp())
-        return;
+
+    // no-op when the class hall exists; skip the teleport into it
+    player->CreateGarrison(player->GetTeam() == ALLIANCE ? SITE_ID_CLASS_ORDER_ALLIANCE : SITE_ID_CLASS_ORDER_HORDE, true);
 
     // researched long ago = ready at once (replaces the other talent of that tier)
     garrison->AddTalentToStore(talent, uint32(GameTime::GetGameTime()) - 10 * DAY, 0, DB_STATE_NEW);
-    chat.SendSysMessage("Gear-Up: class hall talent for a second legendary learned.");
+    chat.SendSysMessage("Gear-Up: class hall upgrade learned, you can equip a second legendary. Log out and back in once so your client knows it too.");
 }
 
 static void ShowMain(Player* player, Creature* creature)
@@ -92,6 +98,7 @@ static void ShowMain(Player* player, Creature* creature)
     if (ChrClassesEntry const* cls = sChrClassesStore.LookupEntry(player->getClass()))
         gear = std::string(cls->Name->Str[DEFAULT_LOCALE]) + " gear (item level 985)";
     player->ADD_GOSSIP_ITEM(GossipOptionNpc::Trainer, gear, GOSSIP_SENDER_MAIN, ACTION_GEAR_MENU);
+    player->ADD_GOSSIP_ITEM(GossipOptionNpc::Trainer, "Class hall upgrade: second legendary", GOSSIP_SENDER_MAIN, ACTION_SECOND_LEGENDARY);
     player->ADD_GOSSIP_ITEM(GossipOptionNpc::Trainer, "Max professions", GOSSIP_SENDER_MAIN, ACTION_PROFESSION_MENU);
     player->SEND_GOSSIP_MENU(DEFAULT_GOSSIP_MESSAGE, creature->GetGUID());
 }
@@ -270,6 +277,13 @@ public:
                 GiveBags(player);
                 ShowMain(player, creature);
                 return true;
+            case ACTION_SECOND_LEGENDARY:
+            {
+                ChatHandler chat(player->GetSession());
+                GrantSecondLegendary(player, chat);
+                ShowMain(player, creature);
+                return true;
+            }
             default:
                 break;
         }
