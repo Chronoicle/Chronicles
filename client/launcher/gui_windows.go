@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/base64"
 	"encoding/json"
@@ -37,7 +38,15 @@ var (
 	messageBox       = user32.NewProc("MessageBoxW")
 	getDpiForWindow  = user32.NewProc("GetDpiForWindow")
 	getSystemMetrics = user32.NewProc("GetSystemMetrics")
-	getModuleHandle  = syscall.NewLazyDLL("kernel32.dll").NewProc("GetModuleHandleW")
+	kernel32         = syscall.NewLazyDLL("kernel32.dll")
+	getModuleHandle  = kernel32.NewProc("GetModuleHandleW")
+	getDiskFreeSpace = kernel32.NewProc("GetDiskFreeSpaceExW")
+	createMutex      = kernel32.NewProc("CreateMutexW")
+	waitForObject    = kernel32.NewProc("WaitForSingleObject")
+	shell32          = syscall.NewLazyDLL("shell32.dll")
+	browseForFolder  = shell32.NewProc("SHBrowseForFolderW")
+	pathFromIDList   = shell32.NewProc("SHGetPathFromIDListW")
+	coTaskMemFree    = syscall.NewLazyDLL("ole32.dll").NewProc("CoTaskMemFree")
 )
 
 const configFile = "launcher.json" // next to Launcher.exe: {"game_folder": "..."}
@@ -46,7 +55,23 @@ type launcherConfig struct {
 	GameFolder string `json:"game_folder"`
 }
 
+// oneLauncher makes sure only one launcher runs (two would download into the same .part files). A launcher that
+// hands over (self-update, install) exits right after starting the next one, so wait a little for it first.
+func oneLauncher() bool {
+	name, _ := syscall.UTF16PtrFromString("ChroniclesLauncher")
+	h, _, err := createMutex.Call(0, 1, uintptr(unsafe.Pointer(name)))
+	if h == 0 || err != syscall.ERROR_ALREADY_EXISTS {
+		return true // ours (or no mutex at all: don't block the player)
+	}
+	r, _, _ := waitForObject.Call(h, 15000)
+	return r != 0x102 // WAIT_TIMEOUT: another launcher is really running (the handle stays open until exit)
+}
+
 func run(root string, args []string, test bool) {
+	if !oneLauncher() {
+		alert("The Chronicles launcher is already running.")
+		return
+	}
 	cfgPath := filepath.Join(exeDir(), configFile)
 	var cfg launcherConfig
 	if b, err := os.ReadFile(cfgPath); err == nil && json.Unmarshal(b, &cfg) == nil && cfg.GameFolder != "" && !test {
@@ -98,6 +123,52 @@ func run(root string, args []string, test bool) {
 	say = func(text string) { eval("setStatus", text) }
 	progress = func(text string, pct float64) { eval("setProgress", text, pct) }
 
+	// setup: no client here. The player picks where it goes (saved in launcher.json right away: an interrupted install
+	// goes on there on the next start, without asking again); once it is there, a copy of this launcher in that folder
+	// takes over. False: this launcher should exit (handed over, or the player cancelled).
+	setup := func(man Manifest) bool {
+		base, files := fetchClient(man)
+		dir := cfg.GameFolder
+		if dir == "" || !started(dir) {
+			size := int64(0)
+			for _, f := range files {
+				size += f.Size
+			}
+			say("World of Warcraft: Legion is not installed yet: choose where to install it")
+			title := fmt.Sprintf("World of Warcraft: Legion is not installed yet (%.1f GB). Choose where to install it: "+
+				"a Chronicles folder is created there.", float64(size)/1e9)
+			picked := make(chan string, 1)
+			w.Dispatch(func() { picked <- pickFolder(hwnd, title) })
+			if dir = <-picked; dir == "" {
+				return false
+			}
+			dir = installDir(dir)
+			cfg.GameFolder = dir // also replaces a launcher.json that named a folder without a client
+			b, _ := json.Marshal(cfg)
+			os.WriteFile(cfgPath, b, 0644) // without it, picking the same folder again goes on there too (installDir)
+		}
+		if !installed(dir) {
+			defer func() {
+				if r := recover(); r != nil {
+					if s, ok := r.(string); ok && strings.HasPrefix(s, noSpace) {
+						cfg.GameFolder = "" // the next refresh asks for another folder
+						b, _ := json.Marshal(cfg)
+						os.WriteFile(cfgPath, b, 0644)
+					}
+					panic(r)
+				}
+			}()
+			installClient(dir, base, files)
+		}
+		if sameDir(dir, exeDir()) {
+			root = dir // this launcher's own folder: go on here
+			return true
+		}
+		startCopy(dir)
+		return false
+	}
+
+	repairing := len(args) > 0 && args[0] == "repair" // check every client file first
 	var busy atomic.Bool
 	var ready atomic.Bool
 	check := func() {
@@ -112,10 +183,16 @@ func run(root string, args []string, test bool) {
 		}()
 		ready.Store(false)
 		eval("setBusy")
-		if prepare(root, test) {
-			w.Dispatch(w.Terminate) // a newer launcher took over
+		man, newer := checkLauncher(test)
+		if newer || (!test && !installed(root) && man.Client != "" && !setup(man)) {
+			w.Dispatch(w.Terminate) // another launcher took over, or no client wanted
 			return
 		}
+		if repairing {
+			repairing = false // a failed repair is not run again on every refresh
+			repair(root, man)
+		}
+		prepare(root, man, test)
 		ready.Store(true)
 		eval("setReady")
 	}
@@ -229,6 +306,68 @@ func setIcon(hwnd uintptr) {
 	small, _, _ := loadImage.Call(inst, uintptr(unsafe.Pointer(name)), 1, 16, 16, 0x8000)
 	sendMessage.Call(hwnd, 0x0080 /* WM_SETICON */, 1, big)
 	sendMessage.Call(hwnd, 0x0080, 0, small)
+}
+
+// pickFolder shows the Windows folder picker and returns the chosen folder, "" on cancel. Run it on the window's
+// thread (w.Dispatch): the new-style dialog needs COM there, which go-webview2 set up (CoInitializeEx, apartment
+// threaded, in its init on the locked main thread).
+func pickFolder(owner uintptr, title string) string {
+	t, _ := syscall.UTF16PtrFromString(title)
+	var name, dir [260]uint16
+	bi := struct { // BROWSEINFOW
+		owner, root   uintptr
+		name, title   *uint16
+		flags         uint32
+		callback, arg uintptr
+		image         int32
+	}{owner: owner, name: &name[0], title: t, flags: 0x1 | 0x40 /* BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE */}
+	pidl, _, _ := browseForFolder.Call(uintptr(unsafe.Pointer(&bi)))
+	if pidl == 0 {
+		return ""
+	}
+	defer coTaskMemFree.Call(pidl)
+	if ok, _, _ := pathFromIDList.Call(pidl, uintptr(unsafe.Pointer(&dir[0]))); ok == 0 {
+		return ""
+	}
+	return syscall.UTF16ToString(dir[:])
+}
+
+// diskFree returns the bytes this user may still write on dir's drive, -1 when Windows cannot tell.
+func diskFree(dir string) int64 {
+	p, _ := syscall.UTF16PtrFromString(dir)
+	var free uint64
+	if ok, _, _ := getDiskFreeSpace.Call(uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&free)), 0, 0); ok == 0 {
+		return -1
+	}
+	return int64(free)
+}
+
+// sameDir tells whether a and b are the same folder (also through a subst drive, a junction or a short name).
+func sameDir(a, b string) bool {
+	sa, err := os.Stat(a)
+	sb, err2 := os.Stat(b)
+	return err == nil && err2 == nil && os.SameFile(sa, sb)
+}
+
+// startCopy copies this launcher into dir (the new client's folder) and starts it there: from now on that copy is the
+// player's launcher. The downloaded one stays where it is. Another Launcher.exe there (another server's?) is kept as
+// Launcher.exe.bak (the first one only, like backup()). A launcher.json there would send the copy to another folder.
+func startCopy(dir string) {
+	exe, err := os.Executable()
+	must(err)
+	b, err := os.ReadFile(exe)
+	must(err)
+	dst := filepath.Join(dir, "Launcher.exe")
+	if old, err := os.ReadFile(dst); err != nil || !bytes.Equal(old, b) {
+		if _, bakErr := os.Stat(dst + ".bak"); err == nil && os.IsNotExist(bakErr) {
+			must(os.Rename(dst, dst+".bak"))
+		}
+		must(os.WriteFile(dst, b, 0755))
+	}
+	os.Remove(filepath.Join(dir, configFile))
+	cmd := exec.Command(dst)
+	cmd.Dir = dir
+	must(cmd.Start())
 }
 
 func openURL(u string) {

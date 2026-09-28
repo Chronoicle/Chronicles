@@ -6,6 +6,10 @@
 // Wow-64_Custom.exe (downloaded if missing or outdated) and the loose addon files the manifest lists (the in-game
 // shop). "Launcher.exe restore" puts the original .build.info and
 // shmem back (the first backups it made), which makes the client use its original build again.
+//
+// Run from a folder without a client (no .build.info), it installs the whole client first (client.go: the player
+// picks the folder) and hands over to a copy of itself there; "Launcher.exe repair" checks an installed client
+// against the server's list and downloads the broken files again.
 package main
 
 import (
@@ -25,6 +29,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -52,9 +57,11 @@ type Manifest struct {
 	LauncherMD5 string `json:"launcher_md5"` // its md5: a different one replaces this launcher
 	Message     string `json:"message"`      // shown to the player, optional
 	Files       []File `json:"files"`        // loose files under Interface/AddOns (older launchers ignore this)
+	Client      string `json:"client"`       // path of client.json, the whole client's files (install, repair)
 }
 
-// File is a loose file in the WoW folder, served from /launcher/files/<Path>; downloaded when its md5 differs.
+// File is a loose file in the WoW folder, served from /launcher/files/<Path>; downloaded when its md5 differs. The
+// files of client.json have the same fields (served next to it; clientPath says which paths they may have).
 type File struct {
 	Path string `json:"path"` // relative to the WoW folder, "/" separated, under Interface/AddOns/
 	MD5  string `json:"md5"`
@@ -81,14 +88,17 @@ func main() {
 	run(root, args, test)
 }
 
-// prepare brings the client in root up to the server's build and makes sure the game exe is there. It returns true
-// when a newer launcher was started instead (this one should exit). Errors panic with a message for the player.
-func prepare(root string, test bool) bool {
+// checkLauncher fetches the manifest and, unless testing, replaces this launcher with a newer one (true: that one
+// was started, this one should exit). Errors panic with a message for the player.
+func checkLauncher(test bool) (Manifest, bool) {
 	say("Checking for updates...")
 	man := fetchManifest()
-	if !test && selfUpdates == "yes" && selfUpdate(man) {
-		return true
-	}
+	return man, !test && selfUpdates == "yes" && selfUpdate(man)
+}
+
+// prepare brings the client in root up to the server's build and makes sure the game exe is there. Errors panic with
+// a message for the player.
+func prepare(root string, man Manifest, test bool) {
 	info := readBuildInfo(root)
 	if info.version != baseVersion {
 		panic(fmt.Sprintf("this client is version %q; the server needs %s", info.version, baseVersion))
@@ -122,7 +132,6 @@ func prepare(root string, test bool) bool {
 		say("Ready to play")
 	}
 	progress("", 100)
-	return false
 }
 
 // startGame runs Wow-64_Custom.exe from root (absolute path: Go refuses to run a program found relative to the
@@ -144,13 +153,30 @@ func exeDir() string {
 }
 
 // tracker turns downloaded bytes into the progress bar: percent of all bytes this run downloads, speed and time left.
+// add, grow and Write may be called from several goroutines (the client install downloads 4 files at a time).
 type tracker struct {
+	mu           sync.Mutex
 	label        string
 	done, total  int64
 	start, shown time.Time
 }
 
+// grow adds n bytes to the total (a file that has to come again).
+func (t *tracker) grow(n int64) {
+	t.mu.Lock()
+	t.total += n
+	t.mu.Unlock()
+}
+
+// Write counts p, so a tracker can sit in an io.MultiWriter.
+func (t *tracker) Write(p []byte) (int, error) {
+	t.add(int64(len(p)))
+	return len(p), nil
+}
+
 func (t *tracker) add(n int64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.done += n
 	if time.Since(t.shown) < 100*time.Millisecond && t.done < t.total {
 		return
@@ -159,7 +185,11 @@ func (t *tracker) add(n int64) {
 	pct, text := 0.0, t.label
 	if t.total > 0 {
 		pct = min(100, 100*float64(t.done)/float64(t.total))
-		text += fmt.Sprintf("  •  %.1f / %.1f MB", float64(t.done)/1e6, float64(t.total)/1e6)
+		unit, div := "MB", 1e6
+		if t.total >= 1e9 {
+			unit, div = "GB", 1e9
+		}
+		text += fmt.Sprintf("  •  %.1f / %.1f %s", float64(t.done)/div, float64(t.total)/div, unit)
 		if secs := time.Since(t.start).Seconds(); secs > 1 && t.done > 0 && t.done < t.total {
 			left := time.Duration(float64(t.total-t.done)/(float64(t.done)/secs)) * time.Second
 			text += "  •  " + left.Round(time.Second).String() + " left"
@@ -380,11 +410,13 @@ func configExists(root, key string) bool {
 func fetchManifest() Manifest {
 	var m Manifest
 	must(json.Unmarshal(download("/launcher/manifest.json", nil), &m))
-	if !regexp.MustCompile(`^[0-9a-f]{32}$`).MatchString(m.Build) {
+	if !md5Hex.MatchString(m.Build) {
 		panic("bad manifest from the server")
 	}
 	return m
 }
+
+var md5Hex = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 // download fetches path from the server, retrying a few times. t (optional) counts the bytes for the progress bar;
 // when it has no total yet, the server's Content-Length becomes the total.
