@@ -874,6 +874,15 @@ DungeonFinder.DebugJoin = 1
 Bpay.Enabled = 1
 
 #
+#     Shop.OpenToPlayers
+#        Description: The ChroniclesShop addon shop (micro menu Shop button, /shop; catalogue auth.donate_*).
+#                     GM accounts can always use it; 1 opens it to every player.
+#        Default:     0 (GM accounts only)
+#                     1 (everyone)
+
+Shop.OpenToPlayers = 0
+
+#
 #     Custom.GainHonorOnGuardKill
 #        Description: Set it to 1 to gain honor when you kill a guard.
 #                     Note that not all city guards will give you honor. It seems only capital and big city guards are flagged

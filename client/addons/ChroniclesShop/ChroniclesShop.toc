@@ -1,0 +1,4 @@
+## Interface: 70300
+## Title: Chronicles Shop
+## Notes: The Chronicles in-game shop, opened from the micro menu Shop button or /shop. The server checks every purchase.
+ChroniclesShop.lua

@@ -25,6 +25,7 @@
 #include "TemporarySummon.h"
 #include "BattlePayMgr.h"
 #include "DatabaseEnv.h"
+#include <mutex>
 
 enum PremiumMenu
 {
@@ -89,6 +90,13 @@ static PremiumTeleport const Teleports[] =
 };
 
 static std::set<ObjectGuid> PlayersWithAddon;   // sent HELLO this login
+static std::mutex PlayersWithAddonLock;         // used from the players' map threads
+
+static bool HasAddon(Player* player)
+{
+    std::lock_guard<std::mutex> guard(PlayersWithAddonLock);
+    return PlayersWithAddon.count(player->GetGUID()) != 0;
+}
 
 static uint32 PremiumSecondsLeft(Player* player)
 {
@@ -108,7 +116,7 @@ static void SendAddon(Player* player, std::string const& text)
 static void Notify(Player* player, std::string const& text)
 {
     ChatHandler(player->GetSession()).SendSysMessage(text.c_str());
-    if (PlayersWithAddon.count(player->GetGUID()))
+    if (HasAddon(player))
         SendAddon(player, "ERR " + text);
 }
 
@@ -331,7 +339,10 @@ public:
 
         if (command == "HELLO")
         {
-            PlayersWithAddon.insert(player->GetGUID());
+            {
+                std::lock_guard<std::mutex> guard(PlayersWithAddonLock);
+                PlayersWithAddon.insert(player->GetGUID());
+            }
             SendAddon(player, "STATE " + std::to_string(PremiumSecondsLeft(player)));
         }
         else if (command == "OPEN")
@@ -342,6 +353,7 @@ public:
 
     void OnLogout(Player* player) override
     {
+        std::lock_guard<std::mutex> guard(PlayersWithAddonLock);
         PlayersWithAddon.erase(player->GetGUID());
     }
 };
@@ -364,7 +376,7 @@ public:
         if (Player* player = session->GetPlayer())
         {
             ChatHandler(session).PSendSysMessage("Premium activated: %u days added. Type .prem to open the premium menu.", _days);
-            if (PlayersWithAddon.count(player->GetGUID()))
+            if (HasAddon(player))
                 SendAddon(player, "STATE " + std::to_string(PremiumSecondsLeft(player)));
         }
     }
@@ -393,7 +405,7 @@ public:
         Player* player = handler->GetSession()->GetPlayer();
 
         // the addon window also shows non-premium players the benefits and a Buy Premium button
-        if (PlayersWithAddon.count(player->GetGUID()))
+        if (HasAddon(player))
         {
             SendAddon(player, "OPEN " + std::to_string(PremiumSecondsLeft(player)));
             return true;

@@ -667,10 +667,10 @@ void WorldSession::HandleChatAddonMessage(ChatMsg type, std::string const& prefi
     if (prefix.empty() || prefix.length() > 16)
         return;
 
-    // premium menu addon: handled by the premium_menu script (PlayerScript::OnChat), never forwarded
-    if (prefix == "PREM")
+    // premium menu and shop addons: handled by the premium_menu / many_in_one_donate scripts (PlayerScript::OnChat), never forwarded
+    if (prefix == "PREM" || prefix == "SHOP")
     {
-        std::string command = "PREM:" + message;
+        std::string command = prefix + ":" + message;
         sScriptMgr->OnPlayerChat(sender, CHAT_MSG_ADDON, LANG_ADDON, command);
         return;
     }
