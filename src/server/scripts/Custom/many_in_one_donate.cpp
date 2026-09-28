@@ -47,6 +47,7 @@ enum DonateProductType : uint8
     PRODUCT_LEVEL       = 5, // param1 = target level
     PRODUCT_GOLD        = 6, // param1 = gold
     PRODUCT_PREMIUM     = 7, // param1 = days of premium (auth.account_premium), extends a running premium
+    PRODUCT_AT_LOGIN    = 8, // param1 = AtLoginFlags: 1 name, 8 appearance/gender, 64 faction, 128 race (used at the next login)
 };
 
 enum DonateSender : uint32
@@ -268,10 +269,42 @@ private:
         return category;
     }
 
+    // bought with donate tokens: refundable at the refund NPC (item_back reads every type; 2 = shop addon).
+    // ponytail: not stackables, whose row would point at the merged stack; refund by count if they get sold
+    static void RecordRefund(Player* player, Item* item, uint32 price)
+    {
+        if (item->GetMaxStackCount() == 1)
+            CharacterDatabase.PExecute("REPLACE INTO character_donate (owner_guid, itemguid, type, itemEntry, efircount, count, account) VALUES (%u, %u, 2, %u, %u, 1, %u)",
+                player->GetGUIDLow(), item->GetGUIDLow(), item->GetEntry(), price, player->GetSession()->GetAccountId());
+    }
+
+    // the shop addon's delivery when the bags are full: the same item (built like Player::StoreNewItem does) by mail
+    static std::string MailItem(Player* player, uint32 itemId, std::string const& bonus, uint32 price)
+    {
+        Item* item = Item::CreateItem(itemId, 1, player);
+        if (!item)
+            return "The item could not be created";
+        item->SetItemRandomProperties(Item::GenerateItemRandomPropertyId(itemId, player->GetLootSpecID()));
+        if (uint32 upgradeID = sDB2Manager.GetRulesetItemUpgrade(itemId))
+            item->SetModifier(ITEM_MODIFIER_UPGRADE_ID, upgradeID);
+        for (uint32 bonusListId : ParseBonuses(bonus, itemId))
+            item->AddBonuses(bonusListId);
+        item->SetFixedLevel(player->getLevel());
+        RecordRefund(player, item, price);   // before the mail takes the item
+
+        CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+        item->SaveToDB(trans);
+        MailDraft("Chronicles Shop", "Your bags were full, so the shop sent your purchase by mail.").AddItem(item)
+            .SendMailTo(trans, MailReceiver(player), MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+        CharacterDatabase.CommitTransaction(trans);
+        return "";
+    }
+
 public:
     // Returns an empty string on success, otherwise the reason it failed (nothing was given).
     // bonus and price are only used for items (the shop addon; the Donate Vendor sells items in its vendor window).
-    static std::string Deliver(Player* player, uint8 type, uint32 param1, uint32 param2, std::string const& bonus = "", uint32 price = 0)
+    // With mailed (the shop addon), an item that doesn't fit in the bags is mailed and *mailed is set.
+    static std::string Deliver(Player* player, uint8 type, uint32 param1, uint32 param2, std::string const& bonus = "", uint32 price = 0, bool* mailed = nullptr)
     {
         switch (type)
         {
@@ -281,6 +314,12 @@ public:
                     return "Item not found";
                 ItemPosCountVec dest;
                 InventoryResult canStore = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, param1, 1);
+                if (canStore == EQUIP_ERR_INV_FULL && mailed)
+                {
+                    std::string error = MailItem(player, param1, bonus, price);
+                    *mailed = error.empty();
+                    return error;
+                }
                 if (canStore == EQUIP_ERR_INV_FULL)
                     return BAGS_FULL;
                 if (canStore != EQUIP_ERR_OK)
@@ -289,11 +328,7 @@ public:
                 if (!item)
                     return "The item could not be created";
                 player->SendNewItem(item, 1, true, false);
-                // bought with donate tokens: refundable at the refund NPC (item_back reads every type; 2 = shop addon).
-                // ponytail: not stackables, whose row would point at the merged stack; refund by count if they get sold
-                if (item->GetMaxStackCount() == 1)
-                    CharacterDatabase.PExecute("REPLACE INTO character_donate (owner_guid, itemguid, type, itemEntry, efircount, count, account) VALUES (%u, %u, 2, %u, %u, 1, %u)",
-                    player->GetGUIDLow(), item->GetGUIDLow(), param1, price, player->GetSession()->GetAccountId());
+                RecordRefund(player, item, price);
                 return "";
             }
             case PRODUCT_CURRENCY:
@@ -347,6 +382,17 @@ public:
                 ChatHandler(session).PSendSysMessage("Premium activated: %u days added. Type .prem to open the premium menu.", param1);
                 return "";
             }
+            case PRODUCT_AT_LOGIN:   // like the Service manager's SERVICE_AT_LOGIN
+            {
+                AtLoginFlags flag = AtLoginFlags(param1);
+                if (flag != AT_LOGIN_RENAME && flag != AT_LOGIN_CUSTOMIZE && flag != AT_LOGIN_CHANGE_FACTION && flag != AT_LOGIN_CHANGE_RACE)
+                    return "This product is not set up correctly";
+                if (player->HasAtLoginFlag(flag))
+                    return "You have already purchased this service";
+                player->SetAtLoginFlag(flag);
+                ChatHandler(player->GetSession()).SendSysMessage("Done! Log out to the character screen to use it.");
+                return "";
+            }
             default:
                 return "This product is not set up correctly";
         }
@@ -357,13 +403,22 @@ public:
 // delivery as the Donate Vendor; the server checks everything. The core passes prefix "SHOP" addon messages here as
 // "SHOP:<text>" and never forwards them; replies are addon whispers to the player himself (space separated, the name last).
 //   client -> server: OPEN | LIST <categoryId> | BUY <productId> <shownPrice> <reqId>
-//   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> <name> ... CEND
-//                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> <name> ... LEND <categoryId> <count>
-//                     | OK <reqId> <productId> <tokens> | FAIL <reqId> NOFUNDS|GONE|PRICE|BAGS|OWNED|BUSY|CLOSED|FAILED <tokens> | ERR <text>
+//   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> #<flags> <name> ... CEND
+//                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name> ... LEND <categoryId> <count>
+//                     | OK <reqId> <productId> <tokens> [MAIL] | FAIL <reqId> NOFUNDS|GONE|PRICE|BAGS|OWNED|BUSY|CLOSED|FAILED <tokens> | ERR <text>
+//   flags: SHOP_KNOWN (ITEM only), SHOP_NEW (CAT: a new product in it or below it); display = creature display of a
+//   mount or pet product for the 3D preview (0 = none); MAIL = the bags were full, the item went to the mailbox.
 // GM accounts only, unless Shop.OpenToPlayers = 1 in worldserver.conf.
 constexpr std::size_t SHOP_MAX_MESSAGE = 250;   // bytes per addon message
 constexpr uint32 SHOP_MAX_REQUESTS     = 10;    // per second, the rest is dropped (every request runs auth queries on the player's map thread)
 constexpr uint32 SHOP_MAX_REQ_ID       = 999999;
+constexpr char const* SHOP_IS_NEW      = "`added` > NOW() - INTERVAL 14 DAY";   // donate_products.added (fix_shop_new_flag_64.sql)
+
+enum ShopFlags : uint32
+{
+    SHOP_KNOWN = 1,     // the character has it already ("Already Known", no Buy button)
+    SHOP_NEW   = 2,     // added to the shop in the last 14 days
+};
 
 struct ShopThrottle
 {
@@ -446,6 +501,69 @@ static bool ShopVisible(Player* player, uint8 type, uint32 param1)
     return true;
 }
 
+// the spell a mount or pet product teaches: the spell product itself, or the learn spell of an item (mount, pet and recipe items)
+static uint32 ShopTaughtSpell(uint8 type, uint32 param1)
+{
+    if (type == PRODUCT_SPELL)
+        return param1;
+    if (type == PRODUCT_ITEM)
+        if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(param1))
+            for (ItemEffectEntry const* effect : proto->Effects)
+                if (effect->TriggerType == ITEM_SPELLTRIGGER_LEARN_SPELL_ID && effect->SpellID > 0)
+                    return uint32(effect->SpellID);
+    return 0;
+}
+
+// the character has this already: the addon shows "Already Known" (Deliver still checks titles, achievements, spells, services)
+static bool ShopKnown(Player* player, uint8 type, uint32 param1)
+{
+    switch (type)
+    {
+        case PRODUCT_TITLE:
+        {
+            CharTitlesEntry const* title = sCharTitlesStore.LookupEntry(param1);
+            return title && player->HasTitle(title);
+        }
+        case PRODUCT_ACHIEVEMENT:
+            return player->HasAchieved(param1);
+        case PRODUCT_LEVEL:
+            return player->getLevel() >= param1;
+        case PRODUCT_AT_LOGIN:
+            return player->HasAtLoginFlag(AtLoginFlags(param1));
+        case PRODUCT_ITEM:
+            if (player->GetCollectionMgr()->HasToy(param1) || player->GetCollectionMgr()->HasHeirloom(param1))
+                return true;
+            // fallthrough: mount, pet and recipe items
+        case PRODUCT_SPELL:
+        {
+            uint32 spell = ShopTaughtSpell(type, param1);
+            if (!spell)
+                return false;
+            if (BattlePetSpeciesEntry const* species = sDB2Manager.GetSpeciesBySpell(spell))
+                return player->GetBattlePetCountForSpecies(species->ID) > 0;
+            return player->HasSpell(spell);
+        }
+        default:
+            return false;
+    }
+}
+
+// the creature display of a mount or pet product, for the addon's 3D preview (0 = none)
+static uint32 ShopDisplay(uint8 type, uint32 param1)
+{
+    uint32 spell = ShopTaughtSpell(type, param1);
+    if (!spell)
+        return 0;
+    if (MountEntry const* mount = sDB2Manager.GetMount(spell))
+        if (auto const* displays = sDB2Manager.GetMountDisplays(mount->ID))
+            if (!displays->empty())
+                return uint32(displays->front()->CreatureDisplayInfoID);
+    if (BattlePetSpeciesEntry const* species = sDB2Manager.GetSpeciesBySpell(spell))
+        if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(species->CreatureID))
+            return creature->GetFirstVisibleModel();
+    return 0;
+}
+
 class donate_shop_addon : public PlayerScript
 {
 public:
@@ -525,14 +643,15 @@ private:
             } while (result->NextRow());
         }
 
-        std::set<uint32> shown;
-        if (QueryResult result = LoginDatabase.PQuery("SELECT `category`, `type`, `param1` FROM `donate_products` WHERE `enable` = 1 AND `faction` IN (0, %u)", faction))
+        std::set<uint32> shown, withNew;
+        if (QueryResult result = LoginDatabase.PQuery("SELECT `category`, `type`, `param1`, %s FROM `donate_products` WHERE `enable` = 1 AND `faction` IN (0, %u)", SHOP_IS_NEW, faction))
         {
             do
             {
                 Field* f = result->Fetch();
                 uint32 id = f[0].GetUInt32();
-                if (shown.count(id) || !ShopVisible(player, f[1].GetUInt8(), f[2].GetUInt32()))
+                bool isNew = f[3].GetUInt64() != 0;
+                if ((shown.count(id) && (!isNew || withNew.count(id))) || !ShopVisible(player, f[1].GetUInt8(), f[2].GetUInt32()))
                     continue;
 
                 // only when the whole path up to the top is enabled (the depth limit stops a parent loop)
@@ -543,14 +662,19 @@ private:
                     id = categories[id].Parent;
                 }
                 if (!id)
+                {
                     shown.insert(path.begin(), path.end());
+                    if (isNew)
+                        withNew.insert(path.begin(), path.end());
+                }
             } while (result->NextRow());
         }
 
         for (uint32 id : shown)
         {
             Category const& c = categories[id];
-            SendShop(player, "CAT " + std::to_string(id) + " " + std::to_string(c.Parent) + " " + std::to_string(c.Sort) + " " + ShopName(c.Name));
+            SendShop(player, "CAT " + std::to_string(id) + " " + std::to_string(c.Parent) + " " + std::to_string(c.Sort)
+                + " #" + std::to_string(withNew.count(id) ? SHOP_NEW : 0) + " " + ShopName(c.Name));
         }
         SendShop(player, "CEND");
     }
@@ -563,8 +687,8 @@ private:
             SendShop(player, "LEND " + std::to_string(category) + " 0");
             return;
         }
-        if (QueryResult result = LoginDatabase.PQuery("SELECT `id`, `type`, `param1`, `token`, `bonus`, `name` FROM `donate_products` WHERE `category` = %u AND `enable` = 1 AND `faction` IN (0, %u) ORDER BY `sort`, `id`",
-            category, FactionFilter(player)))
+        if (QueryResult result = LoginDatabase.PQuery("SELECT `id`, `type`, `param1`, `token`, `bonus`, `name`, %s FROM `donate_products` WHERE `category` = %u AND `enable` = 1 AND `faction` IN (0, %u) ORDER BY `sort`, `id`",
+            SHOP_IS_NEW, category, FactionFilter(player)))
         {
             do
             {
@@ -593,8 +717,10 @@ private:
                         name = proto->GetName()->Get(player->GetSession()->GetSessionDbLocaleIndex());
                 }
 
+                uint32 flags = (ShopKnown(player, type, param1) ? SHOP_KNOWN : 0) | (f[6].GetUInt64() ? SHOP_NEW : 0);
                 SendShop(player, "ITEM " + std::to_string(f[0].GetUInt32()) + " " + std::to_string(type) + " " + std::to_string(param1) + " " + std::to_string(f[3].GetUInt32())
-                    + " " + std::to_string(itemLevel) + " " + (bonuses.empty() ? "-" : bonuses) + " " + ShopName(name));
+                    + " " + std::to_string(itemLevel) + " " + (bonuses.empty() ? "-" : bonuses) + " #" + std::to_string(flags)
+                    + " " + std::to_string(ShopDisplay(type, param1)) + " " + ShopName(name));
                 ++count;
             } while (result->NextRow());
         }
@@ -630,7 +756,8 @@ private:
 
         // ponytail: deliver first, then charge, like the Donate Vendor; safe while one account has one session
         // (the guarded UPDATE only keeps the balance from going below zero, it can't take the item back)
-        std::string error = many_in_one_donate::Deliver(player, type, param1, f[2].GetUInt32(), f[3].GetString(), price);
+        bool mailed = false;
+        std::string error = many_in_one_donate::Deliver(player, type, param1, f[2].GetUInt32(), f[3].GetString(), price, &mailed);
         if (!error.empty())
         {
             if (error == BAGS_FULL)
@@ -646,7 +773,7 @@ private:
         LoginDatabase.DirectPExecute("INSERT INTO `donate_history` (`account`, `char_guid`, `product`, `item`, `token`) VALUES (%u, %u, %u, %u, %u)",
             accountId, player->GetGUIDLow(), productId, type == PRODUCT_ITEM ? param1 : 0, price);
         throttle.Tokens = GetTokens(accountId);
-        SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(productId) + " " + std::to_string(throttle.Tokens));
+        SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(productId) + " " + std::to_string(throttle.Tokens) + (mailed ? " MAIL" : ""));
     }
 };
 
