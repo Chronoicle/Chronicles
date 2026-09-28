@@ -28,9 +28,9 @@ PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, Ob
 
 bool PartyBotSession::Update(uint32 diff, Map* map)
 {
+    // once the bot is on a map, the map updates its session (World::UpdateSessions skips it), so the bot steps run in
+    // both: on the map for a bot in the world, in the world update while it is loading or between maps
     bool result = WorldSession::Update(diff, map);
-    if (map)                            // map threads only process packets; the bot steps run in the world update
-        return result;
 
     Player* bot = GetPlayer();
     if (!_loginStarted)
