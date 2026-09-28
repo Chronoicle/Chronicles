@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-09-28 (Oslo)
+
+- Claude (desktop session) — **server moved** from Kamatera 194.146.39.126 to Contabo 184.174.37.33 (owner OK), down 00:17:46-00:19:33 UTC after a 5 min countdown (`~/cutover.sh`, log `~/cutover.log` on the new server). New launcher (default server + writes `SET portal`) and client exe (patch URLs) handed out by both patch servers; old server forwards port 1119 and redirects the website. Website DB password changed. Went live with it: #60 e1a1999, #53 87f2584, #55 0af33c4, #43 307df20 (+ `~/fix_marrowrend_43.sql`), #52 ecc6f09 (+ `~/fix_garothi_annihilator_52.sql`), keystone reset/GM affixes 841b5b1 — live, changelog 1553924854070124657 — rollback: header of `~/cutover.sh`; code `git revert` the commits, SQL undo files next to the fixes.
+
 ## 2026-09-27 (Oslo)
 
 - Claude (desktop session) — restart 20:25 UTC (owner OK), worldserver 04c8c93: Voidform Shadow damage 20% -> 25% (50c7ec9, owner request); GM-made Mythic keystones keep their own affixes (04c8c93); Chron (guid 1) keystone Vault of the Wardens +27 Raging / Volcanic / Fortified (challenge_key + item 57637 in the backpack, done offline) — live, changelog 1553865328197501049 — `git revert 50c7ec9 04c8c93`, `~/undo_chron_keystone.sql`.

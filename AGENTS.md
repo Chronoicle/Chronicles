@@ -67,10 +67,10 @@ Issue body format: **Reporter** (Discord name + message link) · **Where** (zone
 | Databases (MySQL, local) | `auth`, `characters`, `world`, `hotfixes`, `website` |
 | worldserver | tmux `world`: `~/legion/bin/worldserver_loop.sh` runs it under gdb, restarts on crash / `server restart`; crash backtraces in `~/crashes/` |
 | bnetserver (login) | tmux `bnet`: `bnetserver_loop.sh` |
-| Patch/CDN server (launcher + client updates) | tmux `cdn`: `~/cdn/cdn_server.py` on port 8099; nginx proxies `194-146-39-126.nip.io` port 80 to it |
+| Patch/CDN server (launcher + client updates) | tmux `cdn`: `~/cdn/cdn_server.py` on port 8099; nginx proxies `184-174-37-33.nip.io` port 80 to it |
 | Launcher (Go, WebView2 "Chronicles" window) | `~/launcher` |
 | Client patching (CASC, built-in premium UI) | `~/client_parts` (`build_patch.py`, casc tools, `wdc1.py` DB2 reader) |
-| Website (SahtoutCMS ported to LegionCore) | source `~/website_src/SahtoutCMS`, deploy `bash ~/website_src/deploy.sh` → `/var/www/chronicles`, http://194.146.39.126 |
+| Website (SahtoutCMS ported to LegionCore) | source `~/website_src/SahtoutCMS`, deploy `bash ~/website_src/deploy.sh` → `/var/www/chronicles`, http://184.174.37.33 |
 | Discord bot | tmux `discord`: `~/discord-bot` (`run.sh` restarts it); status watcher in tmux `status` |
 
 ## Build, deploy, restart

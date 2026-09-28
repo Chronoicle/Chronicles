@@ -6,7 +6,7 @@ Background that is not obvious from the code. Rules are in `AGENTS.md`, current 
 
 - **Playerbots are parked** (2026-09-25). DestinyCore's bots are ~50k lines plus ~1,600 edits in 115 core files, and the server (8 GB RAM) was already short on memory. If they come back: start with solo "follow and fight" bots only (BotAI + class AIs + PlayerBotSession), not the battleground/arena bots, and only once crashes have settled. Solocraft and the built-in AuctionHouseBot are on instead.
 - **Don't port boss/dungeon scripts from DestinyCore** (2026-09-25). The DestinyCore versions of Eye of Azshara, Court of Stars and Neltharion's Lair faked mechanics (Rokmora on mana instead of energy, no Brittle, etc.) and were reverted. LegionCore's own scripts (UWOW-derived) are better: compare them against LittleWigs/BigWigs timers and fix them. DestinyCore is still useful for class/artifact spells LegionCore has no handler for (`scripts/Custom/destiny_*.cpp`).
-- **No domain for now** (2026-09-26): the website runs on the IP (http://194.146.39.126), no https yet.
+- **No domain for now** (2026-09-26): the website runs on the IP (http://184.174.37.33 since the move on 2026-09-28; before http://194.146.39.126), no https yet.
 - **Approved reporters** (game bugs fixed without asking): see `AGENTS.md`.
 
 ## Creature health and damage
@@ -32,7 +32,7 @@ The premium menu Lua is appended to `Interface\FrameXML\QuestChoiceFrameMixin.lu
 - Build config without patch / patch-size / patch-config lines (else "encoding table mismatch in patch manifest").
 - Encoding table stored like Blizzard's: BLTE blocks per section (22=n, especs=z, indexes/pages=n, *=z) with a matching trailer ESpec; root as ESpec 'z'.
 - shmem (Data/data/shmem, offset 272 + 4*bucket) must name the new .idx versions.
-- `Wow-64_Custom.exe` = Wow-64_Patched.exe with the versions URL and the `%s.patch.battle.net` CDN URL pointed at our patch server (`~/cdn/cdn_server.py`, tmux `cdn`, port 8099; nginx serves it as 194-146-39-126.nip.io on port 80).
+- `Wow-64_Custom.exe` = Wow-64_Patched.exe with the versions URL and the `%s.patch.battle.net` CDN URL pointed at our patch server (`~/cdn/cdn_server.py`, tmux `cdn`, port 8099; nginx serves it as 184-174-37-33.nip.io on port 80, before the move 194-146-39-126.nip.io). Since 2026-09-28 the launcher also writes `SET portal "184.174.37.33"` into WTF/Config.wtf (setPortal in `~/launcher/main.go`).
 - Always test on backups: a failed client start can create `CASCRepair.mrk` and wipe an index (restore kit `~/downloads/ClientRestore_full.zip`).
 
 ## Launcher

@@ -9,7 +9,7 @@ the practical know-how that is not written down there. Written 2026-09-27 by Cla
 These were given in chat and saved as private memory, so a new account does not have them. They still hold:
 
 - **Run server work yourself** (SSH as `wow`, builds, SQL with fix/undo files, deploy lock, changelog, Discord replies).
-  Don't hand the owner commands to paste. The server (194.146.39.126) is the owner's own Kamatera VPS.
+  Don't hand the owner commands to paste. The server (184.174.37.33, since 2026-09-28) is the owner's own Contabo VPS (8 cores, 23 GB). The old Kamatera VPS 194.146.39.126 only hands out launcher updates, forwards port 1119 and redirects the website until the owner cancels it.
 - **Never restart without an explicit OK in chat** ("restart now"). Build, stage and keep working, then ask.
   "restart now" means: the whole restart routine in section 4, including the changelog and reporter updates.
 - **Discord:** Grok (the intake bot) is out of usage. You relay every new `For the reporter:` line yourself and comment
@@ -22,7 +22,7 @@ These were given in chat and saved as private memory, so a new account does not 
 - Repo: `C:\Users\Chr\Documents\GitHub\Chronicles`. Locally `origin` = Chronoicle/Chronicles (push here: `git push origin main`).
   On the server the same repo is `~/LegionCore` with remote `chronicles` (`git pull --ff-only chronicles main`).
   Workflow: edit + commit + push locally, then pull on the server and build there.
-- SSH: `ssh -o BatchMode=yes wow@194.146.39.126 '<cmd>'` (key is set up; `grok_chronicles` is Grok's key, never use it).
+- SSH: `ssh -o BatchMode=yes wow@184.174.37.33 '<cmd>'` (key is set up, also for root; `grok_chronicles` is Grok's key, never use it). Services: `~/start_all.sh` (also @reboot) starts the tmux sessions bnet, world, cdn, status, discord.
 - The Bash tool is Git Bash on Windows: **no `jq`, no `python`** locally. Parse JSON with `--jq` of `gh`, PowerShell
   `ConvertFrom-Json`, or run Python on the server (`python3` there).
 - Many repo files are **CRLF**. `perl -0pi -e` patterns must use `\r?\n`, or use the Edit tool (safest for multi-line edits).
