@@ -115,6 +115,19 @@ static bool TakeTokens(Player* player, uint32 price)
     return true;
 }
 
+// the shop addon's products (and the new product types at the Donate Vendor): GM accounts only, unless Shop.OpenToPlayers = 1
+static bool ShopOpenFor(Player* player)
+{
+    return AccountMgr::IsModeratorAccount(player->GetSession()->GetSecurity()) || sConfigMgr->GetBoolDefault("Shop.OpenToPlayers", false);
+}
+
+// the Donate Vendor sells titles, achievements, mounts/pets and character services only once the shop is open
+// (the Service manager NPC sells the character services to everyone on its own)
+static char const* VendorTypeFilter(Player* player)
+{
+    return ShopOpenFor(player) ? "" : " AND `type` NOT IN (2, 3, 4, 8)";
+}
+
 static uint32 CountRows(char const* table, char const* where, uint32 category, uint32 faction)
 {
     if (QueryResult result = LoginDatabase.PQuery("SELECT COUNT(*) FROM `%s` WHERE `%s` = %u AND `enable` = 1 AND `faction` IN (0, %u)", table, where, category, faction))
@@ -181,8 +194,8 @@ private:
             player->ADD_GOSSIP_ITEM(GossipOptionNpc::Vendor, "Browse items", SENDER_VENDOR, category);
 
         bool morePages = false;
-        if (QueryResult result = LoginDatabase.PQuery("SELECT `id`, `name`, `token` FROM `donate_products` WHERE `category` = %u AND `type` <> %u AND `enable` = 1 AND `faction` IN (0, %u) ORDER BY `sort`, `id` LIMIT %u OFFSET %u",
-            category, uint32(PRODUCT_ITEM), faction, PRODUCTS_PER_PAGE + 1, page * PRODUCTS_PER_PAGE))
+        if (QueryResult result = LoginDatabase.PQuery("SELECT `id`, `name`, `token` FROM `donate_products` WHERE `category` = %u AND `type` <> %u AND `enable` = 1 AND `faction` IN (0, %u)%s ORDER BY `sort`, `id` LIMIT %u OFFSET %u",
+            category, uint32(PRODUCT_ITEM), faction, VendorTypeFilter(player), PRODUCTS_PER_PAGE + 1, page * PRODUCTS_PER_PAGE))
         {
             uint32 shown = 0;
             do
@@ -235,7 +248,7 @@ private:
     // Returns the product's category, so the menu can go back to it.
     static uint32 Buy(Player* player, uint32 productId)
     {
-        QueryResult result = LoginDatabase.PQuery("SELECT `name`, `type`, `param1`, `param2`, `token`, `category` FROM `donate_products` WHERE `id` = %u AND `enable` = 1 AND `type` <> %u", productId, uint32(PRODUCT_ITEM));
+        QueryResult result = LoginDatabase.PQuery("SELECT `name`, `type`, `param1`, `param2`, `token`, `category` FROM `donate_products` WHERE `id` = %u AND `enable` = 1 AND `type` <> %u%s", productId, uint32(PRODUCT_ITEM), VendorTypeFilter(player));
         if (!result)
             return 0;
 
@@ -360,6 +373,8 @@ public:
                 if (player->HasAchieved(param1))
                     return "You already have this achievement";
                 player->CompletedAchievement(achievement);
+                if (!player->HasAchieved(param1))   // AchievementMgr does nothing for a GM in GM mode
+                    return "Turn GM mode off first (.gm off)";
                 return "";
             }
             case PRODUCT_SPELL:
@@ -605,7 +620,7 @@ public:
             return;
         }
 
-        if (!AccountMgr::IsModeratorAccount(player->GetSession()->GetSecurity()) && !sConfigMgr->GetBoolDefault("Shop.OpenToPlayers", false))
+        if (!ShopOpenFor(player))
         {
             SendShop(player, "CLOSED");
             if (buy)

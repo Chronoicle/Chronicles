@@ -5,7 +5,8 @@
 -- IDs checked against the 7.3.5 client DB2s in ~/data/dbc/enUS (Mount.SourceSpellID + Spell, Achievement, CharTitles)
 -- and hotfixes (no overrides for these). Faction: 1 Alliance, 2 Horde (item Flags2 of the mount's reins,
 -- Achievement.Faction / achievement_reward title_A/title_H of the title), 0 both.
--- Shop only (the Donate Vendor lists only items); GM accounts until Shop.OpenToPlayers = 1.
+-- Apply only with the shop phase 2 worldserver (d9ca3eb and later: type 8 and the Donate Vendor gate are unknown to
+-- older builds). The shop addon and the Donate Vendor sell these to GM accounts only until Shop.OpenToPlayers = 1.
 -- Categories 1 Services, 6 Mounts, 7 Achievements, 8 Titles are already enable = 1 (not changed here).
 -- Idempotent: deletes its own ids first. Undo: undo_shop_catalog2_64.sql
 DELETE FROM auth.donate_products WHERE id IN (2000,2001,2002,2003,
@@ -68,3 +69,8 @@ INSERT INTO auth.donate_products (id, category, sort, name, type, param1, token,
 (2308, 8,  9, 'Obsidian Slayer',         2, 139, 1000, 0),
 (2309, 8, 10, 'of the Emerald Dream',    2,  87, 1000, 0),
 (2310, 8, 11, 'Assassin',                2,  95, 1000, 0);
+
+-- Vicious War Bear: the faction change pair was the wrong way round (229487 is the Alliance bear, reins 142234;
+-- 229486 the Horde one, reins 142235), so Change faction did not swap it. Loaded at startup.
+DELETE FROM world.player_factionchange_spells WHERE (alliance_id = 229486 AND horde_id = 229487) OR (alliance_id = 229487 AND horde_id = 229486);
+INSERT INTO world.player_factionchange_spells (alliance_id, horde_id) VALUES (229487, 229486);

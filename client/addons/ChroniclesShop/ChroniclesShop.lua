@@ -608,6 +608,7 @@ frame:SetScript("OnShow", function()
     newCats = {}
     wipe(lists)
     wipe(requested)
+    search:SetText("")   -- a search from the last visit would hide the first list
     Preview(nil)   -- also draws the rows
     UpdateMicroButton()
     Send("OPEN")
