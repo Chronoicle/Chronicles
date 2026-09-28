@@ -21,6 +21,7 @@
 #include "ScriptedGossip.h"
 #include "AccountMgr.h"
 #include "Chat.h"
+#include "CollectionMgr.h"
 #include "ChatPackets.h"
 #include "Config.h"
 #include "Creature.h"
