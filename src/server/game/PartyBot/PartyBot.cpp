@@ -15,6 +15,11 @@
 #include "LFGMgr.h"
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
+#include "SpellMgr.h"
+#include "SpellInfo.h"
+#include "CellImpl.h"
+#include "GridNotifiers.h"
+#include "GridNotifiersImpl.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <sstream>
 
@@ -247,22 +252,218 @@ void PartyBotAI::UpdateAI(uint32 diff)
         return;
     }
 
-    // help the leader: attack what the leader attacks
-    Unit* target = leader->getVictim();
-    if (target && target->IsAlive() && me->IsValidAttackTarget(target) && me->IsWithinDistInMap(target, 60.0f))
+    // don't move or pick another spell in the middle of a cast or channel
+    if (me->IsNonMeleeSpellCast(false))
+        return;
+
+    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(me->GetSpecializationId());
+    bool healer = spec && spec->Role == 1;
+
+    // fight what the leader fights (tanks also pick up what attacks the group)
+    if (Unit* target = PickTarget(leader))
     {
         if (me->getVictim() != target)
         {
-            me->Attack(target, true);
-            me->GetMotionMaster()->MoveChase(target);
+            me->Attack(target, !IsRanged());
+            if (healer)
+                FollowLeader(leader);       // healers stay with the group
+            else
+                me->GetMotionMaster()->MoveChase(target, IsRanged() ? 25.0f : 0.0f);
         }
+        CastRotation(target);
         return;
     }
 
     if (me->getVictim())
         me->AttackStop();
 
+    CastRotation(nullptr);                  // out of combat: heals, buffs, pets
     FollowLeader(leader);
+}
+
+// ---------------------------------------------------------------- AI: spells (phase 2)
+
+bool PartyBotAI::IsRanged() const
+{
+    switch (me->GetSpecializationId())
+    {
+        case 71: case 72: case 73: case 66: case 70: case 255: case 259: case 260: case 261: case 250: case 251: case 252:
+        case 263: case 268: case 269: case 103: case 104: case 577: case 581:
+            return false;
+        default:
+            return true;
+    }
+}
+
+Unit* PartyBotAI::PickTarget(Player* leader) const
+{
+    auto valid = [this](Unit* unit)
+    {
+        return unit && unit->IsAlive() && me->IsValidAttackTarget(unit) && me->IsWithinDistInMap(unit, 60.0f);
+    };
+
+    if (valid(leader->getVictim()))
+        return leader->getVictim();
+
+    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(me->GetSpecializationId());
+    if (spec && spec->Role == 0)
+        if (Unit* loose = TauntTarget())
+            return loose;
+
+    if (valid(me->getVictim()) && me->isInCombat())
+        return me->getVictim();
+
+    // something attacks the leader or the bot while the leader has no target
+    for (Unit* unit : { static_cast<Unit*>(leader), static_cast<Unit*>(me) })
+        for (Unit* attacker : *unit->getAttackers())
+            if (valid(attacker))
+                return attacker;
+
+    return nullptr;
+}
+
+uint32 PartyBotAI::EnemiesNear(Unit* center, float range) const
+{
+    std::list<Unit*> units;
+    Trinity::AnyUnfriendlyUnitInObjectRangeCheck check(center, me, range);
+    Trinity::UnitListSearcher<Trinity::AnyUnfriendlyUnitInObjectRangeCheck> searcher(center, units, check);
+    Trinity::VisitNearbyObject(center, range, searcher);
+    uint32 count = 0;
+    for (Unit* unit : units)
+        if (unit->isInCombat() && me->IsValidAttackTarget(unit))
+            ++count;
+    return std::max<uint32>(count, 1);  // the center itself
+}
+
+// the group member (bot included) with the lowest health below belowPct, in range and sight; withoutAura: skip those with it
+Unit* PartyBotAI::LowestGroupMember(int32 belowPct, uint32 withoutAura) const
+{
+    Unit* lowest = nullptr;
+    auto consider = [&](Unit* unit)
+    {
+        if (!unit || !unit->IsAlive() || unit->GetMap() != me->GetMap() || !me->IsWithinDistInMap(unit, 40.0f) || !me->IsWithinLOSInMap(unit))
+            return;
+        if (unit->GetHealthPct() >= float(belowPct))
+            return;
+        if (withoutAura && unit->HasAura(withoutAura, me->GetGUID()))
+            return;
+        if (!lowest || unit->GetHealthPct() < lowest->GetHealthPct())
+            lowest = unit;
+    };
+
+    consider(me);
+    if (Group* group = me->GetGroup())
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (ref->getSource() != me)
+                consider(ref->getSource());
+    return lowest;
+}
+
+uint32 PartyBotAI::GroupMembersBelow(int32 pct) const
+{
+    uint32 count = 0;
+    if (Group* group = me->GetGroup())
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->getSource())
+                if (member->IsAlive() && member->GetMap() == me->GetMap() && me->IsWithinDistInMap(member, 40.0f) && member->GetHealthPct() < float(pct))
+                    ++count;
+    return count;
+}
+
+// an enemy hitting a group member other than the bot: the tank takes it
+Unit* PartyBotAI::TauntTarget() const
+{
+    if (Group* group = me->GetGroup())
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+        {
+            Player* member = ref->getSource();
+            if (!member || member == me || member->GetMap() != me->GetMap())
+                continue;
+            for (Unit* attacker : *member->getAttackers())
+                if (attacker->IsAlive() && attacker->getVictim() == member && me->IsValidAttackTarget(attacker) && me->IsWithinDistInMap(attacker, 30.0f))
+                    return attacker;
+        }
+    return nullptr;
+}
+
+bool PartyBotAI::CastRotation(Unit* target)
+{
+    std::vector<PartyBotSpell> const* spells = sPartyBotMgr->GetSpells(me->GetSpecializationId());
+    if (!spells)
+        return false;
+
+    for (PartyBotSpell const& entry : *spells)
+        if (TryCast(entry, target))
+            return true;
+    return false;
+}
+
+bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
+{
+    SpellInfo const* info = sSpellMgr->GetSpellInfo(entry.Spell);
+    if (!info || !me->HasSpell(entry.Spell) || me->HasSpellCooldown(entry.Spell) || me->HasGlobalCooldown(info))
+        return false;
+
+    uint32 aura = entry.Aura ? entry.Aura : entry.Spell;
+    Unit* castTarget = target;
+    switch (entry.Type)
+    {
+        case PartyBotSpellType::Damage:
+        case PartyBotSpellType::Cooldown:
+            if (!target)
+                return false;
+            break;
+        case PartyBotSpellType::Dot:
+            if (!target || target->HasAura(aura, me->GetGUID()))
+                return false;
+            break;
+        case PartyBotSpellType::Execute:
+            if (!target || target->GetHealthPct() >= float(entry.Param))
+                return false;
+            break;
+        case PartyBotSpellType::Finisher:
+            if (!target || me->GetPower(POWER_COMBO_POINTS) < entry.Param)
+                return false;
+            break;
+        case PartyBotSpellType::Aoe:
+            if (!target || EnemiesNear(target, 8.0f) < uint32(entry.Param))
+                return false;
+            break;
+        case PartyBotSpellType::Buff:
+            if (me->HasAura(aura))
+                return false;
+            castTarget = me;
+            break;
+        case PartyBotSpellType::Heal:
+            castTarget = LowestGroupMember(entry.Param, 0);
+            break;
+        case PartyBotSpellType::Hot:
+            castTarget = LowestGroupMember(entry.Param, aura);
+            break;
+        case PartyBotSpellType::AoeHeal:
+            castTarget = GroupMembersBelow(entry.Param) >= 3 ? LowestGroupMember(entry.Param, 0) : nullptr;
+            break;
+        case PartyBotSpellType::SelfHeal:
+            castTarget = me->GetHealthPct() < float(entry.Param) ? me : nullptr;
+            break;
+        case PartyBotSpellType::Taunt:
+            castTarget = TauntTarget();
+            break;
+        case PartyBotSpellType::Pet:
+            castTarget = me->GetPetGUID().IsEmpty() ? me : nullptr;
+            break;
+    }
+    if (!castTarget)
+        return false;
+
+    if (castTarget != me)
+        me->SetFacingToObject(castTarget);
+
+    // ground-targeted spells (Death and Decay, Flamestrike, ...) go to the target's position
+    if (info->GetExplicitTargetMask() & TARGET_FLAG_DEST_LOCATION)
+        return me->CastSpell(castTarget->GetPositionX(), castTarget->GetPositionY(), castTarget->GetPositionZ(), entry.Spell, false) == SPELL_CAST_OK;
+
+    return me->CastSpell(castTarget, info, false) == SPELL_CAST_OK;
 }
 
 // ---------------------------------------------------------------- manager
@@ -297,6 +498,39 @@ std::vector<std::shared_ptr<PartyBotSession>> PartyBotMgr::GetBots(ObjectGuid le
 uint8 PartyBotMgr::CountBots(ObjectGuid leaderGuid)
 {
     return uint8(GetBots(leaderGuid).size());
+}
+
+std::vector<PartyBotSpell> const* PartyBotMgr::GetSpells(uint32 specId)
+{
+    std::call_once(_spellsLoaded, [this]()
+    {
+        static std::map<std::string, PartyBotSpellType> const types =
+        {
+            { "damage", PartyBotSpellType::Damage }, { "dot", PartyBotSpellType::Dot }, { "execute", PartyBotSpellType::Execute },
+            { "finisher", PartyBotSpellType::Finisher }, { "buff", PartyBotSpellType::Buff }, { "cooldown", PartyBotSpellType::Cooldown },
+            { "aoe", PartyBotSpellType::Aoe }, { "heal", PartyBotSpellType::Heal }, { "hot", PartyBotSpellType::Hot },
+            { "aoeheal", PartyBotSpellType::AoeHeal }, { "selfheal", PartyBotSpellType::SelfHeal }, { "taunt", PartyBotSpellType::Taunt },
+            { "pet", PartyBotSpellType::Pet },
+        };
+
+        QueryResult result = WorldDatabase.Query("SELECT spec, spell, type, param, aura FROM partybot_spells ORDER BY spec, prio");
+        if (!result)
+            return;
+        do
+        {
+            Field* fields = result->Fetch();
+            auto type = types.find(fields[2].GetString());
+            if (type == types.end() || !sSpellMgr->GetSpellInfo(fields[1].GetUInt32()))
+            {
+                TC_LOG_ERROR("sql.sql", "partybot_spells: spec %u spell %u type '%s' skipped", fields[0].GetUInt32(), fields[1].GetUInt32(), fields[2].GetString().c_str());
+                continue;
+            }
+            _spells[fields[0].GetUInt32()].push_back({ fields[1].GetUInt32(), type->second, fields[3].GetInt32(), fields[4].GetUInt32() });
+        } while (result->NextRow());
+    });
+
+    auto itr = _spells.find(specId);
+    return itr != _spells.end() ? &itr->second : nullptr;
 }
 
 std::string PartyBotMgr::AddBot(Player* leader, std::string name)
