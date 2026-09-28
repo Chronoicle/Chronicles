@@ -2,11 +2,12 @@
 
 Last updated: 2026-09-28 ~14:40 UTC by Claude (desktop session), transfer to the owner's other Claude session. Previously: ~13:40 UTC.
 
-## Transfer 2026-09-28 ~14:40 UTC (desktop session -> the owner's other Claude session)
+## Transfer 2026-09-28 ~14:40 UTC (taken over by the next Claude session ~14:45 UTC) (desktop session -> the owner's other Claude session)
 
 Read this block first; the "Current state" list below has the details per change.
 
 **Staged, needs "restart now" (built + installed, owner OK needed):**
+- 66f761a (+ build fix): **party bots phase 2** (#65): spell rotations per spec from `world.partybot_spells` (applied, 282 entries, 36 specs, generator `tools/partybot/gen_partybot_spells.py`); tanks taunt, healers heal, ranged keep 25 yd. Built + installed 14:54 UTC (16:54 server time). Test after the restart: `.partybot add tank` / `healer` / `dps`, pull something.
 - 0557c3d: party bot sessions are logged out and saved in `World::KickAll` at shutdown. The restart that installs it still runs the OLD shutdown: ask the owner to `.partybot remove` first (or accept the known harmless shutdown crash, see below).
 
 **Just built this session (all live unless noted):**
