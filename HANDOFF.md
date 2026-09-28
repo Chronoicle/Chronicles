@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-28 ~15:35 UTC by Claude (desktop session, took over from the transfer).
+Last updated: 2026-09-28 ~15:45 UTC by Claude (desktop session).
 
 ## Transfer 2026-09-28 ~14:40 UTC (taken over by the next Claude session ~14:45 UTC) (desktop session -> the owner's other Claude session)
 
@@ -31,6 +31,7 @@ Read this block first; the "Current state" list below has the details per change
 
 ## Current state
 
+- **Discord intake 15:40 UTC:** new issues #71 Mind Trauma, #72 Premonition CC breaks, #73 Purified Resolve, #74 The Fallen Lion gryphon, #75 Demons Among Us marker, #76 An Urgent Gathering (Paladin), #77 Broken Shore intro (Russian gossip, ride, boat spawn), #78 Recruiter Lee skip option (#71 #74-#77 were missed in the 2026-09-27 intake before the transfer; reporters told). Closed on reporter confirmation: #43 #67 #68 #70 (remove the temporary `server.concordance` log with the next build). #55 Harpoon still broken (gabrielf03d). #66: back to the login screen without an error = server-side drop.
 - **Crash 13:26:49 UTC = shutdown of the 13:25 restart** (`~/crashes/crash_2026-09-28_152649.log`): ~World -> ~WorldSession -> LogoutPlayer -> SaveToDB after the DB was closed, for party bot sessions (no socket, so KickAll did not log them out). Fix 0557c3d (KickAll logs bot sessions out) built + installed, NOT live: the NEXT restart still runs the old shutdown, so dismiss bots (`.partybot remove`) before it or expect the same harmless crash at shutdown. Bots work otherwise: Protectionw/Holypaladin/Armswarrior/Arcanemage logged in at 110 with setup done.
 
 - **Domain live (13:05 UTC): https://chronicles-wow.com** (+ www, + **patch.chronicles-wow.com** = patch server, http and https, port 80 proxies to 8099 like the nip.io name), Let's Encrypt via certbot (auto renew, one cert for all three), http and the bare IP redirect to the website; old server redirects there too. Website download link -> https://patch.chronicles-wow.com/launcher/Launcher.exe. **Domain launcher published ~13:25 UTC (owner tested):** Launcher.exe md5 27fb7b3a on both patch servers (new + old Kamatera, launcher_md5 in manifest.json), server http://patch.chronicles-wow.com, portal chronicles-wow.com; every launcher updates itself. Previous: `~/launcher/Launcher_prev_ip.exe` + `manifest_prev_ip.json` (new server), `~/Launcher_before_domain.exe` + `~/manifest_before_domain.json` (old server). Client exe patch URLs unchanged (IP). Realm address stays the IP. #6 closed.
