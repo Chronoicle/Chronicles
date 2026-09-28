@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-09-29 (Oslo)
+
+- Claude (desktop session) — restart 22:31 UTC 2026-09-28 (owner OK, 60 s timer), worldserver dae4002: 8314b5b #81 #82 #79 #80 #83 #84 #85 #73, 92ea901 #79, 1ce1709 (#83/#84 SQL), 65fc5e4 + 03d3f1f #63, a4cd518 + 6cff2c5 #48, cae1a1f #49 (partial), 58afafc + d7dd417 #66, dae4002 atomic id counters, shop phase 2 #64 (d9ca3eb f151a81 d2f8c99 3a61899 b858261, GM accounts only); SQL applied right before: fix_imonar_81, fix_kingaroth_trash_visual_82, fix_broken_shore_79_80, fix_blood_elf_quests_83_84, fix_shrine_russian_85, fix_shop_catalog2_64, fix_antorus_trash_respawn_63, fix_psyfiend_48, fix_ashbringer_66 (fix_shop_new_flag_64 earlier, additive). No crash log at shutdown — live, changelog 1554259680237453313 — `git revert` the commits, the matching `sql/custom/undo_*.sql` files.
+
 ## 2026-09-28 (Oslo)
 
 - Claude (desktop session) — launcher a030a8cf published (owner request, after the owner tested the shop): manifest `files` list, the launcher downloads loose addon files under Interface/AddOns when their md5 differs (5a19465, source now in `client/launcher/`); ChroniclesShop addon served from `~/cdn/launcher/files/Interface/AddOns/ChroniclesShop/`. Tested: unit test (Linux + Windows), console end-to-end, Windows test launcher, self-update from 27fb7b3a in a stand-in folder — live — undo: `cp ~/cdn/launcher/Launcher_prev_before_files.exe ~/cdn/launcher/Launcher.exe` + launcher_md5 27fb7b3a5686f9d381a956a9bbf6133a (or `~/cdn/launcher/manifest_before_files.json`).
