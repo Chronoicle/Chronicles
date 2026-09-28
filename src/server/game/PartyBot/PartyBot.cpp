@@ -217,9 +217,9 @@ void PartyBotAI::UpdateAI(uint32 diff)
     // Dungeon Finder: answer the role check with the spec's role and accept the "dungeon ready" proposal
     if (Group* group = me->GetGroup())
     {
-        uint8 role = PLAYER_ROLE_DAMAGE;
+        uint8 role = lfg::PLAYER_ROLE_DAMAGE;
         if (ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(me->GetSpecializationId()))
-            role = spec->Role == 0 ? PLAYER_ROLE_TANK : spec->Role == 1 ? PLAYER_ROLE_HEALER : PLAYER_ROLE_DAMAGE;
+            role = spec->Role == 0 ? lfg::PLAYER_ROLE_TANK : spec->Role == 1 ? lfg::PLAYER_ROLE_HEALER : lfg::PLAYER_ROLE_DAMAGE;
         sLFGMgr->AnswerForBot(group->GetGUID(), me->GetGUID(), role);
     }
 

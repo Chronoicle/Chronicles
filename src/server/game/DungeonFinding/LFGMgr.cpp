@@ -3021,6 +3021,8 @@ void LFGMgr::SendLfgUpdateQueue(ObjectGuid guid)
 
 } // namespace lfg
 
+namespace lfg
+{
 void LFGMgr::AnswerForBot(ObjectGuid gguid, ObjectGuid guid, uint8 role)
 {
     std::vector<uint32> proposals;
@@ -3054,3 +3056,4 @@ void LFGMgr::AnswerForBot(ObjectGuid gguid, ObjectGuid guid, uint8 role)
         UpdateProposal(response, guid);
     }
 }
+} // namespace lfg
