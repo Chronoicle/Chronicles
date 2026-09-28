@@ -14,6 +14,7 @@ The Broken Islands Scenario
 #include "QuestData.h"
 #include "MoveSplineInit.h"
 #include "CreatureGroups.h"
+#include <mutex>
 // #include "PrecompiledHeaders/ScriptPCH.h"
 
 #define GOSSIP_ACCEPT_DUEL      "Let''s duel"
@@ -662,7 +663,11 @@ public:
 //! 199357 Intro Scene (movie 486 + 217781). #79: spell_area casts it in areas 8290 / 8455 on every area update that
 //! enters them (and every near teleport, resurrect and relog inside them re-runs the update), and it has no aura to
 //! stop the recast, so the intro movie replayed over and over during the scenario (after the Stage 2 teleport, after
-//! a death, ...). It belongs to the scenario's first step only.
+//! a death, ...). Once per player and scenario instance: group members who arrive later still see it.
+//! ponytail: the set only grows (one entry per player per scenario run); clear it per instance if it ever matters.
+static std::set<std::pair<uint32, ObjectGuid>> IntroSceneSeen;   // (instance id, player)
+static std::mutex IntroSceneSeenLock;                             // map threads
+
 class spell_bi_intro_scene : public SpellScriptLoader
 {
 public:
@@ -672,20 +677,34 @@ public:
     {
         PrepareSpellScript(spell_bi_intro_scene_SpellScript);
 
+        // CheckCast runs more than once per cast: it only looks, AfterCast records
         SpellCastResult CheckCast()
         {
             if (Unit* caster = GetCaster())
                 if (caster->GetMapId() == 1460)
-                    if (InstanceScript* script = caster->GetInstanceScript())
-                        if (script->getScenarionStep() != 0)
-                            return SPELL_FAILED_DONT_REPORT;
+                {
+                    std::lock_guard<std::mutex> guard(IntroSceneSeenLock);
+                    if (IntroSceneSeen.count({ caster->GetInstanceId(), caster->GetGUID() }))
+                        return SPELL_FAILED_DONT_REPORT;
+                }
 
             return SPELL_CAST_OK;
+        }
+
+        void Record()
+        {
+            if (Unit* caster = GetCaster())
+                if (caster->GetMapId() == 1460)
+                {
+                    std::lock_guard<std::mutex> guard(IntroSceneSeenLock);
+                    IntroSceneSeen.insert({ caster->GetInstanceId(), caster->GetGUID() });
+                }
         }
 
         void Register() override
         {
             OnCheckCast += SpellCheckCastFn(spell_bi_intro_scene_SpellScript::CheckCast);
+            AfterCast += SpellCastFn(spell_bi_intro_scene_SpellScript::Record);
         }
     };
 
