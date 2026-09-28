@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — restart 12:15 UTC (owner OK, Chrondh online, 60 s timer), worldserver 5d51583: Gear-Up NPC own class hall upgrade option (creates the class hall when missing) — live, no changelog (staff only) — `git revert 5d51583`.
+
 - Claude (desktop session) — restart 12:07 UTC (owner OK, nobody online, 60 s timer), worldserver 0288346: Gear-Up NPC gear option also learns the class hall talent for a second legendary — live, no changelog (staff only) — `git revert 0288346`.
 
 - Claude (desktop session) — restart 11:55 UTC (owner OK, Chronp online, 60 s timer), worldserver 62b15dc: Gear-Up NPC 500010 for staff (bags, best-in-slot gear per spec, max professions; `~/fix_gear_up_npc.sql` + `~/gear_npc_items.sql`), not spawned yet (`.npc add 500010`); fill_character perks (20% Leech/Avoidance/Speed + sockets) — live, no changelog (staff only) — `~/undo_gear_up_npc.sql`, `git revert c1e3839 62b15dc`.
