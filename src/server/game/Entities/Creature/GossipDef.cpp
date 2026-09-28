@@ -233,8 +233,13 @@ uint64 GossipMenu::GetRequiredNpcFlagForOption(GossipOptionNpc optionNpc)
         case GossipOptionNpc::GarrisonTradeskill:
             requiredNpcFlag = UNIT_NPC_FLAG2_TRADESKILL_NPC;
             break;
-        case GossipOptionNpc::GarrisonRecruitment:
+        // Adventure Map (class hall Command Map, Scouting Maps): only the gossip flag. Player::PrepareGossipMenu checks
+        // against UNIT_FIELD_NPC_FLAGS only, so a UNIT_NPC_FLAG2 requirement always hid the option (#59). The other FLAG2
+        // options below have the same problem but work through the client's own npcflag2 handling.
         case GossipOptionNpc::AdventureMap:
+            requiredNpcFlag = UNIT_NPC_FLAG_GOSSIP;
+            break;
+        case GossipOptionNpc::GarrisonRecruitment:
         case GossipOptionNpc::GarrisonTalent:
             requiredNpcFlag = UNIT_NPC_FLAG2_CLASS_HALL_UPGRADE;
             break;
