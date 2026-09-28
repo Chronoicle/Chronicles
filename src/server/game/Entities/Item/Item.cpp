@@ -3323,7 +3323,10 @@ void Item::ActivateFishArtifact(uint8 /*artifactId*/)
 void Item::InitArtifactsTier(uint8 artifactId)
 {
     std::vector<ArtifactPowerEntry const*> artifactPowers = sDB2Manager.GetArtifactPowers(artifactId);
-    m_artifactPowerIdToIndex.assign(sArtifactPowerStore.GetNumRows() + 1, -1);
+    // keep the first tier's powers indexed (InitArtifactPowers sized it): reassigning dropped them, so their ranks
+    // could not be bought or set after the tier unlock until a relog
+    if (m_artifactPowerIdToIndex.empty())
+        m_artifactPowerIdToIndex.assign(sArtifactPowerStore.GetNumRows() + 1, -1);
     for (ArtifactPowerEntry const* artifactPower : artifactPowers)
     {
         if (m_artifactPowerIdToIndex[artifactPower->ID] != -1)

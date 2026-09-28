@@ -132,6 +132,14 @@ void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId)
     if (!spec || spec->ClassID != bot->getClass())
         return;
 
+    // logged out dead (a ghost): talents are refused and gear can't be equipped while dead, and the gear loop below
+    // would destroy the old set with nothing put back
+    if (bot->isDead(false))
+    {
+        bot->ResurrectPlayer(1.0f);
+        bot->SpawnCorpseBones();
+    }
+
     if (bot->getLevel() < 110)
         bot->GiveLevel(110);
     if (bot->GetSpecializationId() != specId)
@@ -251,6 +259,12 @@ void PartyBotSession::Setup(Player* bot)
         sGroupMgr->AddGroup(group);
     }
 
+    // a bot can log in still in another group (the shutdown logout keeps the group): leave it first, or AddMember
+    // only sets the original group and the group check dismisses the bot
+    if (Group* oldGroup = bot->GetGroup())
+        if (oldGroup != group)
+            oldGroup->RemoveMember(bot->GetGUID());
+
     if (!group->IsMember(bot->GetGUID()))
     {
         if (group->IsFull() || !group->AddMember(bot))
@@ -259,6 +273,12 @@ void PartyBotSession::Setup(Player* bot)
             Dismiss();
             return;
         }
+    }
+    else if (!bot->GetGroup())          // its slot from an earlier add (no group_member row): take it again
+    {
+        bot->SetGroup(group, group->GetMemberGroup(bot->GetGUID()));
+        bot->SetPartyType(group->GetGroupCategory(), GROUP_TYPE_NORMAL);
+        group->SendUpdate();
     }
 
     uint8 slot = sPartyBotMgr->CountBots(_leaderGuid);
@@ -300,9 +320,10 @@ void PartyBotAI::FollowLeader(Player* leader)
     if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == FOLLOW_MOTION_TYPE)
         return;
 
-    // spread out behind the leader: slots 0..3 at 2.5 yd, left/right behind, every next four (raids) 2 yd further out
+    // spread out behind the leader: slots 0..3 at 2.5 yd, left/right behind, the next fours (raids) 1.5 yd further out,
+    // at most 7 yd (the follow doesn't move within its distance, even without sight of the leader)
     static float const angles[] = { float(M_PI) * 0.75f, float(M_PI) * 1.25f, float(M_PI) * 0.6f, float(M_PI) * 1.4f };
-    me->GetMotionMaster()->MoveFollow(leader, 2.5f + 2.0f * (_slot / 4), angles[_slot % 4]);
+    me->GetMotionMaster()->MoveFollow(leader, 2.5f + 1.5f * std::min(_slot / 4, 3), angles[_slot % 4]);
 }
 
 void PartyBotAI::UpdateAI(uint32 diff)
