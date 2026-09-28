@@ -1966,6 +1966,40 @@ void Spell::EffectJumpDest(SpellEffIndex effIndex)
 
 void Spell::CalculateJumpSpeeds(uint8 i, float dist, float & speedXY, float & speedZ)
 {
+    // Players (retail formula, as in TrinityCore master): MiscValue is the minimum jump height in 0.1 yd, MiscValueB
+    // the maximum, the horizontal speed comes from the run speed and the arc from the flight time. The formula below
+    // used MiscValue as the vertical speed: Heroic Leap (17) got 1.7 yd/s, a flat slide with only the landing (#51)
+    SpellEffectInfo const* effect = m_spellInfo->GetEffect(i, m_diffMode);
+    if (m_caster->IsPlayer())
+    {
+        float multiplier = effect->Amplitude > 0.0f ? effect->Amplitude : 1.0f;
+        speedXY = std::min(playerBaseMoveSpeed[MOVE_RUN] * 3.0f * multiplier, std::max(28.0f, m_caster->GetSpeed(MOVE_RUN) * 4.0f));
+
+        switch (m_spellInfo->Id) // hand-tuned horizontal speeds kept
+        {
+            case 49376:  // Wild Charge
+            case 102401: // Wild Charge
+            case 49575:  // Death Grip
+            case 146599: // Gorefiend's Grasp
+            case 208674: // Sigil of Chains
+                speedXY = 45.f;
+                break;
+            default:
+                break;
+        }
+
+        float durationSqr = (dist / speedXY) * (dist / speedXY);
+        float minHeight = effect->MiscValue ? effect->MiscValue / 10.0f : 0.5f;
+        float maxHeight = effect->MiscValueB ? effect->MiscValueB / 10.0f : 1000.0f;
+        float height = Movement::gravity * durationSqr / 8;
+        if (durationSqr < minHeight * 8 / Movement::gravity)
+            height = minHeight;
+        else if (durationSqr > maxHeight * 8 / Movement::gravity)
+            height = maxHeight;
+        speedZ = std::sqrt(2 * Movement::gravity * height);
+        return;
+    }
+
     if (m_spellInfo->GetEffect(i, m_diffMode)->MiscValue)
         speedZ = float(m_spellInfo->GetEffect(i, m_diffMode)->MiscValue) / 10;
     else if (m_spellInfo->GetEffect(i, m_diffMode)->MiscValueB)
