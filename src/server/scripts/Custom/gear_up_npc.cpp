@@ -16,6 +16,8 @@
 #include "DB2Stores.h"
 #include "Bag.h"
 #include "Item.h"
+#include "Garrison.h"
+#include "GameTime.h"
 #include "Player.h"
 #include "SpellMgr.h"
 #include "SpellInfo.h"
@@ -60,6 +62,27 @@ static GearUpProfession const Professions[] =
     { 129, 201701, false, "First Aid" },
     { 356, 210829, false, "Fishing" },
 };
+
+// class hall talent that allows a second Legion legendary (Garrison::hasLegendLimitUp), by class
+static uint32 const SecondLegendaryTalent[MAX_CLASSES] = { 0, 412, 401, 379, 445, 456, 434, 42, 390, 368, 258, 357, 423 };
+
+// Without this talent only one legendary fits; Aman'Thul's Vision is a Pantheon trinket (limit category 362) and never counted.
+static void GrantSecondLegendary(Player* player, ChatHandler& chat)
+{
+    uint32 talent = player->getClass() < MAX_CLASSES ? SecondLegendaryTalent[player->getClass()] : 0;
+    Garrison* garrison = player->GetGarrisonPtr();
+    if (!talent || !garrison)
+    {
+        chat.SendSysMessage("Gear-Up: no class hall yet, so only one legendary can be equipped until you have the class hall talent.");
+        return;
+    }
+    if (garrison->hasLegendLimitUp())
+        return;
+
+    // researched long ago = ready at once (replaces the other talent of that tier)
+    garrison->AddTalentToStore(talent, uint32(GameTime::GetGameTime()) - 10 * DAY, 0, DB_STATE_NEW);
+    chat.SendSysMessage("Gear-Up: class hall talent for a second legendary learned.");
+}
 
 static void ShowMain(Player* player, Creature* creature)
 {
@@ -170,6 +193,7 @@ static void GiveGear(Player* player, uint32 specId)
         if (StoreItem(player, itr.first, 1, itr.second))
             ++given;
     chat.PSendSysMessage("Gear-Up: %u of %u items are in your bags.", given, uint32(items.size()));
+    GrantSecondLegendary(player, chat);
 }
 
 static void LearnProfession(Player* player, GearUpProfession const& p)
