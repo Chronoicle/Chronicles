@@ -62,7 +62,7 @@ Last updated: 2026-09-28 ~01:36 UTC by Claude (desktop session), restart 01:34 (
 
 ## Open work
 
-0. **Plan for 2026-09-28 (owner):** Karazhan health vs UWOW (owner sends the comparison); **#64 make the in-game Shop better, inspired by the UWOW shop** (ask for UWOW screenshots first); **#65 start playerbots** (lead: normalzero/LegionPlayerBot, a LegionCore with playerbots; ask the owner: party bots or world-populating random bots).
+0. **Plan for 2026-09-28 (owner):** Karazhan health vs UWOW (owner sends the comparison); **#64 make the in-game Shop better, inspired by the UWOW shop** (owner screenshots in `~/reference/uwow_shop/`, described + plan on #64; no Battle Royal category); **#65 start playerbots** (lead: normalzero/LegionPlayerBot, a LegionCore with playerbots; ask the owner: party bots or world-populating random bots).
 1. **#39 rest (not started):** the rest of #39 (Glayvianna Swoop/Metamorphosis/Unleash Fury, Mendacius Meteor + grimguard rate, Illianna facing, Grimhorn Torment + position, misplaced Defiler/Scorcher pack, Vault of the Betrayer light/statues/webs) is DB/SmartAI and spell-data work that needs the server's DB and `wdc1.py`; not started. **#40** Arcway Mythic list is untaken.
 2. **Antorus (xinkeg, approved):** #29 still open for the 60%/30% adds (activation spells 257941/257942 need their gateway NPCs 122543/122558; test with logging) and the other Hasabel points. #25 Felhounds, #26 platform, #28 High Command, #30 Eonar: Surge of Life fix staged (above); Paraxis Inquisitor/crystals/Feedback still unverified in game.
 3. **#27** trinkets out of combat: waiting for a retail source (needs-info).
