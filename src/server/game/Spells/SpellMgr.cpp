@@ -91,6 +91,7 @@ DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellInfo const* spellproto,
         case 228600:
         case 213688:
         case 199042:
+        case 199845: // Psyflay (Psyfiend): the snare's 8 s PvP limit (hasted ~5.6 s) ended the 12 s channel early (#48)
             return DIMINISHING_NONE;
         default:
             break;
