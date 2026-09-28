@@ -1987,6 +1987,27 @@ void WorldSession::HandleSetAdvancedCombatLogging(WorldPackets::ClientConfig::Se
     _player->SetAdvancedCombatLogging(packet.Enable);
 }
 
+// Party bots: the steps of CMSG_PLAYER_LOGIN + the instance connection a client would do, for a session without socket
+void WorldSession::LoginAsBot(ObjectGuid const& guid)
+{
+    if (PlayerLoading() || GetPlayer())
+        return;
+
+    _allowedCharsToLogin.insert(guid.GetCounter());
+    m_playerLoading = guid;
+    HandleContinuePlayerLogin();
+}
+
+void WorldSession::FinishBotLogin()
+{
+    if (Player* player = GetPlayer())
+        if (player->IsInWorld() && PlayerLoading())
+        {
+            player->SendInitialPacketsAfterAddToMap(true);
+            m_playerLoading.Clear();
+        }
+}
+
 void WorldSession::HandleContinuePlayerLogin()
 {
     if (!PlayerLoading() || GetPlayer())

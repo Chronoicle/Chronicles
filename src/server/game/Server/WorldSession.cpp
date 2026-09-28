@@ -478,7 +478,8 @@ bool WorldSession::Update(uint32 diff, Map* map)
             }
         }
 
-        if (!m_Socket[CONNECTION_TYPE_REALM])
+        // party bots have no socket: they stay until the bot has logged out (PartyBotSession::BotCanBeRemoved)
+        if (!m_Socket[CONNECTION_TYPE_REALM] && (!IsBotSession() || BotCanBeRemoved()))
         {
             m_sUpdate = false;
             return false;                                       //Will remove this session from the world session map

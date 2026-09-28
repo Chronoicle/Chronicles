@@ -1053,7 +1053,13 @@ class TC_GAME_API WorldSession
 {
     public:
         WorldSession(uint32 id, std::string&& name, const std::shared_ptr<WorldSocket>& sock, AccountTypes sec, uint8 expansion, time_t mute_time, std::string os, LocaleConstant locale, uint32 recruiter, bool isARecruiter, AuthFlags flag, std::unordered_map<uint8, int64>&& accountTokenMap);
-        ~WorldSession();
+        virtual ~WorldSession();
+
+        // Party bots (game/PartyBot): a session without a socket that the server drives itself
+        virtual bool IsBotSession() const { return false; }
+        virtual bool BotCanBeRemoved() const { return true; }  // bot session: remove from the world once logged out
+        void LoginAsBot(ObjectGuid const& guid);               // CMSG_PLAYER_LOGIN without a client
+        void FinishBotLogin();                                 // the client's LoadingScreenNotify (loading done)
 
         bool PlayerLoading() const { return !m_playerLoading.IsEmpty(); }
         bool PlayerLogout() const { return m_playerLogout; }
@@ -1140,7 +1146,7 @@ class TC_GAME_API WorldSession
         void SetCanLogout() { canLogout = true; }
 
         void QueuePacket(WorldPacket* new_packet);
-        bool Update(uint32 diff, Map* map = nullptr);
+        virtual bool Update(uint32 diff, Map* map = nullptr);
 
         /// Handle the authentication waiting queue (to be completed)
         void SendAuthWaitQue(uint32 position);
