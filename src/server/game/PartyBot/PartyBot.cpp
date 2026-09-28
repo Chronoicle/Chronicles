@@ -99,6 +99,13 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
             _leaderGoneTimer = 0;
         else if ((_leaderGoneTimer += diff) > 60 * IN_MILLISECONDS)
             Dismiss();
+
+        // kicked from the leader's group, or the group disbanded: go too (owner 2026-09-28)
+        Group* group = bot->GetGroup();
+        if (!_setupDone || (group && group->IsMember(_leaderGuid)))
+            _groupGoneTimer = 0;
+        else if ((_groupGoneTimer += diff) > 5 * IN_MILLISECONDS)
+            Dismiss();
     }
 
     return result;
@@ -130,6 +137,16 @@ void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId)
     if (bot->GetSpecializationId() != specId)
         bot->ActivateTalentGroup(spec);
 
+    // the spec's talent build (world.partybot_talents, generated with the rotations)
+    if (QueryResult result = WorldDatabase.PQuery("SELECT talent FROM partybot_talents WHERE spec = %u", specId))
+    {
+        bot->SetFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHANGING_TALENTS);    // replaces an earlier pick in the row
+        do
+            bot->LearnTalent((*result)[0].GetUInt32());
+        while (result->NextRow());
+        bot->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHANGING_TALENTS);
+    }
+
     // the class hall talent for a second legendary first, or the set's second legendary is refused (empty slot)
     if (Garrison* garrison = bot->GetGarrisonPtr())
         garrison->LearnSecondLegendaryTalent();
@@ -157,9 +174,54 @@ void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId)
         } while (result->NextRow());
     }
 
+    FillArtifacts(bot);
+
     bot->SetFullHealth();
     CharacterDatabase.PExecute("UPDATE partybot_characters SET setup = 1 WHERE guid = %u", bot->GetGUIDLow());
     bot->SaveToDB();
+}
+
+// every artifact trait, the second tier with its fourth ranks, Concordance of the Legionfall at 20 (owner 2026-09-28);
+// same ranks as tools/fill_character full_rank() except the Concordance
+void PartyBotSession::FillArtifacts(Player* bot)
+{
+    static uint8 const ConcordanceRanks = 20;
+
+    for (uint8 slot : { EQUIPMENT_SLOT_MAINHAND, EQUIPMENT_SLOT_OFFHAND })
+    {
+        Item* artifact = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!artifact || !artifact->GetTemplate()->GetArtifactID())
+            continue;
+        if (bot->GetItemByGuid(artifact->GetGuidValue(ITEM_FIELD_CREATOR)))
+            continue;                   // the second half of a pair (off-hand glaive, shield sword): the parent has the traits
+
+        bot->ApplyArtifactPowers(artifact, false);
+        artifact->SetModifier(ITEM_MODIFIER_ARTIFACT_TIER, 1);
+        artifact->InitArtifactsTier(artifact->GetTemplate()->GetArtifactID());
+
+        std::vector<ItemDynamicFieldArtifactPowers> powers(artifact->GetArtifactPowers().begin(), artifact->GetArtifactPowers().end());
+        for (ItemDynamicFieldArtifactPowers power : powers)
+        {
+            ArtifactPowerEntry const* entry = sArtifactPowerStore.LookupEntry(power.ArtifactPowerId);
+            if (!entry || (entry->Flags & ARTIFACT_POWER_FLAG_RELIC_TALENT) || !entry->MaxPurchasableRank)
+                continue;
+
+            uint8 rank = entry->MaxPurchasableRank;
+            if (entry->Flags & ARTIFACT_POWER_FLAG_FINAL)
+                rank = entry->Tier ? std::min<uint8>(rank, ConcordanceRanks) : 1;   // the first tier's paragon trait stays at 1
+            else if (!entry->Tier && (entry->Flags & ARTIFACT_POWER_FLAG_HAS_RANK))
+                ++rank;                                                             // fourth rank with the second tier
+
+            if (rank <= power.PurchasedRank)
+                continue;
+            power.CurrentRankWithBonus += rank - power.PurchasedRank;
+            power.PurchasedRank = rank;
+            artifact->SetArtifactPower(&power);
+        }
+
+        bot->ApplyArtifactPowers(artifact, true);
+        artifact->SetState(ITEM_CHANGED, bot);
+    }
 }
 
 void PartyBotSession::Setup(Player* bot)
@@ -238,9 +300,9 @@ void PartyBotAI::FollowLeader(Player* leader)
     if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == FOLLOW_MOTION_TYPE)
         return;
 
-    // spread out behind the leader: slots 0..3 at 2.5 yd, left/right behind
+    // spread out behind the leader: slots 0..3 at 2.5 yd, left/right behind, every next four (raids) 2 yd further out
     static float const angles[] = { float(M_PI) * 0.75f, float(M_PI) * 1.25f, float(M_PI) * 0.6f, float(M_PI) * 1.4f };
-    me->GetMotionMaster()->MoveFollow(leader, 2.5f, angles[_slot % 4]);
+    me->GetMotionMaster()->MoveFollow(leader, 2.5f + 2.0f * (_slot / 4), angles[_slot % 4]);
 }
 
 void PartyBotAI::UpdateAI(uint32 diff)
@@ -571,8 +633,8 @@ bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
             if (!target)
                 return false;
             break;
-        case PartyBotSpellType::Dot:
-            if (!target || target->HasAura(aura, me->GetGUID()))
+        case PartyBotSpellType::Dot:            // param: combo points needed (Rupture, Rip, Nightblade)
+            if (!target || target->HasAura(aura, me->GetGUID()) || me->GetPower(POWER_COMBO_POINTS) < entry.Param)
                 return false;
             break;
         case PartyBotSpellType::Execute:
@@ -601,8 +663,8 @@ bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
         case PartyBotSpellType::AoeHeal:
             castTarget = GroupMembersBelow(entry.Param) >= 3 ? LowestGroupMember(entry.Param, 0) : nullptr;
             break;
-        case PartyBotSpellType::SelfHeal:
-            castTarget = me->GetHealthPct() < float(entry.Param) ? me : nullptr;
+        case PartyBotSpellType::SelfHeal:       // strikes that heal the bot (Victory Rush, Death Strike) go at the target
+            castTarget = me->GetHealthPct() < float(entry.Param) ? (info->IsPositive() ? me : target) : nullptr;
             break;
         case PartyBotSpellType::Taunt:
             castTarget = TauntTarget();
@@ -719,11 +781,12 @@ std::string PartyBotMgr::AddBot(Player* leader, std::string name)
     if (sWorld->FindSession(accountId))
         return "The account of " + name + " is in use (logged in, or already a bot).";
 
-    if (CountBots(leader->GetGUID()) >= MaxBotsPerLeader)
-        return "You already have the maximum of party bots.";
-    if (Group* group = leader->GetGroup())
-        if (group->IsFull())
-            return "Your group is full.";
+    // a party holds 4 bots; a raid as many as it has free places (owner 2026-09-28)
+    Group* group = leader->GetGroup();
+    if ((!group || !group->isRaidGroup()) && CountBots(leader->GetGUID()) >= MaxBotsPerLeader)
+        return "You already have the maximum of party bots (4 in a party, convert to a raid for more).";
+    if (group && group->IsFull())
+        return "Your group is full.";
 
     std::string accountName;
     if (!AccountMgr::GetName(accountId, accountName))
