@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-28 (Oslo)
 
+- Claude (desktop session) — restart 11:55 UTC (owner OK, Chronp online, 60 s timer), worldserver 62b15dc: Gear-Up NPC 500010 for staff (bags, best-in-slot gear per spec, max professions; `~/fix_gear_up_npc.sql` + `~/gear_npc_items.sql`), not spawned yet (`.npc add 500010`); fill_character perks (20% Leech/Avoidance/Speed + sockets) — live, no changelog (staff only) — `~/undo_gear_up_npc.sql`, `git revert c1e3839 62b15dc`.
+
 - Claude (desktop session) — restart 11:08 UTC (owner OK, Chronp online, 60 s timer), worldserver 69a9be9: class hall troop recruiters (#67) and upgrade NPCs (#68) show their gossip option (all halls), 21 duplicate recruiter options removed (`~/fix_classhall_recruiter_duplicates_67.sql`), Tyrosus / Julia Celeste Dalaran summons only before their quest (#69, `~/fix_dalaran_paladin_summons_69.sql`), temporary server.concordance log (#70) — live, changelog 1554087740222742569 — `git revert 69a9be9`, `~/undo_classhall_recruiter_duplicates_67.sql`, `~/undo_dalaran_paladin_summons_69.sql`.
 
 - Claude (desktop session) — restart 01:34 UTC (owner OK, nobody online, 60 s timer): shop crash fixed, the shop entry HasDisplayInfo bit gets its own byte (53df2b8; the client ran one byte ahead and allocated 1.8 TB), GM accounts see the shop again for testing (players don't while Bpay.Enabled = 0) — live, changelog 1553943127532765200 — `git revert 53df2b8`.
