@@ -30,6 +30,7 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 | **Claude Project** (cloud threads, claude.ai Projects) | Research, audits and code changes, several at once. Works from this repo and the board; code goes in as a pull request with `Refs #N`. Never builds, restarts or deploys itself, never talks to players. When server work is needed, a thread starts the server session on the owner's desktop (below). | This GitHub repo only. The cloud cannot reach the server over SSH. |
 | **Server session** (one Claude or ChatGPT session with SSH as `wow`; since 2026-09-26 normally a Claude session on the owner's Windows desktop, started from a Project thread via Remote Control) | Merges pull requests, builds, deploys, restarts (with the owner's OK), posts #changelog, writes `Live:` comments. Only one deploys at a time (`~/DEPLOY.lock`). | `wow` user on the server (desktop key `chronicles-desktop`). `grok_chronicles` on that PC is Grok's key, never use it. |
 | **Cursor** | Code proposals from the owner's PC: a branch + pull request, never pushes to `main`. | GitHub only. |
+| **Pi team** (OpenRig on the owner's Raspberry Pi since 2026-09-29: rig `chronicles` = implementer + checker on the owner's Claude Max account in `~/Chronicles`, rig `chronicles-pro` = one Sonnet helper on the Claude Pro account in `~/Chronicles-pro`) | Code changes for board issues: a branch `pi/<issue>-<short-name>` + pull request with `Refs #N`, like Cursor. Never pushes to `main`, never builds, deploys or restarts, never talks to players. Does not edit `HANDOFF.md` / `CHANGES.md` (merge conflicts with the server session): status goes in the pull request and the issue comment. | This GitHub repo only (`gh` as Chronoicle, which could push to `main`: the rule above is what stops it). No SSH to the server. |
 | **Owner** | Approves restarts, suggestions, fixes for non-James reports, and merges when in doubt. | Everything. |
 
 ### Issue flow (the GitHub board is how the agents talk to each other)
@@ -51,9 +52,9 @@ This file lives in the repo (`~/LegionCore/AGENTS.md`, `~/AGENTS.md` links to it
 
 Issue body format: **Reporter** (Discord name + message link) · **Where** (zone/dungeon, difficulty) · **What happens** · **What should happen** · **Steps** · **IDs** (NPC/spell/quest/item, if known) · **Screenshots/video** (links).
 
-### Cursor and pull requests
+### Cursor, the Pi team and pull requests
 
-- Cursor works on a clone of Chronoicle/Chronicles on the owner's PC, on a branch `cursor/<issue>-<short-name>`, and opens a pull request with `Refs #N`. It cannot build or test; GitHub builds pull requests with GCC (`.github/workflows/build-gcc.yml`).
+- Cursor works on a clone of Chronoicle/Chronicles on the owner's PC, on a branch `cursor/<issue>-<short-name>`, and opens a pull request with `Refs #N`. It cannot build or test; GitHub builds pull requests with GCC (`.github/workflows/build-gcc.yml`). The Pi team works the same way on `pi/...` branches.
 - A server agent reviews it: `git fetch chronicles pull/<PR>/head:pr-<PR>`, reads the diff, merges into `main`, builds and pushes (GitHub then marks the PR merged).
 - Server agents: run `git pull --ff-only chronicles main` before starting work, in case a pull request was merged on GitHub.
 

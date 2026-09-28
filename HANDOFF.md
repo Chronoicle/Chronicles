@@ -28,6 +28,7 @@ Read this block first; the "Current state" list below has the details per change
 
 - **Server session:** a Claude session on the owner's Windows desktop (Remote Control, started from a Project thread). SSH as `wow` with its own key, `gh` logged in with board access. Cloud threads cannot reach the server; they start this session when server work is needed.
 - The old server session on the owner's Mac is retired (its notes are in `docs/NOTES.md`).
+- **Pi team (being set up 2026-09-29):** OpenRig on the owner's Raspberry Pi (Pi OS Lite 64-bit, user `chron`). Max account: `~/.claude`, daemon port 7433 with the OpenRig kernel; Pro account: `~/.claude-pro`, `OPENRIG_HOME=~/.openrig-pro`, port 7434, `OPENRIG_NO_KERNEL=1` (alias `rigpro`). Code only: `pi/...` branches + pull requests (AGENTS.md "Team and roles"); the server session reviews and merges them. Daemons do not start at boot yet.
 
 ## Current state
 
