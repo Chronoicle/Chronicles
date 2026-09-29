@@ -7668,8 +7668,13 @@ SpellCastResult Spell::CheckCast(bool strict)
                     InstanceTemplate const* instance = sObjectMgr->GetInstanceTemplate(mapId);
                     if (!instance)
                         return SPELL_FAILED_TARGET_NOT_IN_INSTANCE;
-                    if (!target->Satisfy(sObjectMgr->GetAccessRequirement(mapId, difficulty), mapId))
+                    AccessRequirement const* ar = sObjectMgr->GetAccessRequirement(mapId, difficulty);
+                    if (!target->Satisfy(ar, mapId))
                         return SPELL_FAILED_BAD_TARGETS;
+                    // Satisfy takes the target's own difficulty setting: Legion Mythic's level (110) by the map's (#90)
+                    if (ar && ar->levelMin && target->getLevel() < ar->levelMin && !target->isGameMaster() &&
+                        map->ExpansionID == EXPANSION_LEGION && difficulty == DIFFICULTY_MYTHIC_DUNGEON)
+                        return SPELL_FAILED_LOWLEVEL;
                 }
                 break;
             }

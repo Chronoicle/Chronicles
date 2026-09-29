@@ -24593,7 +24593,12 @@ bool Player::Satisfy(AccessRequirement const* ar, uint32 target_map, bool report
         if (!mapEntry)
             return false;
 
-        if (!sWorld->getBoolConfig(CONFIG_INSTANCE_IGNORE_LEVEL))
+        Difficulty target_difficulty = GetDifficultyID(mapEntry);
+
+        // Instance.IgnoreLevel skips the level rows, except for Legion Mythic dungeons (keystones start there too):
+        // level 110 like retail (owner, #90)
+        if (!sWorld->getBoolConfig(CONFIG_INSTANCE_IGNORE_LEVEL) ||
+            (mapEntry->ExpansionID == EXPANSION_LEGION && target_difficulty == DIFFICULTY_MYTHIC_DUNGEON))
         {
             if (ar->levelMin && getLevel() < ar->levelMin)
                 LevelMin = ar->levelMin;
@@ -24641,8 +24646,6 @@ bool Player::Satisfy(AccessRequirement const* ar, uint32 target_map, bool report
         if (checkAchievement)
             if (!leader || !leader->HasAchieved(checkAchievement))
                 missingAchievement = checkAchievement;
-
-        Difficulty target_difficulty = GetDifficultyID(mapEntry);
 
         MapDifficultyEntry const* mapDiff = sDB2Manager.GetDownscaledMapDifficultyData(target_map, target_difficulty);
         if (!mapDiff)
