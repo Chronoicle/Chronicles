@@ -404,6 +404,9 @@ struct npc_eonar_the_paraxis : public ScriptedAI
     uint8 flyPortalCounter = 0;
     uint8 crystolActivated = 0;
     uint8 lifeForceCount = 0;
+    uint32 playersAtPull = 0;
+    uint8 finalDoomCount = 0;
+    uint8 crystalsNeeded = 4;
 
     void Reset() override {}
 
@@ -430,6 +433,15 @@ struct npc_eonar_the_paraxis : public ScriptedAI
             events.RescheduleEvent(EVENT_FINAL_DOOM, 60000);
             finalDoomTimer = { 126000, 98000, 106000, 100000 };
         }
+        ResetFinalDoomCount();
+    }
+
+    // #54: a new attempt starts at Final Doom 1 with a new player count
+    void ResetFinalDoomCount()
+    {
+        playersAtPull = 0;
+        finalDoomCount = 0;
+        crystalsNeeded = 4;
     }
 
     void EnterEvadeMode() override
@@ -438,6 +450,7 @@ struct npc_eonar_the_paraxis : public ScriptedAI
         ScriptedAI::EnterEvadeMode();
         summons.DespawnAll();
         events.Reset();
+        ResetFinalDoomCount();
         instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
         instance->SendEncounterUnit(ENCOUNTER_FRAME_INSTANCE_END, me);
         SwitchDoorState(false);
@@ -569,12 +582,19 @@ struct npc_eonar_the_paraxis : public ScriptedAI
         {
             ++crystolActivated;
 
-            if (crystolActivated == 4)
+            if (crystolActivated == crystalsNeeded)
             {
                 SwitchDoorState(true);
                 me->InterruptNonMeleeSpells(false);
                 me->CastSpell(me, SPELL_PURGE);
                 ZoneTalk(SAY_WARN_PURGE);
+
+                // #54: fewer crystals than 4 were needed, the rest go out too
+                for (auto entry : {NPC_CRYSTAL_TARGETED, NPC_CRYSTAL_BURNING, NPC_CRYSTAL_FOUL_STEPS, NPC_CRYSTAL_ARCANE_SINGULARITY})
+                {
+                    EntryCheckPredicate pred(entry);
+                    summons.DoAction(ACTION_3, pred);
+                }
             }
         }
     }
@@ -604,6 +624,25 @@ struct npc_eonar_the_paraxis : public ScriptedAI
     {
         if (spell->Id == SPELL_PURGE)
             SwitchDoorState(false);
+    }
+
+    // #54: the players CheckPlayers keeps the fight going for (alive, no GM, in the area or on the ship)
+    uint32 CountPlayers()
+    {
+        uint32 count = 0;
+        instance->instance->ApplyOnEveryPlayer([&](Player* player)
+        {
+            if (player->IsAlive() && !player->isGameMaster() && (player->GetCurrentAreaID() == 9333 || player->IsWithinBox({ -4206.80f, -10700.2f, 728.27f }, 100.0f, 100.0f, 20.0f)))
+                ++count;
+        });
+        return count;
+    }
+
+    // #54 (custom): Mythic crystals per Final Doom scale with the players at pull, 5 players per crystal, max 4
+    uint8 GetCrystalsNeeded(uint8 doomNumber) const
+    {
+        uint32 needed = playersAtPull / 5 + (doomNumber <= playersAtPull % 5 ? 1 : 0);
+        return uint8(std::min<uint32>(needed, 4));
     }
 
     void CheckPlayers()
@@ -1087,6 +1126,8 @@ struct npc_eonar_the_paraxis : public ScriptedAI
                     instance->SendEncounterUnit(ENCOUNTER_FRAME_INSTANCE_START, me);
                     instance->SendEncounterUnit(ENCOUNTER_FRAME_ENGAGE, me);
                     DoZoneInCombat();
+
+                    playersAtPull = CountPlayers(); // #54
                     break;
                 }
                 case EVENT_CHECK_PLAYERS:
@@ -1118,6 +1159,18 @@ struct npc_eonar_the_paraxis : public ScriptedAI
                     break;
                 case EVENT_FINAL_DOOM:
                 {
+                    if (!finalDoomTimer.empty())
+                    {
+                        events.RescheduleEvent(EVENT_FINAL_DOOM, finalDoomTimer.front());
+                        finalDoomTimer.pop_front();
+                    }
+
+                    if (!playersAtPull) // #54: nobody counted at the pull (still loading in): count now
+                        playersAtPull = CountPlayers();
+                    crystalsNeeded = GetCrystalsNeeded(++finalDoomCount);
+                    if (!crystalsNeeded) // #54: too few players for this Final Doom, it is not cast
+                        break;
+
                     ZoneTalk(SAY_WARN_FINAL_DOOM);
                     SwitchDoorState(false);
                     me->RemoveAreaObject(SPELL_TELEPORTER_AT);
@@ -1133,11 +1186,6 @@ struct npc_eonar_the_paraxis : public ScriptedAI
                     me->SummonCreature(NPC_CRYSTAL_FOUL_STEPS, -4174.0f, -10741.9f, 734.58f);
                     me->SummonCreature(NPC_CRYSTAL_ARCANE_SINGULARITY, -4165.0f, -10666.4f, 734.58f);
 
-                    if (!finalDoomTimer.empty())
-                    {
-                        events.RescheduleEvent(EVENT_FINAL_DOOM, finalDoomTimer.front());
-                        finalDoomTimer.pop_front();
-                    }
                     if (me->GetAnyOwner())
                         if (auto owner = me->GetAnyOwner()->ToCreature())
                             owner->AI()->ZoneTalk(SAY_FINAL_DOOM);
@@ -1637,6 +1685,17 @@ struct npc_eonar_focusing_crystal : public ScriptedAI
                 if (me)
                     me->DespawnOrUnsummon();
             });
+        }
+
+        // #54: enough crystals were deactivated, the ones nobody clicked go out without counting
+        if (actionId == ACTION_3 && !disabled)
+        {
+            disabled = true;
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+            me->RemoveFlag(UNIT_FIELD_NPC_FLAGS, UNIT_NPC_FLAG_SPELLCLICK);
+            me->RemoveAllAuras();
+            me->SetAnimKitId(0);
+            me->DespawnOrUnsummon(3000);
         }
     }
 
