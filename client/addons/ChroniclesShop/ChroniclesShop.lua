@@ -27,7 +27,7 @@ local STORE_ART = "Interface\\Store\\Store-Main"   -- Blizzard's store art, texc
 local ROW_HEIGHT = 40
 local ROW_WIDTH = 516
 local CARD_WIDTH, CARD_HEIGHT = 254, 64   -- two cards per line
-local BANNER_HEIGHT = 156
+local BANNER_HEIGHT = 176   -- room for a "You will receive" list of 5-6 lines
 local LIST_HEIGHT = 496     -- height of the insets
 local PREVIEW_WIDTH = 230   -- the 3D preview on the right; the window stays within 1024 wide at UI scale 1
 local TABS_WIDTH = 540
@@ -490,7 +490,7 @@ local function Banner(i)
     banner.header:SetText("You will receive:")
     banner.parts = banner:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     banner.parts:SetPoint("TOPLEFT", banner.header, "BOTTOMLEFT", 4, -4)
-    banner.parts:SetSize(ROW_WIDTH - 110, 56)
+    banner.parts:SetSize(ROW_WIDTH - 110, 84)
     banner.parts:SetJustifyH("LEFT")
     banner.parts:SetJustifyV("TOP")
     banner.price = banner:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
