@@ -45,3 +45,25 @@ func TestAddonFiles(t *testing.T) {
 		}
 	}
 }
+
+// Config.wtf: portal always ours, a language only when none is chosen (new install, or "" after a cancelled choice).
+func TestSetPortal(t *testing.T) {
+	portal = "chronicles-wow.com"
+	for _, c := range []struct{ in, want string }{
+		{"", "SET portal \"chronicles-wow.com\"\r\nSET textLocale \"enUS\"\r\nSET audioLocale \"enUS\"\r\n"},
+		{"SET portal \"\"\r\nSET textLocale \"\"\r\nSET audioLocale \"\"\r\n",
+			"SET portal \"chronicles-wow.com\"\r\nSET textLocale \"enUS\"\r\nSET audioLocale \"enUS\"\r\n"},
+		{"SET gxWindow \"1\"\r\nSET portal \"184.174.37.33\"\r\nSET textLocale \"ruRU\"\r\nSET audioLocale \"ruRU\"\r\n",
+			"SET gxWindow \"1\"\r\nSET portal \"chronicles-wow.com\"\r\nSET textLocale \"ruRU\"\r\nSET audioLocale \"ruRU\"\r\n"},
+	} {
+		root := t.TempDir()
+		os.MkdirAll(filepath.Join(root, "WTF"), 0755)
+		if c.in != "" {
+			os.WriteFile(filepath.Join(root, "WTF", "Config.wtf"), []byte(c.in), 0644)
+		}
+		setPortal(root)
+		if got, _ := os.ReadFile(filepath.Join(root, "WTF", "Config.wtf")); string(got) != c.want {
+			t.Errorf("in %q:\n got %q\nwant %q", c.in, got, c.want)
+		}
+	}
+}

@@ -403,7 +403,8 @@ func startCopy(dir string) {
 		if _, bakErr := os.Stat(dst + ".bak"); err == nil && os.IsNotExist(bakErr) {
 			must(os.Rename(dst, dst+".bak"))
 		}
-		must(os.WriteFile(dst, b, 0755))
+		must(os.WriteFile(dst+".new", b, 0755)) // then renamed: a cut-off copy never becomes the player's Launcher.exe
+		must(os.Rename(dst+".new", dst))
 	}
 	os.Remove(filepath.Join(dir, configFile))
 	cmd := exec.Command(dst)

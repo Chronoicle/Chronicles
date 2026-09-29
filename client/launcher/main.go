@@ -476,6 +476,7 @@ type index struct {
 	header  []byte            // HeaderHashSize bytes after the first 8
 	pad     int               // offset of EntriesSize
 	records map[string][]byte // 9 byte key -> 5 byte offset (BE) + 4 byte size (LE)
+	dup     bool              // a key was listed twice: the map lost one copy's archive (cleanupArchives stays away)
 }
 
 func idxName(b int, v uint32) string { return fmt.Sprintf("%02x%08x.idx", b, v) }
@@ -496,6 +497,7 @@ func readIndex(p string) *index {
 		e := d[pos+8+18*k : pos+8+18*(k+1)]
 		ix.records[string(e[:9])] = append([]byte{}, e[9:]...)
 	}
+	ix.dup = len(ix.records) != esize/18
 	return ix
 }
 
@@ -548,14 +550,21 @@ var archiveFile = regexp.MustCompile(`^data\.(\d{3})$`)
 
 // cleanupArchives removes data.NNN files in data that indexes (one per bucket, already parsed and, for touched
 // buckets, already holding this update's new entries: see update) does not reference any more. Conservative: only
-// files matching archiveFile are ever considered, and a broken index never reaches here - readIndex panics on one
+// files matching archiveFile below the highest referenced archive are ever considered (the game may be filling the
+// top one), nothing when an index listed a key twice, and a broken index never reaches here - readIndex panics on one
 // before update gets this far, so cleanupArchives itself never has to guess.
+// A later "restore" names the original index versions again, which may point into a removed archive: the game deletes
+// old index versions itself too, so restore was never guaranteed after an update.
 func cleanupArchives(data string, indexes []*index) {
-	referenced := map[int]bool{}
+	referenced, top := map[int]bool{}, 0
 	for _, ix := range indexes {
+		if ix.dup {
+			return
+		}
 		for _, v := range ix.records {
 			packed := uint64(v[0])<<32 | uint64(binary.BigEndian.Uint32(v[1:5]))
 			referenced[int(packed>>30)] = true
+			top = max(top, int(packed>>30))
 		}
 	}
 	entries, err := os.ReadDir(data)
@@ -567,7 +576,7 @@ func cleanupArchives(data string, indexes []*index) {
 		if m == nil || e.IsDir() {
 			continue
 		}
-		if n, err := strconv.Atoi(m[1]); err == nil && !referenced[n] {
+		if n, err := strconv.Atoi(m[1]); err == nil && n < top && !referenced[n] {
 			if err := os.Remove(filepath.Join(data, e.Name())); err == nil {
 				say("Removed old client archive " + e.Name())
 			}
@@ -692,30 +701,39 @@ func must(err error) {
 
 // setPortal points the client at our login server: WTF/Config.wtf gets "SET portal" with the current address (players
 // set it by hand before; the server moved to a new IP on 2026-09-28). An existing portal line is replaced, else added.
+// It also sets the language to enUS when none is chosen (a new install, or "" after the game's language list was
+// cancelled): the game's first start would ask for a region and language, and most of them (Deutsch, Français, 한국어...)
+// have no data in this client (it has enUS, esMX, ptBR, ruRU). A player's own choice stays.
 func setPortal(root string) {
 	p := filepath.Join(root, "WTF", "Config.wtf")
 	b, err := os.ReadFile(p)
 	if err != nil && !os.IsNotExist(err) {
 		return
 	}
-	want := `SET portal "` + portal + `"`
 	lines := strings.Split(strings.ReplaceAll(string(b), "\r\n", "\n"), "\n")
-	found, changed := false, false
-	for i, l := range lines {
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(l)), "set portal ") {
+	changed := false
+	for _, s := range []struct{ key, value string }{{"portal", portal}, {"textLocale", "enUS"}, {"audioLocale", "enUS"}} {
+		want := `SET ` + s.key + ` "` + s.value + `"`
+		found := false
+		for i, l := range lines {
+			f := strings.Fields(l)
+			if len(f) < 2 || !strings.EqualFold(f[0], "set") || !strings.EqualFold(f[1], s.key) {
+				continue
+			}
 			found = true
-			if strings.TrimSpace(l) != want {
+			chosen := s.key != "portal" && len(f) > 2 && f[2] != `""` // a language the player picked
+			if strings.TrimSpace(l) != want && !chosen {
 				lines[i], changed = want, true
 			}
 		}
-	}
-	if !found {
-		if n := len(lines); n > 0 && lines[n-1] == "" {
-			lines = append(lines[:n-1], want, "")
-		} else {
-			lines = append(lines, want)
+		if !found {
+			if n := len(lines); n > 0 && lines[n-1] == "" {
+				lines = append(lines[:n-1], want, "")
+			} else {
+				lines = append(lines, want)
+			}
+			changed = true
 		}
-		changed = true
 	}
 	if !changed {
 		return
