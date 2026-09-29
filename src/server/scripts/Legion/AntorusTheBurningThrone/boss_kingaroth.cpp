@@ -161,29 +161,19 @@ struct boss_kingaroth : BossAI
     {
         _EnterCombat();
         Talk(SAY_AGGRO);
+        // #97: after a wipe the evade home (SetSpawnHealth -> SetInitialPowerValue) fills energy to 100 after Reset()
+        // set 75, so the next pull went straight into Apocalypse Protocol. 75 + the energize ticks = first protocol
+        // at ~31 s (DBM: 31.8-36.5 s).
+        me->SetPower(POWER_ENERGY, 75);
         DoCast(me, SPELL_ENERGIZE_PERIODIC, true);
-        DefaultEvents(true);
+        // #97: pull timers from DBM-Raids-Legion Kingaroth.lua (OnCombatStart)
+        events.RescheduleEvent(EVENT_FORGING_STRIKE, 6000);
+        events.RescheduleEvent(EVENT_DIABOLIC_BOMB, 11000);
+        events.RescheduleEvent(EVENT_REVERBERATING_STRIKE, 14000);
+        events.RescheduleEvent(EVENT_RUINER, 21000);
+        events.RescheduleEvent(EVENT_CHECK_NEAREST_PLAYER, 3000);
 
         DoActionSummon(NPC_INCINERATOR_STALKER, ACTION_1); //Cast AT
-    }
-
-    void DefaultEvents(bool enterCombat = false)
-    {
-        if (enterCombat)
-        {
-            events.RescheduleEvent(EVENT_FORGING_STRIKE, 6000);
-            events.RescheduleEvent(EVENT_REVERBERATING_STRIKE, 14000);
-            events.RescheduleEvent(EVENT_DIABOLIC_BOMB, 14000);
-            events.RescheduleEvent(EVENT_RUINER, 26000);
-        }
-        else
-        {
-            events.RescheduleEvent(EVENT_FORGING_STRIKE, 1000);
-            events.RescheduleEvent(EVENT_REVERBERATING_STRIKE, 2000);
-            events.RescheduleEvent(EVENT_DIABOLIC_BOMB, 20000);
-            events.RescheduleEvent(EVENT_RUINER, 22000);
-        }
-        events.RescheduleEvent(EVENT_CHECK_NEAREST_PLAYER, 3000);
     }
 
     void JustDied(Unit* /*killer*/) override
@@ -217,7 +207,8 @@ struct boss_kingaroth : BossAI
         if (actionID == ACTION_1 && !phaseConstruction)
         {
             phaseConstruction = true;
-            events.Reset();
+            // #97: no events.Reset(): the timers pause during Apocalypse Protocol (UpdateAI) and resume where they
+            // stopped, like retail (DBM stores the remaining times). The old reset restarted them at 1-2 s afterwards.
             events.RescheduleEvent(EVENT_PHASE_2, 500);
         }
 
@@ -270,7 +261,6 @@ struct boss_kingaroth : BossAI
             DoActionSummon(NPC_INCINERATOR_STALKER, ACTION_1); //Cast AT
             DoActionSummon(NPC_INFERNAL_TOWER_1, ACTION_2); //Move Down
             me->SetReactState(REACT_AGGRESSIVE, 1000);
-            DefaultEvents();
             phaseConstruction = false;
         }
     }
@@ -388,6 +378,13 @@ struct boss_kingaroth : BossAI
         if (!UpdateVictim())
             return;
 
+        // #97: boss timers are paused while Apocalypse Protocol is up
+        if (me->HasAura(SPELL_APOCALYPSE_PROTOCOL))
+        {
+            DoMeleeAttackIfReady();
+            return;
+        }
+
         events.Update(diff);
 
         if (me->HasUnitState(UNIT_STATE_CASTING))
@@ -399,7 +396,7 @@ struct boss_kingaroth : BossAI
             {
                 case EVENT_FORGING_STRIKE:
                     DoCastTopAggro(IsLfrRaid() ? SPELL_FORGING_STRIKE_LFR : SPELL_FORGING_STRIKE);
-                    events.RescheduleEvent(EVENT_FORGING_STRIKE, 14000);
+                    events.RescheduleEvent(EVENT_FORGING_STRIKE, 14500);
                     break;
                 case EVENT_REVERBERATING_STRIKE:
                     Talk(SAY_REVERBERATING_STRIKE);
@@ -407,7 +404,7 @@ struct boss_kingaroth : BossAI
                         DoCast(target, IsLfrRaid() ? SPELL_REVERBERATING_STRIKE_LFR : SPELL_REVERBERATING_STRIKE);
                     else
                         DoCastTopAggro(IsLfrRaid() ? SPELL_REVERBERATING_STRIKE_LFR : SPELL_REVERBERATING_STRIKE);
-                    events.RescheduleEvent(EVENT_REVERBERATING_STRIKE, 30000);
+                    events.RescheduleEvent(EVENT_REVERBERATING_STRIKE, 28000);
                     break;
                 case EVENT_DIABOLIC_BOMB:
                     DoCast(SPELL_DIABOLIC_BOMB);
@@ -430,7 +427,8 @@ struct boss_kingaroth : BossAI
                     Talk(SAY_RUINER);
                     me->StopAttack();
                     me->CastSpell(me, SPELL_RUINER_FILTER);
-                    events.RescheduleEvent(EVENT_RUINER, 30000);
+                    events.RescheduleEvent(EVENT_RUINER, 29000);
+                    events.RescheduleEvent(EVENT_FORGING_STRIKE, 10000); // DBM: Forging Strike 10 s after Ruiner
                     events.RescheduleEvent(EVENT_CHECK_NEAREST_PLAYER, 12000);
                     break;
                 }
@@ -514,26 +512,42 @@ struct npc_kingaroth_ruiner : public ScriptedAI
         me->SetSpeed(MOVE_RUN, 0.8f, true);
     }
 
+    Position path[6];
+    uint8 step = 0;
+
     void Reset() override {}
 
     void SpellHit(Unit* caster, SpellInfo const* spell) override
     {
         if (spell->Id == SPELL_RUINER_CHANNEL)
         {
-            Position pos;
-            G3D::Vector3 path[6];
             float angle = caster->GetRelativeAngle(me);
             float direction = urand(0, 1) ? 0.3f : -0.3f;
 
             for (uint8 i = 0; i < 6; ++i)
             {
-                pos = caster->GetNearPosition(35.0f, angle);
-                path[i] = G3D::Vector3(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
+                path[i] = caster->GetNearPosition(35.0f, angle);
                 angle += direction;
             }
 
-            me->GetMotionMaster()->MoveSmoothPath(1, path, 6, false);
+            // #97: start slow and speed up (was one smooth path at full speed); path[0] is the spawn spot
+            step = 1;
+            MoveNextStep();
         }
+    }
+
+    // ponytail: speeds 5-15 yd/s per ~10.5 yd leg are estimates (whole arc ~6.3 s, the 246833 channel is 6 s), no
+    // retail source for the exact curve; tune here if it feels off in game.
+    void MoveNextStep()
+    {
+        static float const speeds[6] = { 0.0f, 5.0f, 7.0f, 9.0f, 12.0f, 15.0f };
+        me->GetMotionMaster()->MovePoint(step, path[step], false, speeds[step]);
+    }
+
+    void MovementInform(uint32 type, uint32 id) override
+    {
+        if (type == POINT_MOTION_TYPE && id == step && ++step < 6)
+            MoveNextStep();
     }
 
     void UpdateAI(uint32 diff) override {}
