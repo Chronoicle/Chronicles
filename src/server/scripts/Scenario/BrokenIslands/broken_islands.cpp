@@ -1231,6 +1231,19 @@ public:
     }
 };
 
+//! #79: the heroes follow their group leader only while they are out of combat, so one that is still fighting when the
+//! leader stops walking stays behind; scenario steps that wait for her (Jaina) then never finish. Out of combat, to pos.
+static void BringStragglingHero(Creature* hero, Position const& pos)
+{
+    hero->CombatStop(true);
+    hero->DeleteThreatList();
+    hero->GetMotionMaster()->Clear(false);
+    hero->GetMotionMaster()->MoveIdle();    // no half-walked path pulling her back
+    hero->ClearUnitState(UNIT_STATE_EVADE);
+    hero->NearTeleportTo(pos);
+    hero->SetHomePosition(pos);
+}
+
 struct scenarion_bi_heroesl_baseAI : ScriptedAI
 {
     scenarion_bi_heroesl_baseAI(Creature* creature) : ScriptedAI(creature)
@@ -1569,6 +1582,15 @@ public:
                     if (script->getScenarionStep() == 3)
                         if (auto script = me->GetInstanceScript())
                             if (Creature* cre = script->instance->GetCreature(script->GetGuidData(90714)))
+                            {
+                                // #79: Jaina comes here as a follower of Genn's group. A follower that is still fighting
+                                // when Genn takes his last steps is left behind for good, and "Find Varian" waited for
+                                // her forever. Once Genn has arrived, bring her over.
+                                if (me->GetDistance(cre) > 30.0f)
+                                    if (Creature* genn = script->instance->GetCreature(script->GetGuidData(90717)))
+                                        if (me->GetDistance(genn) <= 15.0f) // his last path point is ~10 yd away
+                                            BringStragglingHero(cre, me->GetNearPosition(5.0f, float(M_PI) / 2));
+
                                 if (me->GetDistance(cre) <= 30.0f)
                                 {
                                     introEvent = true;
@@ -1583,6 +1605,7 @@ public:
 
                                     me->SetReactState(REACT_AGGRESSIVE);
                                 }
+                            }
             }
         };
 
@@ -2340,7 +2363,16 @@ public:
                     if (Creature* jaina = m->GetCreature(script->GetGuidData(NPC_JAINA)))
                     {
                         if (me->GetDistance2d(jaina) >= 100.0f)
-                            return;
+                        {
+                            // #79: wait while she comes here with Varian's group; a Jaina that fell behind the group
+                            // kept "The Highlord" from ever finishing. Bring her like Varian below, only in that step
+                            // (her distance is also what keeps this intro from starting in an earlier step).
+                            Creature* varian = m->GetCreature(script->GetGuidData(NPC_VARIAN));
+                            if (script->getScenarionStep() != 6 || !varian || jaina->GetDistance(varian) <= 40.0f)
+                                return;
+
+                            BringStragglingHero(jaina, Position(1502.416f, 1816.275f, 37.43131f, 0.0f));
+                        }
                     }
                     else
                         me->SummonCreature(NPC_JAINA, 1502.416f, 1816.275f, 37.43131f, 0.0f);
