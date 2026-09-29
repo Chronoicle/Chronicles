@@ -24,3 +24,6 @@ cmake-build-*/
 *.user
 .cache/
 __pycache__/
+
+# Codex keeps its own copies of the project skills here
+.agents/
