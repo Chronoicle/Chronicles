@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-30 ~22:40 UTC by Claude (desktop team, dev-owner).
+Last updated: 2026-09-29 ~22:40 UTC by Claude (desktop team, dev-owner).
 
 ## Transfer 2026-09-28 ~14:40 UTC (taken over by the next Claude session ~14:45 UTC) (desktop session -> the owner's other Claude session)
 
