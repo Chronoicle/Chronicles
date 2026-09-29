@@ -320,13 +320,15 @@ struct boss_latosius : public BossAI
                     events.RescheduleEvent(EVENT_SUM_IMAGE, 4000);
                     break;
                 case EVENT_SUM_IMAGE:
+                    // #89: one image a second around the whole ring (was 11 at 1.6 s: slow, no real threat); ends
+                    // ~18 s after the cast started, DBM's Guile lasts 20 s
                     me->SummonCreature(NPC_IMAGE_OF_LATOSIUS, tpPos[imageSumCount], TEMPSUMMON_TIMED_DESPAWN, 4000);
-                    if (++imageSumCount > 10)
+                    if (++imageSumCount >= 12)
                     {
                         events.RescheduleEvent(EVENT_IMAGE_END, 3000);
                         break;
                     }
-                    events.RescheduleEvent(EVENT_SUM_IMAGE, 1600);
+                    events.RescheduleEvent(EVENT_SUM_IMAGE, 1000);
                     break;
                 case EVENT_IMAGE_END:
                     me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1 | UNIT_FLAG_NOT_SELECTABLE);

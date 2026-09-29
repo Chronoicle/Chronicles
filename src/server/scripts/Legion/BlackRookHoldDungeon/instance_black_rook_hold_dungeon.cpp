@@ -126,7 +126,10 @@ public:
             {
                 case DATA_KURTALOS_STATE:
                     KurtalosState = data;
-                    break;               
+                    break;
+                case DATA_STAIRS_BOULDER_2:
+                    boulderStairs2State = data; // SPECIAL: a trickster already yelled the retreat line (#89)
+                    break;
                 case DATA_AMALGAM_OUTRO:
                     if (data == 0)
                         ++AmalgamState;
@@ -300,7 +303,16 @@ public:
                 }
                 case DATA_SMASHSPITE_FEL_BAT_EVENT:
                 {
-                    if (instance->GetPlayersCountExceptGMs())
+                    // #89: only while someone is near the Felspite Dominators at the gate; the bats now fly path
+                    // 10278100 (was empty, they idled at the gate) and would otherwise pile up all run long
+                    bool nearGate = false;
+                    instance->ApplyOnEveryPlayer([&](Player* player)
+                    {
+                        if (player && !player->isGameMaster() && player->GetDistance(3224.31f, 7335.72f, 226.0f) < 70.0f)
+                            nearGate = true;
+                    });
+
+                    if (nearGate)
                     {
                         for (uint8 i = 0; i < 3; ++i)
                             AddDelayedEvent(1500 * i, [this, i] () -> void { instance->SummonCreature(NPC_EVENT_FEL_BAT, mashFelBatPos[i]); });

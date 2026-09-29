@@ -148,6 +148,20 @@ struct boss_illysanna_ravencrest : public BossAI
         Talk(SAY_AGGRO);
     }
 
+    void EnterEvadeMode() override
+    {
+        // #89: a wipe in phase 2 left her hovering at the perch (the run home starts in the air), so the next pull
+        // began up there, out of melee range, looking like phase 2. Reset() clears the phase; put her back home.
+        bool inAir = phaseTwo;
+        BossAI::EnterEvadeMode();
+        if (inAir && me->IsAlive())
+        {
+            me->GetMotionMaster()->Clear();
+            me->NearTeleportTo(me->GetHomePosition());
+            me->ClearUnitState(UNIT_STATE_EVADE);
+        }
+    }
+
     void JustDied(Unit* /*killer*/) override
     {
         Talk(SAY_DEATH);
@@ -188,7 +202,9 @@ struct boss_illysanna_ravencrest : public BossAI
     {
         if (type == EFFECT_MOTION_TYPE)
         {
-            if (id == SPELL_PHASE_FLY_JUMP)
+            // the jump's movement generator also informs when a wipe/evade cuts it short: without the check the
+            // eye beams were queued for the next pull (#89)
+            if (id == SPELL_PHASE_FLY_JUMP && phaseTwo && me->isInCombat())
             {
                 Talk(SAY_EYE_BEAMS);
                 me->GetMotionMaster()->Clear(false);
@@ -672,8 +688,9 @@ struct npc_brh_wyrmtongue_scavenger : public ScriptedAI
     }
 };
 
-//98900 (#89): the ones at the top of the second staircase roll the boulders: neutral, yell while the boulders roll,
-//run around scared once the group reaches the top (boulder event stopped). The others are plain melee trash.
+//98900 (#89): the two at the top of the second staircase roll the boulders. Hostile (template faction) but passive:
+//they never fight back. Silent while the boulders roll; once the group reaches the top one of them yells the retreat
+//line and both cower around their spot. The others are plain melee trash.
 struct npc_brh_wyrmtongue_trickster : public ScriptedAI
 {
     npc_brh_wyrmtongue_trickster(Creature* creature) : ScriptedAI(creature)
@@ -685,42 +702,58 @@ struct npc_brh_wyrmtongue_trickster : public ScriptedAI
     InstanceScript* instance;
     bool boulderTop = false;
     bool scared = false;
-    uint32 talkTimer = 0;
+    uint32 cowerTimer = 0;
 
     void Reset() override
     {
         if (!boulderTop)
             return;
 
-        me->setFaction(7); // neutral: attackable, no aggro
+        me->SetReactState(REACT_PASSIVE);
         scared = false;
-        talkTimer = urand(5000, 20000);
+    }
+
+    void AttackStart(Unit* who) override
+    {
+        if (!boulderTop)
+            ScriptedAI::AttackStart(who);
     }
 
     void UpdateAI(uint32 diff) override
     {
-        if (boulderTop && !me->isInCombat() && instance)
+        if (!boulderTop)
         {
-            if (instance->GetData(DATA_STAIRS_BOULDER_2) == DONE)
-            {
-                if (!scared)
-                {
-                    scared = true;
-                    me->SetWalk(false);
-                    me->GetMotionMaster()->MoveRandom(5.0f);
-                }
-            }
-            else if (talkTimer <= diff)
-            {
-                talkTimer = urand(15000, 30000);
-                if (me->FindNearestPlayer(80.0f))
-                    Talk(0); // "This time we'll hit for sure!"
-            }
-            else
-                talkTimer -= diff;
+            ScriptedAI::UpdateAI(diff);
+            return;
         }
 
-        ScriptedAI::UpdateAI(diff);
+        if (me->isInCombat())
+            UpdateVictim(); // passive: only evades once nobody is left on the threat list
+
+        if (!scared)
+        {
+            uint32 state = instance ? instance->GetData(DATA_STAIRS_BOULDER_2) : 0;
+            if (state != DONE && state != SPECIAL)
+                return;
+
+            scared = true;
+            if (state == DONE)
+            {
+                instance->SetData(DATA_STAIRS_BOULDER_2, SPECIAL); // only one of the pair yells
+                Talk(1); // "Ahh! They coming! RUN!"
+            }
+            me->SetWalk(false);
+            me->GetMotionMaster()->MoveRandom(3.0f);
+            cowerTimer = 2000;
+        }
+
+        if (cowerTimer <= diff)
+        {
+            cowerTimer = urand(4000, 7000);
+            me->HandleEmoteCommand(EMOTE_ONESHOT_COWER);
+        }
+        else
+            cowerTimer -= diff;
     }
 };
 
