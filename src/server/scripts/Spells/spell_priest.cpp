@@ -1266,6 +1266,26 @@ class spell_pri_premonition_pvp : public SpellScriptLoader
                         return;
 
                     SetHitDamage(caster->GetSpellPowerDamage(spellInfo->GetSchoolMask()) * spellInfo->Effects[EFFECT_0]->BonusCoefficient * count);
+
+                    // The self damage breaks every damage-breakable CC on the priest (issue #72). The generic
+                    // proc break misses some: this cast is triggered, so CCs without SPELL_ATTR3_CAN_PROC_WITH_TRIGGERED
+                    // (Sap, Chastise, Sigil of Misery, Bursting Shot) never proc, and fear/transform auras (Fear,
+                    // Psychic Scream, Hex...) only break past a 5% max-health threshold. Damage-breakable = has a
+                    // ProcTypeMask (Kidney Shot, Hammer of Justice, Mortal Coil, Cyclone have none). Roots are left alone.
+                    static AuraType const ccTypes[] = { SPELL_AURA_MOD_CONFUSE, SPELL_AURA_MOD_FEAR, SPELL_AURA_MOD_FEAR_2, SPELL_AURA_MOD_STUN, SPELL_AURA_TRANSFORM };
+                    std::set<Aura*> toBreak;
+                    for (AuraType type : ccTypes)
+                        for (AuraEffect* eff : caster->GetAuraEffectsByType(type))
+                        {
+                            Aura* cc = eff->GetBase();
+                            SpellInfo const* ccInfo = cc->GetSpellInfo();
+                            if (cc->GetCasterGUID() != caster->GetGUID() && !ccInfo->IsPositive() && ccInfo->Id != 3355 /*Freezing Trap: proc path handles it (Waylay)*/ &&
+                                ccInfo->GetAuraOptions(caster->GetSpawnMode())->ProcTypeMask)
+                                toBreak.insert(cc);
+                        }
+                    for (Aura* cc : toBreak)
+                        if (!cc->IsRemoved())
+                            cc->Remove();
                 }
             }
 
