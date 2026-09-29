@@ -2206,7 +2206,7 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
         uint16 GetSpecType();
         static uint8 ConvertLFGRoleToRole(uint8 role);
 
-        bool ResetTalents(bool no_cost = false);
+        bool ResetTalents(bool no_cost = false, bool keepPet = false);
         void InitTalentForLevel();
         void SendTalentsInfoData(bool pet);
         bool LearnTalent(uint32 talentId);

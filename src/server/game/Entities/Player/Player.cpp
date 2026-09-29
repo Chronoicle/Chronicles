@@ -3943,7 +3943,7 @@ void Player::InitTalentForLevel()
     uint8 talentPointsForLevel = CalculateTalentsPoints();
 
     if (level < 15)
-        ResetTalents(true);
+        ResetTalents(true, true); // level-up / login: keep the pet (retail), only clear talents
     else
     {
         for (uint8 t = talentPointsForLevel; t < MAX_TALENT_TIERS; ++t)
@@ -6063,7 +6063,7 @@ uint32 Player::GetChargesCooldown(uint32 SpellID) const
     return 0;
 }
 
-bool Player::ResetTalents(bool no_cost)
+bool Player::ResetTalents(bool no_cost, bool keepPet)
 {
     sScriptMgr->OnPlayerTalentsReset(this, no_cost);
 
@@ -6082,7 +6082,8 @@ bool Player::ResetTalents(bool no_cost)
         }
     }
 
-    RemovePet(nullptr, PET_SAVE_NOT_IN_SLOT, true);
+    if (!keepPet)
+        RemovePet(nullptr, PET_SAVE_NOT_IN_SLOT, true);
 
     for (TalentEntry const* talentInfo : sTalentStore)
         if (talentInfo->ClassID == getClass() && talentInfo->SpellID)
