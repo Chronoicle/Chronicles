@@ -583,6 +583,12 @@ public:
 };
 
 
+//! #79: (instance id, player) sets, shared by spell_bi_enter_stage1 and spell_bi_intro_scene (map threads: lock).
+//! ponytail: the sets only grow (one entry per player per scenario run); clear them per instance if it ever matters.
+static std::set<std::pair<uint32, ObjectGuid>> IntroSceneSeen;    // intro movie played (199357 / 225150)
+static std::set<std::pair<uint32, ObjectGuid>> Stage1Ported;      // Stage 1 Port cast (217781 step 0)
+static std::mutex IntroSceneSeenLock;
+
 //! 217781 phase update.
 class spell_bi_enter_stage1 : public SpellScriptLoader
 {
@@ -632,9 +638,18 @@ public:
                 if (PlList.isEmpty())
                     return;
 
+                // #79: 217781 is re-applied by every Intro Scene cast (every area update in 8290 / 8455). While step 0 was
+                // not done this sent movie 486 and the port to everybody again each time: the movie loop and a port
+                // storm on the whole map. Each player is ported once per instance; the movie is the Intro Scene's own.
                 for (Map::PlayerList::const_iterator i = PlList.begin(); i != PlList.end(); ++i)
                     if (Player* plr = i->getSource())
                     {
+                        {
+                            std::lock_guard<std::mutex> guard(IntroSceneSeenLock);
+                            if (!Stage1Ported.insert({ plr->GetInstanceId(), plr->GetGUID() }).second)
+                                continue;
+                        }
+
                         if (Transport* transport = plr->GetTransport())
                         {
                             transport->RemovePassenger(plr);
@@ -642,7 +657,6 @@ public:
                             plr->m_movementInfo.transport.Reset();
                         }
 
-                        plr->SendMovieStart(486);
                         plr->CastSpell(plr, plr->GetTeam() == ALLIANCE ? 199358 : 225152, false);
                     }
             }
@@ -660,13 +674,11 @@ public:
     }
 };
 
-//! 199357 Intro Scene (movie 486 + 217781). #79: spell_area casts it in areas 8290 / 8455 on every area update that
-//! enters them (and every near teleport, resurrect and relog inside them re-runs the update), and it has no aura to
+//! 199357 / 225150 Intro Scene (each: movie 486 + 217781; spell_area casts both, for either faction). #79: spell_area
+//! casts them in areas 8290 / 8455 on every area update that enters them (and every near teleport, resurrect and relog inside them re-runs the update), and it has no aura to
 //! stop the recast, so the intro movie replayed over and over during the scenario (after the Stage 2 teleport, after
-//! a death, ...). Once per player and scenario instance: group members who arrive later still see it.
-//! ponytail: the set only grows (one entry per player per scenario run); clear it per instance if it ever matters.
-static std::set<std::pair<uint32, ObjectGuid>> IntroSceneSeen;   // (instance id, player)
-static std::mutex IntroSceneSeenLock;                             // map threads
+//! a death, ...). Once per player and scenario instance for the two spells together: group members who arrive later
+//! still see it. The first fix only covered 199357; 225150 kept replaying the movie on every area update.
 
 class spell_bi_intro_scene : public SpellScriptLoader
 {
