@@ -1586,7 +1586,7 @@ public:
                                 // #79: Jaina comes here as a follower of Genn's group. A follower that is still fighting
                                 // when Genn takes his last steps is left behind for good, and "Find Varian" waited for
                                 // her forever. Once Genn has arrived, bring her over.
-                                if (me->GetDistance(cre) > 30.0f)
+                                if (me->GetDistance(cre) > 30.0f && script->GetData(DATA_SCENARIO_TEAM) == ALLIANCE)
                                     if (Creature* genn = script->instance->GetCreature(script->GetGuidData(90717)))
                                         if (me->GetDistance(genn) <= 15.0f) // his last path point is ~10 yd away
                                             BringStragglingHero(cre, me->GetNearPosition(5.0f, float(M_PI) / 2));
