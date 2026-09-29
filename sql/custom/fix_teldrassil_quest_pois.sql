@@ -286,7 +286,7 @@ INSERT INTO world.quest_poi_points (QuestID, Idx1, Idx2, X, Y, VerifiedBuild) VA
 -- 3) Shadowglen class training quests: no quest_poi rows at all (and no client blobs). Same layout as the #105 Sigil
 -- rows: map 1, WMA 888 (Shadowglen); turn-in at the class trainer, objective ("Spell Practice Credit" 44175) at the four
 -- Training Dummies 44614 (10481.8-10486.4, 805.6-826.4). 26949 (priest) was not reported but is the same case;
--- 26946 / 26948 / 31169 are disabled, 26945 (warrior) has no quest_objectives row, both left out.
+-- the other four classes follow in 3b.
 
 -- quest 26940 Frost Nova: turn-in at Rhyanda 43006, objective at the dummies
 DELETE FROM world.quest_poi WHERE QuestID = 26940;
@@ -317,6 +317,50 @@ INSERT INTO world.quest_poi (QuestID, BlobIndex, Idx1, ObjectiveIndex, QuestObje
 INSERT INTO world.quest_poi_points (QuestID, Idx1, Idx2, X, Y, VerifiedBuild) VALUES
 (26949,0,0,10459,802,26972),
 (26949,1,0,10484,816,26972);
+
+-- 3b) The other four Shadowglen class training quests, re-enabled / given objectives by the class-quest fix of the same
+-- batch (26945 objectives 253520/253521 arrive with that fix). Same layout; objective = the 44175 practice objective
+-- (StorageIndex 0). Trainer spawns: Alyissia 3593, Frahun Shadewhisper 3594, Mardant Strongoak 3597, Laoxi 63331.
+
+-- quest 26945 Learning New Techniques: turn-in at Alyissia 3593, objective at the dummies
+DELETE FROM world.quest_poi WHERE QuestID = 26945;
+DELETE FROM world.quest_poi_points WHERE QuestID = 26945;
+INSERT INTO world.quest_poi (QuestID, BlobIndex, Idx1, ObjectiveIndex, QuestObjectiveID, QuestObjectID, MapID, WorldMapAreaId, Floor, Priority, Flags, WorldEffectID, PlayerConditionID, WoDUnk1, AlwaysAllowMergingBlobs, VerifiedBuild) VALUES
+(26945,0,0,-1,0,0,1,888,0,0,1,0,0,0,0,26972),
+(26945,0,1,0,253521,44175,1,888,0,0,1,0,0,0,0,26972);
+INSERT INTO world.quest_poi_points (QuestID, Idx1, Idx2, X, Y, VerifiedBuild) VALUES
+(26945,0,0,10527,778,26972),
+(26945,1,0,10484,816,26972);
+
+-- quest 26946 A Rogue's Advantage: turn-in at Frahun Shadewhisper 3594, objective at the dummies
+DELETE FROM world.quest_poi WHERE QuestID = 26946;
+DELETE FROM world.quest_poi_points WHERE QuestID = 26946;
+INSERT INTO world.quest_poi (QuestID, BlobIndex, Idx1, ObjectiveIndex, QuestObjectiveID, QuestObjectID, MapID, WorldMapAreaId, Floor, Priority, Flags, WorldEffectID, PlayerConditionID, WoDUnk1, AlwaysAllowMergingBlobs, VerifiedBuild) VALUES
+(26946,0,0,-1,0,0,1,888,0,0,1,0,0,0,0,26972),
+(26946,0,1,0,267273,44175,1,888,0,0,1,0,0,0,0,26972);
+INSERT INTO world.quest_poi_points (QuestID, Idx1, Idx2, X, Y, VerifiedBuild) VALUES
+(26946,0,0,10519,778,26972),
+(26946,1,0,10484,816,26972);
+
+-- quest 26948 Moonfire: turn-in at Mardant Strongoak 3597, objective at the dummies
+DELETE FROM world.quest_poi WHERE QuestID = 26948;
+DELETE FROM world.quest_poi_points WHERE QuestID = 26948;
+INSERT INTO world.quest_poi (QuestID, BlobIndex, Idx1, ObjectiveIndex, QuestObjectiveID, QuestObjectID, MapID, WorldMapAreaId, Floor, Priority, Flags, WorldEffectID, PlayerConditionID, WoDUnk1, AlwaysAllowMergingBlobs, VerifiedBuild) VALUES
+(26948,0,0,-1,0,0,1,888,0,0,1,0,0,0,0,26972),
+(26948,0,1,0,266625,44175,1,888,0,0,1,0,0,0,0,26972);
+INSERT INTO world.quest_poi_points (QuestID, Idx1, Idx2, X, Y, VerifiedBuild) VALUES
+(26948,0,0,10486,816,26972),
+(26948,1,0,10484,816,26972);
+
+-- quest 31169 The Art of the Monk: turn-in at Laoxi 63331, objective at the dummies
+DELETE FROM world.quest_poi WHERE QuestID = 31169;
+DELETE FROM world.quest_poi_points WHERE QuestID = 31169;
+INSERT INTO world.quest_poi (QuestID, BlobIndex, Idx1, ObjectiveIndex, QuestObjectiveID, QuestObjectID, MapID, WorldMapAreaId, Floor, Priority, Flags, WorldEffectID, PlayerConditionID, WoDUnk1, AlwaysAllowMergingBlobs, VerifiedBuild) VALUES
+(31169,0,0,-1,0,0,1,888,0,0,1,0,0,0,0,26972),
+(31169,0,1,0,268202,44175,1,888,0,0,1,0,0,0,0,26972);
+INSERT INTO world.quest_poi_points (QuestID, Idx1, Idx2, X, Y, VerifiedBuild) VALUES
+(31169,0,0,10529,785,26972),
+(31169,1,0,10484,816,26972);
 
 -- 4) Not reported yet: same merge in the same zone with a visible effect, rebuilt from the client blobs the same
 -- way (933, 935 and 2399 only have a duplicate blob on the same point and are left alone).

@@ -325,6 +325,26 @@ DELETE FROM world.quest_poi WHERE QuestID = 26949;
 DELETE FROM world.quest_poi_points WHERE QuestID = 26949;
 -- (had no quest_poi / quest_poi_points rows)
 
+-- quest 26945 Learning New Techniques
+DELETE FROM world.quest_poi WHERE QuestID = 26945;
+DELETE FROM world.quest_poi_points WHERE QuestID = 26945;
+-- (had no quest_poi / quest_poi_points rows)
+
+-- quest 26946 A Rogue's Advantage
+DELETE FROM world.quest_poi WHERE QuestID = 26946;
+DELETE FROM world.quest_poi_points WHERE QuestID = 26946;
+-- (had no quest_poi / quest_poi_points rows)
+
+-- quest 26948 Moonfire
+DELETE FROM world.quest_poi WHERE QuestID = 26948;
+DELETE FROM world.quest_poi_points WHERE QuestID = 26948;
+-- (had no quest_poi / quest_poi_points rows)
+
+-- quest 31169 The Art of the Monk
+DELETE FROM world.quest_poi WHERE QuestID = 31169;
+DELETE FROM world.quest_poi_points WHERE QuestID = 31169;
+-- (had no quest_poi / quest_poi_points rows)
+
 -- quest 488 Zenn's Bidding
 DELETE FROM world.quest_poi WHERE QuestID = 488;
 DELETE FROM world.quest_poi_points WHERE QuestID = 488;
