@@ -3456,6 +3456,7 @@ public:
                     case 122:    // Frost Nova (night elf mage 26940)
                     case 196819: // Eviscerate (night elf rogue 26946; 2098 is Run Through in 7.x)
                     case 100780: // Tiger Palm (night elf monk 31169; 100787 is not a 7.3.5 spell)
+                    case 188389: // Flame Shock (shaman "Primal Strike" quests, #118: Primal Strike 73899 is not in 7.3.5)
                     {
                         player->KilledMonsterCredit(44175, ObjectGuid::Empty);
                         break;

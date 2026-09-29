@@ -2946,6 +2946,7 @@ void GameObject::BuildValuesUpdate(uint8 updateType, ByteBuffer* data, Player* t
                     case GAMEOBJECT_TYPE_CHEST:
                     case GAMEOBJECT_TYPE_GOOBER:
                     case GAMEOBJECT_TYPE_CAPTURE_POINT:
+                    case GAMEOBJECT_TYPE_GATHERING_NODE: // quest plants (e.g. Azure Snapdragon 181644, #118) have GO_FLAG_INTERACT_COND
                         if (ActivateToQuest(target))
                             dynFlags |= GO_DYNFLAG_LO_ACTIVATE | GO_DYNFLAG_LO_SPARKLE;
                         else if (targetIsGM)
