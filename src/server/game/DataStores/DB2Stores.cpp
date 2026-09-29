@@ -1715,6 +1715,15 @@ void DB2Manager::InitDB2CustomStores()
             _questPackages[questPackageItem->PackageID].second.push_back(questPackageItem);
     }
 
+    // Almost no package has "unmatched" fallback items. Without them a class that fits none of the class/spec rewards
+    // (e.g. a hunter on Mossy Tumors 923: dagger or mace) was refused every reward the client offered and could not
+    // turn the quest in. Fall back to the whole package instead.
+    // ponytail: a hand-made reward packet can now pick another class's item of the same package; check "fits none"
+    // per player in the three callers (QuestHandler, CanRewardQuest, RewardQuestPackage) if that ever matters.
+    for (auto& questPackage : _questPackages)
+        if (questPackage.second.second.empty())
+            questPackage.second.second = questPackage.second.first;
+
     for (GameObjectsEntry const* store : sGameObjectsStore)
         _gameObjectsList.push_back(store->ID);
 
