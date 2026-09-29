@@ -31334,7 +31334,11 @@ void Player::SetClientControl(Unit* target, bool allowMove)
             SetViewpoint(target, true);
     }
 
-    SetMovedUnit(target);
+    // only a grant makes the target this client's active mover (like TrinityCore 7.3.5). Sending the active
+    // mover after a revoke gave the 7.3.5 client its control back: a mind controlled player's own client kept
+    // moving itself while the priest moved it (laggy fight over the unit, #47)
+    if (allowMove)
+        SetMovedUnit(target);
 }
 
 // spell_area autocast: the spell counts as applied while its aura is on the player or, for a pure summon spell (the
