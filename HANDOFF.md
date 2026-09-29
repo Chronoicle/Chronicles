@@ -1,6 +1,6 @@
 # Handoff: current state (update at the end of every task)
 
-Last updated: 2026-09-29 ~02:50 UTC by Claude (Pi team, dev-owner).
+Last updated: 2026-09-29 ~10:30 UTC by Claude (Pi team, dev-owner).
 
 ## Transfer 2026-09-28 ~14:40 UTC (taken over by the next Claude session ~14:45 UTC) (desktop session -> the owner's other Claude session)
 
@@ -32,6 +32,7 @@ Read this block first; the "Current state" list below has the details per change
 
 ## Current state
 
+- **Staged, 6ee77ec built + installed ~10:30 UTC by the Pi team, needs a restart (owner OK), all reviewed by dev-check:** #92 class hall messengers (10 classes), #97 Kin'garoth, #40 Ivanyr Nether Link, #98 Antorus beacon gate + Magni on reload, #30 Eonar Daughters hover, #89 BRH round 2. **Apply right before the restart:** `cd ~/LegionCore/sql/custom && for f in fix_classhall_messengers_92 fix_kingaroth_97 fix_ivanyr_nether_link_40 fix_eonar_area_30 fix_brh_89b; do mysql < $f.sql; done` (#98 has no SQL). Changelog draft in the Pi session. Owner decisions open: #90 (Mythic below 110 + achievement grant, not applied), #98 Garothi pod (retail .gps or simple straight flight), #94.
 - **Live since the restart at 02:43 UTC (owner OK, done + go-live by the Pi team), worldserver 12ac80d (ready 02:44:41 UTC, no crash log, no DBErrors for the new rows), changelog 1554323105269415947, reporters told:** #40 Arcway (still open: Nether Link needs a spell script, lead: AshamaneCore boss_ivanyr.cpp; Chaosbringer Demonic Ascension, Withered Fiends, bats need retail data), #72, #56, #18, #79 (loop fixed; open: hero waypoint paths 439136-439155 missing, lead: upstream dufernst/LegionCore-7.3.5 world DB), #89 (partial, needs-info from James), #88, #91, #93 (Lympkin spawn deleted, owner OK), SmartAI random-pick core fix. SQL applied right before (12 files, all checked). Needs testing on the board except #40/#79/#89 (open work, In Progress).
 - **Pi team intake 2026-09-29 ~02:10 UTC (Grok intake was not running since ~21:22 UTC):** filed #88-#93 from Discord, all reporters answered, #74 closed (James confirmed), #76 checked (should work, Needs testing), audit #94 (283 quest chests with Data1 = 0, needs-owner). PR #95 (#11 launcher archive cleanup, Pro helper) merged, not published: goes out with the next launcher publish.
 - **Waiting for the owner (Pi team):** #90 (fix_dungeon_access_90.sql grants hidden achievement 11063 to the 34 level-110 characters so the Dungeon Finder opens Legion dungeons; apply with them offline; plus: Mythic open below 110 because Instance.IgnoreLevel = 1: open all or close Mythic?), #94, #92 (asked gabrielf03d for the class).
