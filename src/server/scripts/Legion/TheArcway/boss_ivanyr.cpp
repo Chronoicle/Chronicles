@@ -2,11 +2,12 @@
     Dungeon : The Arcway 100-110
     Encounter: Ivanyr
     Mythic: 75%
-    Need implemented: SPELL_NETHER_LINK
 */
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
+#include "AreaTrigger.h"   // (#40)
+#include "AreaTriggerAI.h" // (#40)
 #include "the_arcway.h"
 
 // TO-DO: Скиллы почти у всего треша, когда будет 703
@@ -26,6 +27,8 @@ enum Spells
     SPELL_OVERCHARGE_MANA       = 196392,
     SPELL_OVERCHARGE            = 196396,
     SPELL_NETHER_LINK           = 196804,
+    SPELL_NETHER_LINK_AURA      = 196805, // (#40) 5 s link on each chosen player
+    SPELL_NETHER_LINK_AREA      = 196806, // (#40) areatrigger 5285: triangle, damage 196824 via areatrigger_actions
     SPELL_WITHERING_CONSUMPTION = 196549,
     SPELL_CONSUME_ESSENCE       = 196877,
     SPELL_CHARGED_BOLT          = 220581,
@@ -308,6 +311,118 @@ public:
     }
 };
 
+// (#40) corners for at_ivanyr_nether_link, handed over inside the same synchronous CastSpell (map threads each have their own)
+static thread_local std::vector<Position> const* netherLinkVertices = nullptr;
+
+//196804 (#40): link three random players
+class spell_ivanyr_nether_link : public SpellScriptLoader
+{
+public:
+    spell_ivanyr_nether_link() : SpellScriptLoader("spell_ivanyr_nether_link") { }
+
+    class spell_ivanyr_nether_link_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_ivanyr_nether_link_SpellScript);
+
+        void HandleOnCast()
+        {
+            Unit* caster = GetCaster();
+            std::list<Player*> players;
+            caster->GetPlayerListInGrid(players, 100.0f); // range of 196805/196806
+            Trinity::Containers::RandomResizeList(players, [](Player* player) { return player->IsAlive() && !player->isGameMaster(); }, 3);
+            for (Player* player : players)
+                caster->AddAura(SPELL_NETHER_LINK_AURA, player);
+        }
+
+        void Register() override
+        {
+            OnCast += SpellCastFn(spell_ivanyr_nether_link_SpellScript::HandleOnCast);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_ivanyr_nether_link_SpellScript();
+    }
+};
+
+//196805 (#40): when the links run out, the triangle between the three linked players forms
+class spell_ivanyr_nether_link_aura : public SpellScriptLoader
+{
+public:
+    spell_ivanyr_nether_link_aura() : SpellScriptLoader("spell_ivanyr_nether_link_aura") { }
+
+    class spell_ivanyr_nether_link_aura_AuraScript : public AuraScript
+    {
+        PrepareAuraScript(spell_ivanyr_nether_link_aura_AuraScript);
+
+        void OnRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+        {
+            Unit* caster = GetCaster();
+            Unit* target = GetTarget();
+            if (!caster || !caster->isInCombat() || GetTargetApplication()->GetRemoveMode() != AURA_REMOVE_BY_EXPIRE)
+                return;
+
+            std::list<Player*> others;
+            caster->GetPlayerListInGrid(others, 250.0f);
+            others.remove_if([caster, target](Player* player) { return player == target || !player->HasAura(SPELL_NETHER_LINK_AURA, caster->GetGUID()); });
+            if (others.size() != 2) // only the first of the three expiring links builds it (fewer than 3 players: no triangle)
+                return;
+
+            std::vector<Position> vertices = { target->GetPosition(), others.front()->GetPosition(), others.back()->GetPosition() };
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            for (Position const& v : vertices)
+            {
+                x += v.GetPositionX() / 3;
+                y += v.GetPositionY() / 3;
+                z += v.GetPositionZ() / 3;
+            }
+            for (Position& v : vertices) // corners relative to the centre; orientation 0 keeps them unrotated
+                v.Relocate(v.GetPositionX() - x, v.GetPositionY() - y);
+
+            netherLinkVertices = &vertices;
+            caster->CastSpell(Position(x, y, z, 0.0f), SPELL_NETHER_LINK_AREA, true);
+            netherLinkVertices = nullptr;
+        }
+
+        void Register() override
+        {
+            AfterEffectRemove += AuraEffectRemoveFn(spell_ivanyr_nether_link_aura_AuraScript::OnRemove, EFFECT_0, SPELL_AURA_DUMMY, AURA_EFFECT_HANDLE_REAL);
+        }
+    };
+
+    AuraScript* GetAuraScript() const override
+    {
+        return new spell_ivanyr_nether_link_aura_AuraScript();
+    }
+};
+
+//customEntry 10007 (areatrigger 5285) (#40): the triangle's corners are the linked players, not the sniffed shape
+class at_ivanyr_nether_link : public AreaTriggerScript
+{
+public:
+    at_ivanyr_nether_link() : AreaTriggerScript("at_ivanyr_nether_link") { }
+
+    struct at_ivanyr_nether_linkAI : AreaTriggerAI
+    {
+        at_ivanyr_nether_linkAI(AreaTrigger* areatrigger) : AreaTriggerAI(areatrigger) { }
+
+        void OnInitialize() override // runs before the radius is calculated and before players get the shape
+        {
+            if (!netherLinkVertices)
+                return;
+
+            for (uint32 i = 0; i < netherLinkVertices->size(); ++i)
+                at->SetPolygonVertices(i, true, (*netherLinkVertices)[i].GetPositionX(), true, (*netherLinkVertices)[i].GetPositionY());
+        }
+    };
+
+    AreaTriggerAI* GetAI(AreaTrigger* areatrigger) const override
+    {
+        return new at_ivanyr_nether_linkAI(areatrigger);
+    }
+};
+
 //31372
 class achievement_arcanic_cling : public AchievementCriteriaScript
 {
@@ -332,5 +447,8 @@ void AddSC_boss_ivanyr()
     new boss_ivanyr();
     new spell_ivanyr_overcharge_mana();
     new spell_ivanyr_charged_bolt();
+    new spell_ivanyr_nether_link();      // (#40)
+    new spell_ivanyr_nether_link_aura(); // (#40)
+    new at_ivanyr_nether_link();         // (#40)
     new achievement_arcanic_cling();
 }
