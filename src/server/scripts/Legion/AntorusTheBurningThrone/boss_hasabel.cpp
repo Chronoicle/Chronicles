@@ -470,6 +470,7 @@ struct boss_hasabel : BossAI
                 else if (hasPlayerNexusPlatform && platformEmpty)
                 {
                     platformEmpty = false;
+                    me->InterruptNonMeleeSpells(false); // a Catastrophic Implosion cast must not land on the players coming back
                     me->SetReactState(REACT_AGGRESSIVE);
                 }
             }
