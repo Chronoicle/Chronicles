@@ -187,6 +187,20 @@ static std::string UseMorph(Player* player, uint32 productId)
     return "";
 }
 
+// a currency product the caps would cut (Player::ModifyCurrency stops at the total cap and, on a gain, at the week cap;
+// this core doesn't scale the counts): refused before anything is given or paid. "" = it fits
+static std::string CurrencyError(Player* player, uint32 id, uint32 amount)
+{
+    CurrencyTypesEntry const* currency = sCurrencyTypesStore.LookupEntry(id);
+    if (!currency)
+        return "Currency not found";
+    uint32 totalCap = player->GetTotalCurrencyCap(id);
+    uint32 weekCap = uint32(std::max(currency->MaxEarnablePerWeek, 0));
+    if ((totalCap && uint64(player->GetCurrency(id)) + amount > totalCap) || (weekCap && uint64(player->GetCurrencyOnWeek(id)) + amount > weekCap))
+        return std::string("You can't carry that much ") + currency->Name->Str[DEFAULT_LOCALE];
+    return "";
+}
+
 // a quest the shop can mark rewarded: one that is rewarded only once
 static bool ShopQuestSellable(uint32 questId)
 {
@@ -450,11 +464,14 @@ public:
                 RecordRefund(player, item, price);
                 return "";
             }
-            case PRODUCT_CURRENCY:
-                if (!sCurrencyTypesStore.LookupEntry(param1))
-                    return "Currency not found";
+            case PRODUCT_CURRENCY:  // the Donate Vendor, the shop and bundles
+            {
+                std::string error = CurrencyError(player, param1, std::max<uint32>(param2, 1));
+                if (!error.empty())
+                    return error;
                 player->ModifyCurrency(param1, int32(std::max<uint32>(param2, 1)), true);
                 return "";
+            }
             case PRODUCT_TITLE:
             {
                 CharTitlesEntry const* title = sCharTitlesStore.LookupEntry(param1);
@@ -860,7 +877,7 @@ static std::string ShopPartError(Player* player, ShopPart const& part)
             return canStore == EQUIP_ERR_INV_FULL ? BAGS_FULL : "You already have as many of an item in this bundle as you can carry";
         }
         case PRODUCT_CURRENCY:
-            return sCurrencyTypesStore.LookupEntry(part.Param1) ? "" : "Currency not found";
+            return CurrencyError(player, part.Param1, std::max<uint32>(part.Param2, 1));
         case PRODUCT_GOLD:
             return player->GetMoney() + uint64(part.Param1) * GOLD > MAX_MONEY_AMOUNT ? "You can't carry that much gold" : "";
         case PRODUCT_PREMIUM:
