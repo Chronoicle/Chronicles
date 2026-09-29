@@ -86,8 +86,9 @@ struct TC_GAME_API CharmInfo
     bool IsAtStay();
     void SetIsFollowing(bool val);
     bool IsFollowing();
-    void SetIsReturning(bool val);
+    void SetIsReturning(bool val, bool commanded = false); // commanded: the player clicked Follow / Passive
     bool IsReturning();
+    bool IsCommandFollow() const { return m_isCommandFollow; } // returning because the player said so
     void SaveStayPosition();
     void GetStayPosition(float &x, float &y, float &z);
 
@@ -104,6 +105,7 @@ private:
     bool m_isAtStay;
     bool m_isFollowing;
     bool m_isReturning;
+    bool m_isCommandFollow;
 };
 
 #endif // ChramInfo_h__
