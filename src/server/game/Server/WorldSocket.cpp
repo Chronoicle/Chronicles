@@ -81,54 +81,23 @@ WorldSocket::~WorldSocket()
     }
 }
 
+// The ban check is async (like upstream): a synchronous query here ran on the acceptor's I/O thread before the server
+// hello went out, so a busy login DB connection left new connections - and the loading screen of a player entering
+// the world (second, instance connection) - hanging until the client gave up (#103).
 void WorldSocket::Start()
 {
-    std::string ip_address = GetRemoteIpAddress().to_string();
     LoginDatabasePreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_SEL_IP_INFO);
-    stmt->setString(0, ip_address);
-    PreparedQueryResult result = LoginDatabase.Query(stmt);
-
-    if (result)
-    {
-        TC_LOG_INFO("network", "WorldSocket::CheckIpCallback: Sent Auth Response (IP %s banned).", GetRemoteIpAddress().to_string().c_str());
-        DelayedCloseSocket();
-        return;
-    }
-
-    _packetBuffer.Resize(ClientConnectionInitialize.length() + 1);
-
-    AsyncReadWithCallback(&WorldSocket::InitializeHandler);
-
-    MessageBuffer initializer;
-    initializer.Write(ServerConnectionInitialize.c_str(), ServerConnectionInitialize.length());
-    initializer.Write("\n", 1);
-
-    QueuePacket(std::move(initializer));
-    //_queryProcessor.AddQuery(LoginDatabase.AsyncQuery(stmt).WithPreparedCallback(std::bind(&WorldSocket::CheckIpCallback, this, std::placeholders::_1)));
+    stmt->setString(0, GetRemoteIpAddress().to_string());
+    _queryProcessor.AddCallback(LoginDatabase.AsyncQuery(stmt).WithPreparedCallback(std::bind(&WorldSocket::CheckIpCallback, this, std::placeholders::_1)));
 }
 
 void WorldSocket::CheckIpCallback(PreparedQueryResult result)
 {
-    if (result)
+    if (result) // a row in ip_banned
     {
-        bool banned = false;
-        do
-        {
-            Field* fields = result->Fetch();
-            if (fields[0].GetUInt64() != 0)
-                banned = true;
-
-            if (!fields[1].GetString().empty())
-                _ipCountry = fields[1].GetString();
-
-        } while (result->NextRow());
-
-        if (banned)
-        {
-            TC_LOG_INFO("network", "WorldSocket::CheckIpCallback: Sent Auth Response (IP %s banned).", GetRemoteIpAddress().to_string().c_str());
-            DelayedCloseSocket();
-            return;
-        }
+        TC_LOG_INFO("network", "WorldSocket::CheckIpCallback: Sent Auth Response (IP %s banned).", GetRemoteIpAddress().to_string().c_str());
+        DelayedCloseSocket();
+        return;
     }
 
     _packetBuffer.Resize(ClientConnectionInitialize.length() + 1);

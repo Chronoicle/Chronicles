@@ -186,6 +186,16 @@ bool MySQLConnection::PrepareStatements()
     return !m_prepareError;
 }
 
+// Every query's time: "sql.sql" debug as before, and a Server.log warning from 1 s up (#103: one slow query holds its
+// connection, and each database has a single synchronous one, so it can stall logins and handshakes: this names it).
+static void LogQueryTime(uint32 start, char const* sql)
+{
+    uint32 ms = getMSTimeDiff(start, getMSTime());
+    TC_LOG_DEBUG("sql.sql", "[%u ms] SQL: %s", ms, sql);
+    if (ms >= 1000)
+        TC_LOG_WARN("server.slowsql", "[%u ms] SQL: %.300s", ms, sql);
+}
+
 bool MySQLConnection::Execute(char const* sql)
 {
     if (!m_Mysql)
@@ -207,7 +217,7 @@ bool MySQLConnection::Execute(char const* sql)
             return false;
         }
         else
-            TC_LOG_DEBUG("sql.sql", "[%u ms] SQL: %s", getMSTimeDiff(_s, getMSTime()), sql);
+            LogQueryTime(_s, sql);
     }
 
     return true;
@@ -273,7 +283,7 @@ bool MySQLConnection::Execute(PreparedStatementBase* stmt)
         return false;
     }
 
-    TC_LOG_DEBUG("sql.sql", "[%u ms] SQL(p): %s", getMSTimeDiff(_s, getMSTime()), m_mStmt->getQueryString().c_str());
+    LogQueryTime(_s, m_mStmt->getQueryString().c_str());
 
     m_mStmt->ClearParameters();
     return true;
@@ -322,7 +332,7 @@ bool MySQLConnection::_Query(PreparedStatementBase* stmt, MySQLPreparedStatement
         return false;
     }
 
-    TC_LOG_DEBUG("sql.sql", "[%u ms] SQL(p): %s", getMSTimeDiff(_s, getMSTime()), m_mStmt->getQueryString().c_str());
+    LogQueryTime(_s, m_mStmt->getQueryString().c_str());
 
     m_mStmt->ClearParameters();
 
@@ -369,7 +379,7 @@ bool MySQLConnection::_Query(const char* sql, MySQLResult** pResult, MySQLField*
             return false;
         }
         else
-            TC_LOG_DEBUG("sql.sql", "[%u ms] SQL: %s", getMSTimeDiff(_s, getMSTime()), sql);
+            LogQueryTime(_s, sql);
 
         *pResult = reinterpret_cast<MySQLResult*>(mysql_store_result(m_Mysql));
         *pRowCount = mysql_affected_rows(m_Mysql);
