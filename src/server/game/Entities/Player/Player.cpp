@@ -31337,13 +31337,42 @@ void Player::SetClientControl(Unit* target, bool allowMove)
     SetMovedUnit(target);
 }
 
+// spell_area autocast: the spell counts as applied while its aura is on the player or, for a pure summon spell (the
+// Dalaran class hall messengers, #92), while one of the player's summons of it is still here. HasAura alone made every
+// zone/area update summon one more messenger, and the extra ones kept following after the quest was taken.
+static bool HasSpellAreaSpell(Player* player, uint32 spellId)
+{
+    if (player->HasAura(spellId))
+        return true;
+
+    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
+    if (!spellInfo)
+        return false;
+
+    for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+    {
+        if (spellInfo->EffectMask < uint32(1 << i))
+            break;
+
+        if (spellInfo->Effects[i]->Effect != SPELL_EFFECT_SUMMON || !spellInfo->Effects[i]->MiscValue)
+            continue;
+
+        for (ObjectGuid const& guid : *player->GetSummonList(spellInfo->Effects[i]->MiscValue))
+            if (Creature* summon = ObjectAccessor::GetCreature(*player, guid))
+                if (summon->IsAlive())
+                    return true;
+    }
+
+    return false;
+}
+
 void Player::UpdateZoneDependentAuras(uint32 newZone)
 {
     // Some spells applied at enter into zone (with subzones), aura removed in UpdateAreaDependentAuras that called always at zone->area update
     SpellAreaForAreaMapBounds saBounds = sSpellMgr->GetSpellAreaForAreaMapBounds(newZone);
     for (SpellAreaForAreaMap::const_iterator itr = saBounds.first; itr != saBounds.second; ++itr)
         if (itr->second->autocast && itr->second->IsFitToRequirements(this, newZone, 0))
-            if (!HasAura(itr->second->spellId))
+            if (!HasSpellAreaSpell(this, itr->second->spellId))
                 CastSpell(this, itr->second->spellId, true);
 }
 
@@ -31365,7 +31394,7 @@ void Player::UpdateAreaDependentAuras(uint32 newArea)
     SpellAreaForAreaMapBounds saBounds = sSpellMgr->GetSpellAreaForAreaMapBounds(newArea);
     for (SpellAreaForAreaMap::const_iterator itr = saBounds.first; itr != saBounds.second; ++itr)
         if (itr->second->autocast && itr->second->IsFitToRequirements(this, m_zoneId, newArea))
-            if (!HasAura(itr->second->spellId))
+            if (!HasSpellAreaSpell(this, itr->second->spellId))
                 CastSpell(this, itr->second->spellId, true);
 
     if (newArea == 4273 && GetVehicleCreatureBase() && GetPositionX() > 400) // Ulduar
@@ -35147,7 +35176,7 @@ void Player::SetQuestUpdate(uint32 quest_id)
             {
                 apply[itr->second->spellId] = true;
                 if (itr->second->autocast)
-                    if (!HasAura(itr->second->spellId))
+                    if (!HasSpellAreaSpell(this, itr->second->spellId))
                         CastSpell(this, itr->second->spellId, true);
             }
             else
@@ -35171,7 +35200,7 @@ void Player::SetQuestUpdate(uint32 quest_id)
             {
                 apply[itr->second->spellId] = true;
                 if (itr->second->autocast)
-                    if (!HasAura(itr->second->spellId))
+                    if (!HasSpellAreaSpell(this, itr->second->spellId))
                         CastSpell(this, itr->second->spellId, true);
             }
             else
