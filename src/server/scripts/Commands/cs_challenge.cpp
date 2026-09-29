@@ -16,6 +16,7 @@
 #include "DB2Stores.h"
 #include "DisableMgr.h"
 #include "BattlegroundMgr.h"
+#include "SocialMgr.h"
 #include <boost/algorithm/string/predicate.hpp>
 
 namespace
@@ -62,9 +63,10 @@ public:
             return "in a battleground, arena or queue";
         if (player->GetMap()->Instanceable())
             return "in an instance";
-        if (Group* group = player->GetGroup())
-            if (!group->GetMaxCountOfRolesForArenaQueue(ROLES_HEALER) || !group->GetMaxCountOfRolesForArenaQueue(ROLES_TANK))
-                return "in a group with more than one healer or tank";
+        if (player->GetGroup())
+            return "in a group: leave your group first";
+        if (player->isGameMaster())
+            return "in GM mode";
         return nullptr;
     }
 
@@ -78,11 +80,6 @@ public:
         if (char const* reason = CannotFight(other))
         {
             handler->PSendSysMessage("%s can't fight a challenge now (%s).", other->GetName(), reason);
-            return false;
-        }
-        if (player->GetGroup() && player->GetGroup() == other->GetGroup())
-        {
-            handler->SendSysMessage("You can't challenge a member of your own group.");
             return false;
         }
         return true;
@@ -116,6 +113,10 @@ public:
         {
             GroupQueueInfo* ginfo = bgQueue.AddGroup(player, nullptr, bgTypeId, bracketEntry, joinType, false, false, WorldPackets::Battleground::IgnorMapInfo(), 0, team);
 
+            // AddGroup's solo path doesn't do it: on the other faction's side, the mercenary contract like its group branch
+            if (player->GetTeam() != team)
+                player->CastSpell(player, player->GetTeam() == ALLIANCE ? SPELL_MERCENARY_CONTRACT_HORDE : SPELL_MERCENARY_CONTRACT_ALLIANCE);
+
             WorldPackets::Battleground::BattlefieldStatusQueued battlefieldStatus;
             sBattlegroundMgr->BuildBattlegroundStatusQueued(&battlefieldStatus, bg, player, player->AddBattlegroundQueueId(bgQueueTypeId), ginfo->JoinTime, bgQueue.GetAverageQueueWaitTime(ginfo, bracketEntry->RangeIndex), ginfo->JoinType, false);
             player->SendDirectMessage(battlefieldStatus.Write());
@@ -123,8 +124,10 @@ public:
             bgQueue.InviteGroupToBG(ginfo, bg, team);
         };
 
-        invite(challenger, HORDE);
-        invite(target, ALLIANCE);
+        // the challenger keeps his own faction's side, the target gets the other one (a mercenary when it isn't his)
+        uint32 challengerTeam = challenger->GetTeam();
+        invite(challenger, challengerTeam);
+        invite(target, challengerTeam == HORDE ? ALLIANCE : HORDE);
 
         bg->StartBattleground();
         return nullptr;
@@ -148,6 +151,13 @@ public:
         {
             if (itr->second.Expires <= now)
                 itr = PendingChallenges.erase(itr);
+            else
+                ++itr;
+        }
+        for (auto itr = ChallengeCooldowns.begin(); itr != ChallengeCooldowns.end();)
+        {
+            if (itr->second <= now)
+                itr = ChallengeCooldowns.erase(itr);
             else
                 ++itr;
         }
@@ -207,6 +217,12 @@ public:
         if (target == player)
         {
             handler->SendSysMessage("You can't challenge yourself.");
+            return true;
+        }
+
+        if (target->GetSocial() && target->GetSocial()->HasIgnore(player->GetGUID()))
+        {
+            handler->SendSysMessage("That player does not accept challenges from you.");
             return true;
         }
 
