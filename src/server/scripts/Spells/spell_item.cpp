@@ -4414,6 +4414,26 @@ class spell_item_toy_train_set_pulse : public SpellScript
     }
 };
 
+// 257376 - Legion Bombardment, one pulse of the Terminus Signaling Beacon (item 151969, #56), cast by the player from
+// areatrigger 11885. Its damage effect has no base points: the amount is the item-scaled value of the trinket's equip
+// aura 256325 (effect 0), full damage to every enemy hit.
+class spell_item_terminus_legion_bombardment : public SpellScript
+{
+    PrepareSpellScript(spell_item_terminus_legion_bombardment);
+
+    void HandleLaunch(SpellEffIndex /*effIndex*/)
+    {
+        if (Unit* caster = GetCaster())
+            if (AuraEffect const* amount = caster->GetAuraEffect(256325, EFFECT_0))
+                SetEffectValue(amount->GetAmount());
+    }
+
+    void Register() override
+    {
+        OnEffectLaunchTarget += SpellEffectFn(spell_item_terminus_legion_bombardment::HandleLaunch, EFFECT_0, SPELL_EFFECT_SCHOOL_DAMAGE);
+    }
+};
+
 class spell_item_last_deck_of_nemelex_nobeh : public SpellScript
 {
     PrepareSpellScript(spell_item_last_deck_of_nemelex_nobeh);
@@ -4639,6 +4659,7 @@ void AddSC_item_spell_scripts()
     RegisterAuraScript(spell_item_guardians_familiar);
     RegisterSpellScript(spell_item_toy_train_set_pulse);
     RegisterSpellScript(spell_item_last_deck_of_nemelex_nobeh);
+    RegisterSpellScript(spell_item_terminus_legion_bombardment);
 
 	new spell_item_acrid_catalyst_injector<SPELL_FERVOR_OF_THE_LEGION, SPELL_BURTALITY_OF_THE_LEGION, SPELL_MALICE_OF_THE_LEGION>("spell_item_acrid_catalyst_injector");
 }
