@@ -3453,6 +3453,9 @@ public:
                     case 118215:
                     case 193455: // Cobra Shot, hunters' "Steady Shot" practice (#104: Steady Shot is not in 7.3.5)
                     case 185358: // Arcane Shot
+                    case 122:    // Frost Nova (night elf mage 26940)
+                    case 196819: // Eviscerate (night elf rogue 26946; 2098 is Run Through in 7.x)
+                    case 100780: // Tiger Palm (night elf monk 31169; 100787 is not a 7.3.5 spell)
                     {
                         player->KilledMonsterCredit(44175, ObjectGuid::Empty);
                         break;
