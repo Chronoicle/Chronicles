@@ -157,6 +157,7 @@ class TC_GAME_API StaticTransport : public Transport
         uint32 stateChangeTime = 0;
         uint32 stateChangeProgress = 0;
         uint32 stateTargetProgress = 0;
+        bool stopStates = false;     // #26: stop-frame transport that rides by stop states (MoveToStopState)
 };
 
 #endif

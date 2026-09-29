@@ -884,7 +884,16 @@ bool StaticTransport::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* m
     if (!m_goValue.Transport.StopFrames->empty() && transportPeriod)
     {
         hasStopFrame = true;
-        MoveToStopState(GetGoState());
+        // #26: only stoppable elevators with a first stop frame (the Antoran High Command platform 278815) ride by
+        // stop states; the Deeprun Tram car 218207 (first stop frame 0) keeps the old cycle until it is tested
+        stopStates = goinfo->transport.Timeto2ndfloor > 0;
+        if (stopStates)
+            MoveToStopState(GetGoState());
+        else
+        {
+            deltaTimer = GameTime::GetGameTimeMS() % transportPeriod;
+            SetUInt32Value(GAMEOBJECT_FIELD_LEVEL, GameTime::GetGameTimeMS() - deltaTimer);
+        }
     }
 
     SetGoAnimProgress(animprogress);
@@ -948,6 +957,37 @@ void StaticTransport::Update(uint32 diff)
     uint32 transportPeriod = GetTransportPeriod();
     if (!transportPeriod)
         return;
+
+    if (hasStopFrame && !stopStates) // #26: the old cycle, unchanged (see Create)
+    {
+        if (isMapObject && GetGoState() != GO_STATE_TRANSPORT_ACTIVE || !IsMoving())
+            return;
+
+        if (GetGoState() == GO_STATE_TRANSPORT_ACTIVE)
+            m_goValue.Transport.PathProgress += diff * moveSpeed;
+
+        uint32 oldProgress = m_goValue.Transport.PathProgress % transportPeriod;
+        UpdateUInt32Value(GAMEOBJECT_FIELD_LEVEL, GameTime::GetGameTimeMS());
+        FrameUpdateTimer += diff;
+        if (FrameUpdateTimer >= (isMapObject ? 60000.0f : 20000.0f))
+        {
+            if (GetGoState() != GO_STATE_TRANSPORT_ACTIVE)
+                SetTransportState(GO_STATE_TRANSPORT_ACTIVE);
+            else
+            {
+                SetTransportState(GO_STATE_TRANSPORT_STOPPED);
+                nextStopFrame++;
+                if (nextStopFrame >= m_goValue.Transport.StopFrames->size())
+                    nextStopFrame = 0;
+            }
+
+            FrameUpdateTimer -= (isMapObject ? 60000.0f : 20000.0f);
+        }
+
+        SetUInt16Value(OBJECT_FIELD_DYNAMIC_FLAGS, 1, int16(float(oldProgress) / float(transportPeriod) * 65535.0f), false);
+        RelocateToProgress(oldProgress);
+        return;
+    }
 
     if (!IsMoving() || (!hasStopFrame && isMapObject && GetGoState() != GO_STATE_TRANSPORT_ACTIVE))
         return;
