@@ -15,5 +15,5 @@ WHERE MenuID = 10656 AND OptionID = 0;
 -- 3) Auctioneer Lympkin (9859) is the Ironforge auctioneer (faction 55, Alliance); the Dalaran spawn 146850828 is a
 --    stray copy standing 3 yards from Reginald (not on retail). Her template faction must stay Alliance for Ironforge,
 --    and this core has no per-spawn faction, so the fix is removing the stray spawn.
---    DELETION: needs the owner's OK before applying (AGENTS.md). Uncomment once approved.
--- DELETE FROM world.creature WHERE guid = 146850828 AND id = 9859 AND map = 1220;
+--    Owner approved the deletion 2026-09-29 (#93).
+DELETE FROM world.creature WHERE guid = 146850828 AND id = 9859 AND map = 1220;
