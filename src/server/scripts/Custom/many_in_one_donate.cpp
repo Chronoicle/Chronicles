@@ -187,6 +187,13 @@ static std::string UseMorph(Player* player, uint32 productId)
     return "";
 }
 
+// a quest the shop can mark rewarded: one that is rewarded only once
+static bool ShopQuestSellable(uint32 questId)
+{
+    Quest const* quest = sQuestDataStore->GetQuestTemplate(questId);
+    return quest && !quest->IsRepeatable() && !quest->IsDaily() && !quest->IsWeekly();
+}
+
 // the equipped class artifact (not the fishing one), or null
 static Item* ClassArtifact(Player* player)
 {
@@ -539,8 +546,7 @@ public:
             }
             case PRODUCT_QUEST:     // rewarded like a tracking quest done by a spell (Spell::EffectQuestComplete): no quest rewards
             {
-                Quest const* quest = sQuestDataStore->GetQuestTemplate(param1);
-                if (!quest || quest->IsRepeatable() || quest->IsDaily() || quest->IsWeekly())
+                if (!ShopQuestSellable(param1))
                     return "This product is not set up correctly";
                 if (player->IsQuestRewarded(param1))
                     return "You already have this";
@@ -562,7 +568,8 @@ public:
 //   client -> server: OPEN | LIST <categoryId> [ilvl] | BUY <productId> <shownPrice> <reqId> [ilvl]
 //                     | BUYN <productId> <count> <shownTotal> <reqId> (type 10: count 1..param1, shownTotal = count * price)
 //                     | MORPH <productId> <reqId> (use an owned morph) | MORPH 0 <reqId> (remove it)
-//                     | PERKS <bag> <slot> | PERKADD <bag> <slot> <perkId> <shownPrice> <reqId> | PERKDEL <bag> <slot> <perkId> <reqId> (free)
+//                     | PERKS <bag> <slot> | PERKADD <bag> <slot> <perkId> <shownPrice> <reqId> <itemEntry>
+//                     | PERKDEL <bag> <slot> <perkId> <reqId> <itemEntry> (free)
 //   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> #<flags> <name> ... CEND
 //                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name> ...
 //                       [ILV <categoryId> <current> <ilvl>,<ilvl>,...] LEND <categoryId> <count>
@@ -575,10 +582,12 @@ public:
 //   item level of that table for token * percent(ilvl) / percent(N). LIST with an ilvl lists them at it (an ilvl not in
 //   the table: their own N), BUY with an ilvl buys at it (not in the table: FAIL PRICE); ILV: current = the item level
 //   they are listed at, then the table's item levels, highest first. Other products ignore the ilvl.
-//   Perks (v3): bag 0 = backpack, 1-4 = the bags, slot from 1 (the addon's numbers); only equipment in the bags.
-//   PERK flags: PERK_BLOCKED = can't be added to this item (legendary/artifact, or another perk of its group is on it);
-//   has = 1/0; PEND itemEntry 0 = no equipment item there. NOART = no class artifact equipped, NOITEM = the perk item is
-//   gone, LIMIT = count out of range or past the artifact's last rank.
+//   Perks (v3): bag 0 = backpack, 1-4 = the bags, slot from 1 (the addon's numbers); only weapons and armour in the bags,
+//   uncommon or better, with stats (no shirts, tabards). PERK flags: PERK_BLOCKED = can't be added to this item
+//   (legendary/artifact, or another perk of its group is on it); has = 1/0; PEND itemEntry 0 = no such item there.
+//   PERKADD/PERKDEL send back PEND's itemEntry: another item at bag/slot now (or itemEntry 0) = FAIL NOITEM.
+//   NOART = no class artifact equipped, NOITEM = the perk item is gone or another one, LIMIT = count out of range or past
+//   the artifact's last rank, PRICE also = a price of 0 (nothing in the shop is free).
 // GM accounts only, unless Shop.OpenToPlayers = 1 in worldserver.conf.
 constexpr std::size_t SHOP_MAX_MESSAGE = 250;   // bytes per addon message
 constexpr uint32 SHOP_MAX_REQUESTS     = 10;    // per second, the rest is dropped (every request runs auth queries on the player's map thread)
@@ -742,11 +751,11 @@ static uint32 ShopDisplay(uint8 type, uint32 param1)
     return 0;
 }
 
-// auth.donate_ilvl_prices: item level -> percent of the price (985 = 100)
+// auth.donate_ilvl_prices: item level -> percent of the price (985 = 100); 0 % rows are left out (never free)
 static std::map<uint32, uint32> ShopItemLevelPrices()
 {
     std::map<uint32, uint32> percents;
-    if (QueryResult result = LoginDatabase.Query("SELECT `ilvl`, `percent` FROM `donate_ilvl_prices`"))
+    if (QueryResult result = LoginDatabase.Query("SELECT `ilvl`, `percent` FROM `donate_ilvl_prices` WHERE `percent` > 0"))
     {
         do
         {
@@ -765,7 +774,7 @@ static uint32 ShopAtItemLevel(std::map<uint32, uint32> const& percents, uint32 i
     if (at == std::string::npos)
         return 0;
     auto own = percents.find(uint32(atoi(bonus.c_str() + at + 5)));
-    if (own == percents.end() || !own->second)
+    if (own == percents.end())
         return 0;
     auto wanted = percents.find(ilvl);
     if (wanted == percents.end())
@@ -811,7 +820,9 @@ static void ShopGearParts(Player* player, std::string const& bonus, std::vector<
 }
 
 // BUNDLE_ARTIFACTS: the artifact rows of gear_npc_items for every spec of the class (with the off-hand parts), the ones
-// the character doesn't have yet (bags and bank)
+// the character doesn't have yet (bags and bank). Plain items are enough: Item::Create sets up the artifact powers and the
+// default appearance, as for quest rewards and fill_character's mailed artifacts (its trait/relic step and the party
+// bots' FillArtifacts only max the traits afterwards, which a bought artifact doesn't get).
 static void ShopArtifactParts(Player* player, std::vector<ShopPart>& parts)
 {
     std::string specs;
@@ -864,6 +875,8 @@ static std::string ShopPartError(Player* player, ShopPart const& part)
             return !artifact ? NO_ARTIFACT : !ArtifactXpFor(artifact, part.Param1) ? ARTIFACT_MAX : "";
         }
         case PRODUCT_QUEST:
+            if (!ShopQuestSellable(part.Param1))
+                return "This product is not set up correctly";
             if (player->FindQuestSlot(part.Param1) < MAX_QUEST_LOG_SIZE)
                 return "Finish or abandon the bundle's quest in your quest log first";
             // fallthrough
@@ -991,7 +1004,9 @@ static std::vector<uint32> ShopPerkGroup(std::vector<ShopPerk> const& perks, Sho
     return group;
 }
 
-// an equipment item in the bags by the addon's numbers (bag 0 = backpack, 1-4 = the bags, slot from 1), or null
+// an item in the bags that can take a shop perk, by the addon's numbers (bag 0 = backpack, 1-4 = the bags, slot from 1),
+// or null: a weapon or armour piece of uncommon quality or better that carries stats (not a shirt or tabard; bags,
+// relics, ammo and quivers are other item classes)
 static Item* ShopBagItem(Player* player, uint32 bag, uint32 slot)
 {
     if (bag > 4 || slot < 1 || slot > 255)
@@ -1004,7 +1019,16 @@ static Item* ShopBagItem(Player* player, uint32 bag, uint32 slot)
     }
     else
         item = player->GetItemByPos(uint8(INVENTORY_SLOT_BAG_START + bag - 1), uint8(slot - 1));
-    return item && item->GetTemplate()->GetInventoryType() != INVTYPE_NON_EQUIP ? item : nullptr;
+    if (!item)
+        return nullptr;
+
+    ItemTemplate const* proto = item->GetTemplate();
+    uint32 invType = proto->GetInventoryType();
+    if ((proto->GetClass() != ITEM_CLASS_WEAPON && proto->GetClass() != ITEM_CLASS_ARMOR) || proto->GetQuality() < ITEM_QUALITY_UNCOMMON
+        || invType == INVTYPE_NON_EQUIP || invType == INVTYPE_BODY || invType == INVTYPE_TABARD || invType == INVTYPE_BAG
+        || invType == INVTYPE_AMMO || invType == INVTYPE_RELIC)
+        return nullptr;
+    return item;
 }
 
 class donate_shop_addon : public PlayerScript
@@ -1071,8 +1095,10 @@ public:
                 Buy(player, throttle, a[0], a[2], reqId, 0, true, a[1]);
             else if (command == "MORPH")
                 Morph(player, throttle, a[0], reqId);
+            else if (command == "PERKADD")
+                Perk(player, throttle, true, a[0], a[1], a[2], a[3], reqId, a[5]);
             else
-                Perk(player, throttle, command == "PERKADD", a[0], a[1], a[2], command == "PERKADD" ? a[3] : 0, reqId);
+                Perk(player, throttle, false, a[0], a[1], a[2], 0, reqId, a[4]);
         }
     }
 
@@ -1244,7 +1270,7 @@ private:
             if (type == PRODUCT_ITEM)
                 ShopAtItemLevel(percents, ilvl, bonus, price);
         }
-        if (shownPrice != price)
+        if (shownPrice != price || !price)     // nothing is free (a 0 token row, or an item level price rounded down to 0)
             return fail("PRICE");
         if (throttle.Tokens < price)
             return fail("NOFUNDS");
@@ -1280,15 +1306,23 @@ private:
         SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(productId) + " " + std::to_string(throttle.Tokens) + (mailed ? " MAIL" : ""));
     }
 
-    // after a delivery: takes the tokens, logs it (donate_history: product, item entry) and reads the new balance
+    // after a delivery: takes the tokens, logs it (donate_history: product, item entry) and reads the new balance.
+    // The delivery can't be taken back (artifact XP, quest, morph, bundle), so a charge that didn't apply is only reported.
     static void Charge(Player* player, ShopThrottle& throttle, uint32 productId, uint32 itemEntry, uint32 price)
     {
         uint32 accountId = player->GetSession()->GetAccountId();
         player->SaveToDB();     // the delivery is saved before the tokens go (a crash in between must not charge for nothing)
+        uint32 before = GetTokens(accountId);
         LoginDatabase.DirectPExecute("UPDATE `account` SET `donate` = `donate` - %u WHERE `id` = %u AND `donate` >= %u", price, accountId, price);
         LoginDatabase.DirectPExecute("INSERT INTO `donate_history` (`account`, `char_guid`, `product`, `item`, `token`) VALUES (%u, %u, %u, %u, %u)",
             accountId, player->GetGUIDLow(), productId, itemEntry, price);
         throttle.Tokens = GetTokens(accountId);
+        if (before < price || throttle.Tokens != before - price)
+        {
+            TC_LOG_WARN("server.shop", "shop: charge did not apply account %u product %u price %u balance before %u after %u (character %s, guid %u)",
+                accountId, productId, price, before, throttle.Tokens, player->GetName(), player->GetGUIDLow());
+            ChatHandler(player->GetSession()).SendSysMessage("Your purchase was delivered, but the payment did not go through. Please tell a GM.");
+        }
     }
 
     // MORPH <productId> | MORPH 0: wear an owned morph or the race's own look again (free)
@@ -1324,14 +1358,15 @@ private:
         SendShop(player, "PEND " + std::to_string(bag) + " " + std::to_string(slot) + " " + std::to_string(item ? item->GetEntry() : 0));
     }
 
-    // PERKADD (charged like BUY, no refund row) and PERKDEL (free; the tokens paid for the perk are not given back)
-    static void Perk(Player* player, ShopThrottle& throttle, bool add, uint32 bag, uint32 slot, uint32 perkId, uint32 shownPrice, uint32 reqId)
+    // PERKADD (charged like BUY, no refund row) and PERKDEL (free; the tokens paid for the perk are not given back).
+    // itemEntry = the item PEND named: another item at bag/slot now (or 0 from an older addon) is refused.
+    static void Perk(Player* player, ShopThrottle& throttle, bool add, uint32 bag, uint32 slot, uint32 perkId, uint32 shownPrice, uint32 reqId, uint32 itemEntry)
     {
         throttle.Tokens = GetTokens(player->GetSession()->GetAccountId());
         auto fail = [&](char const* code) { SendShop(player, "FAIL " + std::to_string(reqId) + " " + code + " " + std::to_string(throttle.Tokens)); };
 
         Item* item = ShopBagItem(player, bag, slot);
-        if (!item)
+        if (!item || item->GetEntry() != itemEntry)
             return fail("NOITEM");
         std::vector<ShopPerk> perks = ShopPerkList(player);
         auto perk = std::find_if(perks.begin(), perks.end(), [perkId](ShopPerk const& p) { return p.Id == perkId; });
@@ -1351,7 +1386,7 @@ private:
             return;
         }
 
-        if (shownPrice != perk->Price)
+        if (shownPrice != perk->Price || !perk->Price)
             return fail("PRICE");
         if (throttle.Tokens < perk->Price)
             return fail("NOFUNDS");
