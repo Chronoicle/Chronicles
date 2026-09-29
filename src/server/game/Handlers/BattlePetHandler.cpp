@@ -32,8 +32,11 @@ void WorldSession::HandleBattlePetSummon(WorldPackets::BattlePet::BattlePetGuidR
     if (_player->IsOnVehicle() || _player->IsSitState())
         return;
 
+    // the client sends the summoned pet's own GUID to dismiss it (pet journal Dismiss): decide that before the
+    // unsummon below clears the summoned pet (checked after it, every Dismiss summoned the pet again)
+    bool dismiss = _player->GetGuidValue(PLAYER_FIELD_SUMMONED_BATTLE_PET_GUID) == packet.BattlePetGUID;
     _player->UnsummonCurrentBattlePetIfAny(false);
-    if (!_player->GetSummonedBattlePet() || _player->GetSummonedBattlePet()->GetGuidValue(UNIT_FIELD_BATTLE_PET_COMPANION_GUID) != packet.BattlePetGUID)
+    if (!dismiss)
         _player->SummonBattlePet(packet.BattlePetGUID);
 }
 
