@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -269,6 +270,9 @@ func update(root string, info buildInfo, man Manifest, t *tracker) {
 
 	// 4) .build.info last: until now the client still starts its old build
 	must(os.WriteFile(filepath.Join(root, ".build.info"), []byte(strings.ReplaceAll(info.raw, info.buildKey, man.Build)), 0644))
+
+	// 5) old archives no index references any more (issue #11: every update adds one and none was ever removed)
+	cleanupArchives(data, indexes)
 }
 
 func restore(root string) {
@@ -537,6 +541,38 @@ func (ix *index) bytes() []byte {
 	binary.LittleEndian.PutUint32(out[ix.pad+4:], pc)
 	copy(out[ix.pad+8:], entries.Bytes())
 	return out
+}
+
+// archiveFile matches a local storage archive's name, e.g. "data.003" (see update, getClientFiles).
+var archiveFile = regexp.MustCompile(`^data\.(\d{3})$`)
+
+// cleanupArchives removes data.NNN files in data that indexes (one per bucket, already parsed and, for touched
+// buckets, already holding this update's new entries: see update) does not reference any more. Conservative: only
+// files matching archiveFile are ever considered, and a broken index never reaches here - readIndex panics on one
+// before update gets this far, so cleanupArchives itself never has to guess.
+func cleanupArchives(data string, indexes []*index) {
+	referenced := map[int]bool{}
+	for _, ix := range indexes {
+		for _, v := range ix.records {
+			packed := uint64(v[0])<<32 | uint64(binary.BigEndian.Uint32(v[1:5]))
+			referenced[int(packed>>30)] = true
+		}
+	}
+	entries, err := os.ReadDir(data)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		m := archiveFile.FindStringSubmatch(e.Name())
+		if m == nil || e.IsDir() {
+			continue
+		}
+		if n, err := strconv.Atoi(m[1]); err == nil && !referenced[n] {
+			if err := os.Remove(filepath.Join(data, e.Name())); err == nil {
+				say("Removed old client archive " + e.Name())
+			}
+		}
+	}
 }
 
 func bucket(k []byte) int {
