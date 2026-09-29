@@ -6,6 +6,7 @@
  *   everything else is bought through gossip with a confirmation popup.
  *   Purchases:  logged in auth.donate_history
  *   GM:         .donate add|take|balance <account> [amount]
+ *   Players:    .donate morph use <productId> | .donate morph remove (morphs bought in the shop)
  *   The ChroniclesShop addon (donate_shop_addon below) sells the same catalogue in a shop window.
  *
  * Also rebuilds "multi_vendor", the Service manager: name/race/faction/appearance changes, level-ups,
@@ -27,7 +28,9 @@
 #include "Creature.h"
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
+#include "GameTables.h"
 #include "Item.h"
+#include "Log.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "SpellMgr.h"
@@ -49,6 +52,19 @@ enum DonateProductType : uint8
     PRODUCT_GOLD        = 6, // param1 = gold
     PRODUCT_PREMIUM     = 7, // param1 = days of premium (auth.account_premium), extends a running premium
     PRODUCT_AT_LOGIN    = 8, // param1 = AtLoginFlags: 1 name, 8 appearance/gender, 64 faction, 128 race (used at the next login)
+    // phase 3 (#64): the shop addon only (the Donate Vendor never lists type 9 and up)
+    PRODUCT_MORPH          = 9,  // param1 = CreatureDisplayInfo ID: the account owns it (donate_owned), applied now and with .donate morph use
+    PRODUCT_ARTIFACT_LEVEL = 10, // param1 = most levels per purchase, token = price per level (shop BUYN); Deliver's param1 = levels to add
+    PRODUCT_BUNDLE         = 11, // param1 = bundle ID: the rows of auth.donate_bundle_items, all or nothing
+    PRODUCT_QUEST          = 12, // param1 = quest ID, marked rewarded without its rewards (hidden artifact appearance unlocks)
+    PRODUCT_PERK           = 13, // param1 = bonus list ID, param2 = group (one perk per group on an item): the shop's perks, kept in
+                                 // a disabled category, read by PERKS/PERKADD/PERKDEL (the Service manager's perks, UWOW prices)
+};
+
+enum DonateBundlePart : uint8   // auth.donate_bundle_items.type: any product type above except bundles, and
+{
+    BUNDLE_GEARSET   = 100,     // the Gear Master's set of the character's spec (world.gear_npc_items); bonus "ilvl:N" or empty
+    BUNDLE_ARTIFACTS = 101,     // every artifact weapon of the class the character doesn't have yet
 };
 
 enum DonateSender : uint32
@@ -122,10 +138,87 @@ static bool ShopOpenFor(Player* player)
 }
 
 // the Donate Vendor sells titles, achievements, mounts/pets and character services only once the shop is open
-// (the Service manager NPC sells the character services to everyone on its own)
+// (the Service manager NPC sells the character services to everyone on its own); the phase 3 types only in the shop
 static char const* VendorTypeFilter(Player* player)
 {
-    return ShopOpenFor(player) ? "" : " AND `type` NOT IN (2, 3, 4, 8)";
+    return ShopOpenFor(player) ? " AND `type` < 9" : " AND `type` NOT IN (2, 3, 4, 8) AND `type` < 9";
+}
+
+// Deliver's errors that the shop answers with their own FAIL code
+constexpr char const* NO_ARTIFACT   = "You must have an artifact weapon equipped.";       // NOART
+constexpr char const* ARTIFACT_MAX  = "Your artifact can't gain that many more levels.";  // LIMIT
+constexpr char const* MORPH_UNKNOWN = "There is no morph with this number.";              // GONE
+
+// the account owns a morph of this display (auth.donate_owned: bought per product, used per display)
+static bool MorphOwned(uint32 accountId, uint32 display)
+{
+    return LoginDatabase.PQuery("SELECT 1 FROM `donate_owned` o JOIN `donate_products` p ON p.`id` = o.`product` WHERE o.`account` = %u AND p.`type` = %u AND p.`param1` = %u LIMIT 1",
+        accountId, uint32(PRODUCT_MORPH), display) != nullptr;
+}
+
+// a morph as the native display, so shapeshifts and transforms end on it; 0 = the race's own look again
+static void ApplyMorph(Player* player, uint32 display)
+{
+    if (display)
+        player->SetNativeDisplayId(display);
+    else
+        player->InitDisplayIds();
+    player->RestoreDisplayId();
+}
+
+// .donate morph use|remove and the shop's MORPH: an owned morph (productId 0 = remove it), kept for the next login in
+// characters.character_morph; "" = done
+static std::string UseMorph(Player* player, uint32 productId)
+{
+    uint32 display = 0;
+    if (productId)
+    {
+        QueryResult result = LoginDatabase.PQuery("SELECT `param1` FROM `donate_products` WHERE `id` = %u AND `type` = %u", productId, uint32(PRODUCT_MORPH));
+        if (!result)
+            return MORPH_UNKNOWN;
+        display = (*result)[0].GetUInt32();
+        if (!sCreatureDisplayInfoStore.LookupEntry(display) || !MorphOwned(player->GetSession()->GetAccountId(), display))
+            return "You don't own this morph. Buy it in the shop first.";
+        CharacterDatabase.PExecute("REPLACE INTO `character_morph` (`guid`, `display`) VALUES (%u, %u)", player->GetGUIDLow(), display);
+    }
+    else
+        CharacterDatabase.PExecute("DELETE FROM `character_morph` WHERE `guid` = %u", player->GetGUIDLow());
+    ApplyMorph(player, display);
+    return "";
+}
+
+// the equipped class artifact (not the fishing one), or null
+static Item* ClassArtifact(Player* player)
+{
+    Item* artifact = player->GetArtifactWeapon();
+    ArtifactEntry const* entry = artifact ? sArtifactStore.LookupEntry(artifact->GetTemplate()->GetArtifactID()) : nullptr;
+    return entry && entry->ArtifactCategoryID == ARTIFACT_CATEGORY_CLASS ? artifact : nullptr;
+}
+
+// the artifact XP for `levels` more ranks than the artifact's unspent XP already pays for, at the forge's costs
+// (ArtifactLevelXP: XP, XP2 after the artifact tier upgrade, like WorldSession::HandleArtifactAddPower); 0 = past the last rank
+static uint64 ArtifactXpFor(Item* artifact, uint32 levels)
+{
+    bool upgraded = artifact->GetModifier(ITEM_MODIFIER_ARTIFACT_TIER) == 1;
+    auto cost = [upgraded](uint32 rank) -> uint64
+    {
+        GtArtifactLevelXPEntry const* row = sArtifactLevelXPGameTable.GetRow(rank);
+        return row ? uint64(upgraded ? row->XP2 : row->XP) : 0;
+    };
+
+    uint32 rank = artifact->GetTotalPurchasedArtifactPowers() + 1;   // the next rank to buy
+    uint64 unspent = artifact->GetUInt64Value(ITEM_FIELD_ARTIFACT_XP);
+    for (; cost(rank) && cost(rank) <= unspent; ++rank)
+        unspent -= cost(rank);
+
+    uint64 xp = 0;
+    for (uint32 i = 0; i < levels; ++i, ++rank)
+    {
+        if (!cost(rank))
+            return 0;
+        xp += cost(rank);
+    }
+    return levels ? xp - unspent : 0;   // unspent < the cost of the first of them
 }
 
 static uint32 CountRows(char const* table, char const* where, uint32 category, uint32 faction)
@@ -287,7 +380,7 @@ private:
     // ponytail: not stackables, whose row would point at the merged stack; refund by count if they get sold
     static void RecordRefund(Player* player, Item* item, uint32 price)
     {
-        if (item->GetMaxStackCount() == 1)
+        if (price && item->GetMaxStackCount() == 1)   // bundle items come with price 0: not refundable one by one
             CharacterDatabase.PExecute("REPLACE INTO character_donate (owner_guid, itemguid, type, itemEntry, efircount, count, account) VALUES (%u, %u, 2, %u, %u, 1, %u)",
                 player->GetGUIDLow(), item->GetGUIDLow(), item->GetEntry(), price, player->GetSession()->GetAccountId());
     }
@@ -414,6 +507,49 @@ public:
                 ChatHandler(player->GetSession()).SendSysMessage("Done! Log out to the character screen to use it.");
                 return "";
             }
+            case PRODUCT_MORPH:     // the account owns it from now on (the first product with this display), worn right away
+            {
+                QueryResult result = LoginDatabase.PQuery("SELECT `id` FROM `donate_products` WHERE `type` = %u AND `param1` = %u ORDER BY `id` LIMIT 1", uint32(PRODUCT_MORPH), param1);
+                if (!result || !sCreatureDisplayInfoStore.LookupEntry(param1))
+                    return "Morph not found";
+                uint32 accountId = player->GetSession()->GetAccountId();
+                if (MorphOwned(accountId, param1))
+                    return "You already own this morph";
+                uint32 productId = (*result)[0].GetUInt32();
+                LoginDatabase.DirectPExecute("INSERT IGNORE INTO `donate_owned` (`account`, `product`) VALUES (%u, %u)", accountId, productId);
+                UseMorph(player, productId);
+                // players have dot commands only with AllowPlayerCommands = 1
+                if (sWorld->getBoolConfig(CONFIG_ALLOW_PLAYER_COMMANDS) || !AccountMgr::IsPlayerAccount(player->GetSession()->GetSecurity()))
+                    ChatHandler(player->GetSession()).PSendSysMessage("You can use your morph with the macro: .donate morph use %u (to remove a morph, write .donate morph remove)", productId);
+                else
+                    ChatHandler(player->GetSession()).SendSysMessage("You can put your morph on and take it off in the shop's Morphs category.");
+                return "";
+            }
+            case PRODUCT_ARTIFACT_LEVEL:    // param1 = levels (the shop's BUYN count)
+            {
+                Item* artifact = ClassArtifact(player);
+                if (!artifact)
+                    return NO_ARTIFACT;
+                uint64 xp = ArtifactXpFor(artifact, param1);
+                if (!xp)
+                    return ARTIFACT_MAX;
+                artifact->GiveArtifactXp(xp, nullptr, 0);
+                ChatHandler(player->GetSession()).PSendSysMessage("Artifact power for %u more ranks added: spend it at your artifact forge.", param1);
+                return "";
+            }
+            case PRODUCT_QUEST:     // rewarded like a tracking quest done by a spell (Spell::EffectQuestComplete): no quest rewards
+            {
+                Quest const* quest = sQuestDataStore->GetQuestTemplate(param1);
+                if (!quest || quest->IsRepeatable() || quest->IsDaily() || quest->IsWeekly())
+                    return "This product is not set up correctly";
+                if (player->IsQuestRewarded(param1))
+                    return "You already have this";
+                if (player->FindQuestSlot(param1) < MAX_QUEST_LOG_SIZE)
+                    return "Finish or abandon this quest in your quest log first";
+                player->SetRewardedQuest(param1);
+                player->SetQuestCompletedBit(sDB2Manager.GetQuestUniqueBitFlag(param1), true);
+                return "";
+            }
             default:
                 return "This product is not set up correctly";
         }
@@ -423,12 +559,26 @@ public:
 // ChroniclesShop addon (#64): the shop window from the micro menu Shop button and /shop. Same catalogue, balance and
 // delivery as the Donate Vendor; the server checks everything. The core passes prefix "SHOP" addon messages here as
 // "SHOP:<text>" and never forwards them; replies are addon whispers to the player himself (space separated, the name last).
-//   client -> server: OPEN | LIST <categoryId> | BUY <productId> <shownPrice> <reqId>
+//   client -> server: OPEN | LIST <categoryId> [ilvl] | BUY <productId> <shownPrice> <reqId> [ilvl]
+//                     | BUYN <productId> <count> <shownTotal> <reqId> (type 10: count 1..param1, shownTotal = count * price)
+//                     | MORPH <productId> <reqId> (use an owned morph) | MORPH 0 <reqId> (remove it)
+//                     | PERKS <bag> <slot> | PERKADD <bag> <slot> <perkId> <shownPrice> <reqId> | PERKDEL <bag> <slot> <perkId> <reqId> (free)
 //   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> #<flags> <name> ... CEND
-//                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name> ... LEND <categoryId> <count>
-//                     | OK <reqId> <productId> <tokens> [MAIL] | FAIL <reqId> NOFUNDS|GONE|PRICE|BAGS|OWNED|BUSY|CLOSED|FAILED <tokens> | ERR <text>
+//                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name> ...
+//                       [ILV <categoryId> <current> <ilvl>,<ilvl>,...] LEND <categoryId> <count>
+//                     | PERK <perkId> <price> <has> #<flags> <name> ... PEND <bag> <slot> <itemEntry>
+//                     | OK <reqId> <productId|perkId> <tokens> [MAIL]
+//                     | FAIL <reqId> NOFUNDS|GONE|PRICE|BAGS|OWNED|BUSY|CLOSED|FAILED|NOART|NOITEM|LIMIT <tokens> | ERR <text>
 //   flags: SHOP_KNOWN (ITEM only), SHOP_NEW (CAT: a new product in it or below it); display = creature display of a
-//   mount or pet product for the 3D preview (0 = none); MAIL = the bags were full, the item went to the mailbox.
+//   mount, pet or morph product for the 3D preview (0 = none); MAIL = the bags were full, the item went to the mailbox.
+//   Item levels (v3): an item product with "ilvl:N" in its bonus, N a row of auth.donate_ilvl_prices, is sold at every
+//   item level of that table for token * percent(ilvl) / percent(N). LIST with an ilvl lists them at it (an ilvl not in
+//   the table: their own N), BUY with an ilvl buys at it (not in the table: FAIL PRICE); ILV: current = the item level
+//   they are listed at, then the table's item levels, highest first. Other products ignore the ilvl.
+//   Perks (v3): bag 0 = backpack, 1-4 = the bags, slot from 1 (the addon's numbers); only equipment in the bags.
+//   PERK flags: PERK_BLOCKED = can't be added to this item (legendary/artifact, or another perk of its group is on it);
+//   has = 1/0; PEND itemEntry 0 = no equipment item there. NOART = no class artifact equipped, NOITEM = the perk item is
+//   gone, LIMIT = count out of range or past the artifact's last rank.
 // GM accounts only, unless Shop.OpenToPlayers = 1 in worldserver.conf.
 constexpr std::size_t SHOP_MAX_MESSAGE = 250;   // bytes per addon message
 constexpr uint32 SHOP_MAX_REQUESTS     = 10;    // per second, the rest is dropped (every request runs auth queries on the player's map thread)
@@ -439,6 +589,7 @@ enum ShopFlags : uint32
 {
     SHOP_KNOWN = 1,     // the character has it already ("Already Known", no Buy button)
     SHOP_NEW   = 2,     // added to the shop in the last 14 days
+    PERK_BLOCKED = 1,   // PERK: can't be added to this item
 };
 
 struct ShopThrottle
@@ -551,6 +702,10 @@ static bool ShopKnown(Player* player, uint8 type, uint32 param1)
             return player->getLevel() >= param1;
         case PRODUCT_AT_LOGIN:
             return player->HasAtLoginFlag(AtLoginFlags(param1));
+        case PRODUCT_MORPH:
+            return MorphOwned(player->GetSession()->GetAccountId(), param1);
+        case PRODUCT_QUEST:
+            return player->IsQuestRewarded(param1);
         case PRODUCT_ITEM:
             if (player->GetCollectionMgr()->HasToy(param1) || player->GetCollectionMgr()->HasHeirloom(param1))
                 return true;
@@ -569,9 +724,11 @@ static bool ShopKnown(Player* player, uint8 type, uint32 param1)
     }
 }
 
-// the creature display of a mount or pet product, for the addon's 3D preview (0 = none)
+// the creature display of a mount, pet or morph product, for the addon's 3D preview (0 = none)
 static uint32 ShopDisplay(uint8 type, uint32 param1)
 {
+    if (type == PRODUCT_MORPH)
+        return param1;
     uint32 spell = ShopTaughtSpell(type, param1);
     if (!spell)
         return 0;
@@ -583,6 +740,271 @@ static uint32 ShopDisplay(uint8 type, uint32 param1)
         if (CreatureTemplate const* creature = sObjectMgr->GetCreatureTemplate(species->CreatureID))
             return creature->GetFirstVisibleModel();
     return 0;
+}
+
+// auth.donate_ilvl_prices: item level -> percent of the price (985 = 100)
+static std::map<uint32, uint32> ShopItemLevelPrices()
+{
+    std::map<uint32, uint32> percents;
+    if (QueryResult result = LoginDatabase.Query("SELECT `ilvl`, `percent` FROM `donate_ilvl_prices`"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            percents[f[0].GetUInt32()] = f[1].GetUInt32();
+        } while (result->NextRow());
+    }
+    return percents;
+}
+
+// an item product at item level ilvl (a row of donate_ilvl_prices; others leave it as it is): its "ilvl:N" and its price
+// follow it. Returns the item level it is sold at, 0 = not sold by item level (no "ilvl:N" with N in the table).
+static uint32 ShopAtItemLevel(std::map<uint32, uint32> const& percents, uint32 ilvl, std::string& bonus, uint32& price)
+{
+    std::size_t at = bonus.find("ilvl:");
+    if (at == std::string::npos)
+        return 0;
+    auto own = percents.find(uint32(atoi(bonus.c_str() + at + 5)));
+    if (own == percents.end() || !own->second)
+        return 0;
+    auto wanted = percents.find(ilvl);
+    if (wanted == percents.end())
+        return own->first;
+
+    std::size_t end = bonus.find(' ', at);
+    bonus.replace(at, end == std::string::npos ? std::string::npos : end - at, "ilvl:" + std::to_string(ilvl));
+    price = uint32(uint64(price) * wanted->second / own->second);
+    return ilvl;
+}
+
+// one thing a bundle gives, after BUNDLE_GEARSET / BUNDLE_ARTIFACTS are turned into their items
+struct ShopPart
+{
+    uint8 Type;
+    uint32 Param1;
+    uint32 Param2;
+    std::string Bonus;
+};
+
+// BUNDLE_GEARSET: the Gear Master's set (world.gear_npc_items, fill_character export) of the character's spec, or of the
+// class's default spec if the character's has none; without the artifact rows and legendaries (sold on their own), and
+// without the items the character has already. bonus "ilvl:N" = every piece at item level N, empty = the rows' own
+// bonuses (985 with tertiary stats and sockets).
+static void ShopGearParts(Player* player, std::string const& bonus, std::vector<ShopPart>& parts)
+{
+    char const* query = "SELECT `item`, `bonus` FROM `gear_npc_items` WHERE `spec` = %u AND `slot` NOT LIKE 'artifact%%' ORDER BY `slot`";
+    QueryResult result = WorldDatabase.PQuery(query, player->GetSpecializationId());
+    ChrSpecializationEntry const* spec = result ? nullptr : sDB2Manager.GetDefaultChrSpecializationForClass(player->getClass());
+    if (spec)
+        result = WorldDatabase.PQuery(query, spec->ID);
+    if (!result)
+        return;
+    do
+    {
+        Field* f = result->Fetch();
+        uint32 item = f[0].GetUInt32();
+        ItemTemplate const* proto = sObjectMgr->GetItemTemplate(item);
+        if (!proto || proto->GetQuality() >= ITEM_QUALITY_LEGENDARY || player->HasItemCount(item, 1, true))
+            continue;
+        parts.push_back({ uint8(PRODUCT_ITEM), item, 1, bonus.empty() ? f[1].GetString() : bonus });
+    } while (result->NextRow());
+}
+
+// BUNDLE_ARTIFACTS: the artifact rows of gear_npc_items for every spec of the class (with the off-hand parts), the ones
+// the character doesn't have yet (bags and bank)
+static void ShopArtifactParts(Player* player, std::vector<ShopPart>& parts)
+{
+    std::string specs;
+    for (uint32 i = 0; i < MAX_SPECIALIZATIONS; ++i)
+        if (ChrSpecializationEntry const* spec = sDB2Manager.GetChrSpecializationByIndex(player->getClass(), i))
+            specs += (specs.empty() ? "" : ",") + std::to_string(spec->ID);
+    if (specs.empty())
+        return;
+
+    std::set<uint32> added;
+    if (QueryResult result = WorldDatabase.PQuery("SELECT `item` FROM `gear_npc_items` WHERE `slot` LIKE 'artifact%%' AND `spec` IN (%s) ORDER BY `spec`, `slot`", specs.c_str()))
+    {
+        do
+        {
+            uint32 item = result->Fetch()[0].GetUInt32();
+            if (added.insert(item).second && !player->HasItemCount(item, 1, true))
+                parts.push_back({ uint8(PRODUCT_ITEM), item, 1, "" });
+        } while (result->NextRow());
+    }
+}
+
+// why a bundle part can't be delivered ("" = it can): what Deliver would refuse, checked before anything is given
+static std::string ShopPartError(Player* player, ShopPart const& part)
+{
+    switch (part.Type)
+    {
+        case PRODUCT_ITEM:
+        {
+            if (!sObjectMgr->GetItemTemplate(part.Param1))
+                return "Item not found";
+            ItemPosCountVec dest;
+            InventoryResult canStore = player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, part.Param1, 1);
+            if (canStore == EQUIP_ERR_OK || (canStore == EQUIP_ERR_INV_FULL && !sDB2Manager.GetHeirloomByItemId(part.Param1)))   // or mailed
+                return "";
+            return canStore == EQUIP_ERR_INV_FULL ? BAGS_FULL : "You already have as many of an item in this bundle as you can carry";
+        }
+        case PRODUCT_CURRENCY:
+            return sCurrencyTypesStore.LookupEntry(part.Param1) ? "" : "Currency not found";
+        case PRODUCT_GOLD:
+            return player->GetMoney() + uint64(part.Param1) * GOLD > MAX_MONEY_AMOUNT ? "You can't carry that much gold" : "";
+        case PRODUCT_PREMIUM:
+            return "";
+        case PRODUCT_LEVEL:
+            if (player->InBattleground() || player->InArena() || player->GetMap()->IsDungeon())
+                return "Levels can't be bought in a battleground, arena or dungeon.";
+            return player->getLevel() >= part.Param1 ? "Your level is already this high" : "";
+        case PRODUCT_ARTIFACT_LEVEL:
+        {
+            Item* artifact = ClassArtifact(player);
+            return !artifact ? NO_ARTIFACT : !ArtifactXpFor(artifact, part.Param1) ? ARTIFACT_MAX : "";
+        }
+        case PRODUCT_QUEST:
+            if (player->FindQuestSlot(part.Param1) < MAX_QUEST_LOG_SIZE)
+                return "Finish or abandon the bundle's quest in your quest log first";
+            // fallthrough
+        case PRODUCT_TITLE:
+        case PRODUCT_ACHIEVEMENT:
+        case PRODUCT_SPELL:
+        case PRODUCT_AT_LOGIN:
+        case PRODUCT_MORPH:
+            return ShopKnown(player, part.Type, part.Param1) ? "You already have something in this bundle" : "";
+        default:    // bundles in bundles too
+            return "This product is not set up correctly";
+    }
+}
+
+// PRODUCT_BUNDLE: every row of auth.donate_bundle_items in sort order through Deliver, all of them checked first;
+// "" = delivered. Items are not refundable one by one (price 0); *mailed = at least one went to the mailbox.
+static std::string DeliverBundle(Player* player, uint32 bundleId, bool* mailed)
+{
+    std::vector<ShopPart> parts;
+    QueryResult result = LoginDatabase.PQuery("SELECT `type`, `param1`, `param2`, `bonus` FROM `donate_bundle_items` WHERE `bundle` = %u ORDER BY `sort`", bundleId);
+    if (!result)
+        return "This product is not set up correctly";
+    do
+    {
+        Field* f = result->Fetch();
+        uint8 type = f[0].GetUInt8();
+        if (type == BUNDLE_GEARSET)
+            ShopGearParts(player, f[3].GetString(), parts);
+        else if (type == BUNDLE_ARTIFACTS)
+            ShopArtifactParts(player, parts);
+        else
+            parts.push_back({ type, f[1].GetUInt32(), f[2].GetUInt32(), f[3].GetString() });
+    } while (result->NextRow());
+
+    if (parts.empty())
+        return "You already have everything in this bundle";
+    for (ShopPart const& part : parts)
+    {
+        std::string error = ShopPartError(player, part);
+        if (!error.empty())
+            return error;
+    }
+
+    for (ShopPart const& part : parts)
+    {
+        bool partMailed = false;
+        std::string error = many_in_one_donate::Deliver(player, part.Type, part.Param1, part.Param2, part.Bonus, 0, &partMailed);
+        *mailed = *mailed || partMailed;
+        if (!error.empty())     // missed by the checks above: the rest is still given and the bundle charged, a GM makes it up
+        {
+            TC_LOG_ERROR("server.shop", "Shop bundle %u: part type %u param1 %u not delivered to %s (guid %u, account %u): %s",
+                bundleId, uint32(part.Type), part.Param1, player->GetName(), player->GetGUIDLow(), player->GetSession()->GetAccountId(), error.c_str());
+            ChatHandler(player->GetSession()).PSendSysMessage("Part of the bundle could not be delivered (%s). Please tell a GM.", error.c_str());
+        }
+    }
+    return "";
+}
+
+// Perks (#64): an extra bonus list (tertiary stat, prismatic socket) on an item, sold by the Service manager
+// (donate_services type 4, the item in the first backpack slot) and the shop (donate_products type 13, PERKADD)
+static bool ItemHasBonus(Item* item, uint32 bonusId)
+{
+    std::vector<uint32> const& bonuses = item->GetDynamicValues(ITEM_DYNAMIC_FIELD_BONUS_LIST_IDS);
+    return std::find(bonuses.begin(), bonuses.end(), bonusId) != bonuses.end();
+}
+
+// why the perk can't be added to the item ("" = it can); group = the bonus IDs of the other perks of its group
+static std::string PerkError(Item* item, uint32 bonusId, std::vector<uint32> const& group)
+{
+    // the item loader (ObjectMgr::DeleteBugBonus) strips sockets and tertiary stats from legendary and artifact items
+    if (item->GetTemplate()->GetQuality() >= ITEM_QUALITY_LEGENDARY && (bonusId == 1808 || (bonusId >= 40 && bonusId <= 42)))
+        return "Legendary and artifact items can't get this bonus.";
+    if (ItemHasBonus(item, bonusId))
+        return "You already have this bonus!";
+    for (uint32 other : group)
+        if (ItemHasBonus(item, other))
+            return "You already have another similar bonus!";
+    return "";
+}
+
+static void AddPerk(Player* player, Item* item, uint32 bonusId)
+{
+    item->AddBonuses(bonusId);
+    item->SetState(ITEM_CHANGED, player);
+}
+
+static void RemovePerk(Player* player, Item* item, uint32 bonusId)
+{
+    // ponytail: the item's cached stats only rebuild from the database, hence the relog
+    item->RemoveDynamicValue(ITEM_DYNAMIC_FIELD_BONUS_LIST_IDS, bonusId);
+    item->SetState(ITEM_CHANGED, player);
+}
+
+struct ShopPerk
+{
+    uint32 Id;
+    uint32 Bonus;
+    uint32 Group;
+    uint32 Price;
+    std::string Name;
+};
+
+static std::vector<ShopPerk> ShopPerkList(Player* player)
+{
+    std::vector<ShopPerk> perks;
+    if (QueryResult result = LoginDatabase.PQuery("SELECT `id`, `param1`, `param2`, `token`, `name` FROM `donate_products` WHERE `type` = %u AND `enable` = 1 AND `faction` IN (0, %u) ORDER BY `sort`, `id`",
+        uint32(PRODUCT_PERK), FactionFilter(player)))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            perks.push_back({ f[0].GetUInt32(), f[1].GetUInt32(), f[2].GetUInt32(), f[3].GetUInt32(), f[4].GetString() });
+        } while (result->NextRow());
+    }
+    return perks;
+}
+
+static std::vector<uint32> ShopPerkGroup(std::vector<ShopPerk> const& perks, ShopPerk const& perk)
+{
+    std::vector<uint32> group;
+    if (perk.Group)
+        for (ShopPerk const& other : perks)
+            if (other.Group == perk.Group && other.Id != perk.Id)
+                group.push_back(other.Bonus);
+    return group;
+}
+
+// an equipment item in the bags by the addon's numbers (bag 0 = backpack, 1-4 = the bags, slot from 1), or null
+static Item* ShopBagItem(Player* player, uint32 bag, uint32 slot)
+{
+    if (bag > 4 || slot < 1 || slot > 255)
+        return nullptr;
+    Item* item = nullptr;
+    if (bag == 0)
+    {
+        if (INVENTORY_SLOT_ITEM_START + slot - 1 < INVENTORY_SLOT_ITEM_END)
+            item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, uint8(INVENTORY_SLOT_ITEM_START + slot - 1));
+    }
+    else
+        item = player->GetItemByPos(uint8(INVENTORY_SLOT_BAG_START + bag - 1), uint8(slot - 1));
+    return item && item->GetTemplate()->GetInventoryType() != INVTYPE_NON_EQUIP ? item : nullptr;
 }
 
 class donate_shop_addon : public PlayerScript
@@ -597,9 +1019,15 @@ public:
 
         std::istringstream in(msg.substr(5));
         std::string command;
-        uint32 arg1 = 0, arg2 = 0, reqId = 0;
-        in >> command >> arg1 >> arg2 >> reqId;
-        bool buy = command == "BUY" && reqId >= 1 && reqId <= SHOP_MAX_REQ_ID;
+        uint32 a[6] = { };     // the numbers after the command, missing ones 0
+        in >> command;
+        for (uint32& value : a)
+            if (!(in >> value))
+                break;
+        // "buy" = every command that changes something: its <reqId> is the n-th number (0 = none)
+        uint32 reqAt = command == "BUY" ? 3 : command == "BUYN" ? 4 : command == "MORPH" ? 2 : command == "PERKADD" ? 5 : command == "PERKDEL" ? 4 : 0;
+        uint32 reqId = reqAt ? a[reqAt - 1] : 0;
+        bool buy = reqId >= 1 && reqId <= SHOP_MAX_REQ_ID;
 
         ShopThrottle* entry;
         {
@@ -631,12 +1059,29 @@ public:
         if (command == "OPEN")
             Open(player, throttle);
         else if (command == "LIST")
-            List(player, arg1);
+            List(player, a[0], a[1]);
+        else if (command == "PERKS")
+            Perks(player, a[0], a[1]);
         else if (buy)
         {
             throttle.LastBuy = now;
-            Buy(player, throttle, arg1, arg2, reqId);
+            if (command == "BUY")
+                Buy(player, throttle, a[0], a[1], reqId, a[3], false, 0);
+            else if (command == "BUYN")
+                Buy(player, throttle, a[0], a[2], reqId, 0, true, a[1]);
+            else if (command == "MORPH")
+                Morph(player, throttle, a[0], reqId);
+            else
+                Perk(player, throttle, command == "PERKADD", a[0], a[1], a[2], command == "PERKADD" ? a[3] : 0, reqId);
         }
+    }
+
+    // a bought morph comes back at every login (characters.character_morph)
+    void OnLogin(Player* player) override
+    {
+        if (QueryResult result = CharacterDatabase.PQuery("SELECT `display` FROM `character_morph` WHERE `guid` = %u", player->GetGUIDLow()))
+            if (sCreatureDisplayInfoStore.LookupEntry((*result)[0].GetUInt32()))
+                ApplyMorph(player, (*result)[0].GetUInt32());
     }
 
     void OnLogout(Player* player) override
@@ -700,7 +1145,8 @@ private:
         SendShop(player, "CEND");
     }
 
-    static void List(Player* player, uint32 category)
+    // the category's products; ilvl = the item level for its products sold by item level (0 or not in the table: their own)
+    static void List(Player* player, uint32 category, uint32 ilvl)
     {
         uint32 count = 0;
         if (!ShopCategoryOpen(category, FactionFilter(player)))
@@ -708,6 +1154,8 @@ private:
             SendShop(player, "LEND " + std::to_string(category) + " 0");
             return;
         }
+        std::map<uint32, uint32> percents = ShopItemLevelPrices();
+        uint32 current = 0;     // the item level the products sold by item level are listed at
         if (QueryResult result = LoginDatabase.PQuery("SELECT `id`, `type`, `param1`, `token`, `bonus`, `name`, %s FROM `donate_products` WHERE `category` = %u AND `enable` = 1 AND `faction` IN (0, %u) ORDER BY `sort`, `id`",
             SHOP_IS_NEW, category, FactionFilter(player)))
         {
@@ -720,13 +1168,16 @@ private:
                     continue;
 
                 std::string name = f[5].GetString();
+                uint32 price = f[3].GetUInt32();
                 int32 itemLevel = 0;
                 std::string bonuses;
                 if (type == PRODUCT_ITEM)
                 {
                     ItemTemplate const* proto = sObjectMgr->GetItemTemplate(param1);   // ShopVisible checked it
+                    std::string bonus = f[4].GetString();
+                    current = std::max(current, ShopAtItemLevel(percents, ilvl, bonus, price));
                     itemLevel = int32(proto->GetBaseItemLevel());
-                    for (uint32 bonusListId : ParseBonuses(f[4].GetString(), param1))
+                    for (uint32 bonusListId : ParseBonuses(bonus, param1))
                     {
                         bonuses += (bonuses.empty() ? "" : ",") + std::to_string(bonusListId);
                         if (DB2Manager::ItemBonusList const* list = sDB2Manager.GetItemBonusList(bonusListId))
@@ -739,16 +1190,24 @@ private:
                 }
 
                 uint32 flags = (ShopKnown(player, type, param1) ? SHOP_KNOWN : 0) | (f[6].GetUInt64() ? SHOP_NEW : 0);
-                SendShop(player, "ITEM " + std::to_string(f[0].GetUInt32()) + " " + std::to_string(type) + " " + std::to_string(param1) + " " + std::to_string(f[3].GetUInt32())
+                SendShop(player, "ITEM " + std::to_string(f[0].GetUInt32()) + " " + std::to_string(type) + " " + std::to_string(param1) + " " + std::to_string(price)
                     + " " + std::to_string(itemLevel) + " " + (bonuses.empty() ? "-" : bonuses) + " #" + std::to_string(flags)
                     + " " + std::to_string(ShopDisplay(type, param1)) + " " + ShopName(name));
                 ++count;
             } while (result->NextRow());
         }
+        if (current)
+        {
+            std::string levels;
+            for (auto itr = percents.rbegin(); itr != percents.rend(); ++itr)
+                levels += (levels.empty() ? "" : ",") + std::to_string(itr->first);
+            SendShop(player, "ILV " + std::to_string(category) + " " + std::to_string(current) + " " + levels);
+        }
         SendShop(player, "LEND " + std::to_string(category) + " " + std::to_string(count));
     }
 
-    static void Buy(Player* player, ShopThrottle& throttle, uint32 productId, uint32 shownPrice, uint32 reqId)
+    // BUY (ilvl: see the header) and BUYN (buyN: artifact levels, count 1..param1, the price is per level)
+    static void Buy(Player* player, ShopThrottle& throttle, uint32 productId, uint32 shownPrice, uint32 reqId, uint32 ilvl, bool buyN, uint32 count)
     {
         uint32 accountId = player->GetSession()->GetAccountId();
         throttle.Tokens = GetTokens(accountId);
@@ -762,9 +1221,29 @@ private:
         Field* f = result->Fetch();
         uint8 type = f[0].GetUInt8();
         uint32 param1 = f[1].GetUInt32();
+        std::string bonus = f[3].GetString();
         uint32 price = f[4].GetUInt32();
         if (!ShopVisible(player, type, param1))
             return fail("GONE");
+        if ((type == PRODUCT_ARTIFACT_LEVEL) != buyN)   // artifact levels only with BUYN, BUYN only for them
+            return fail(buyN ? "FAILED" : "LIMIT");
+        if (buyN)
+        {
+            if (!count || count > param1)
+                return fail("LIMIT");
+            if (uint64(price) * count != shownPrice)
+                return fail("PRICE");
+            price = shownPrice;
+            param1 = count;     // Deliver adds this many levels
+        }
+        if (ilvl)
+        {
+            std::map<uint32, uint32> percents = ShopItemLevelPrices();
+            if (!percents.count(ilvl))
+                return fail("PRICE");
+            if (type == PRODUCT_ITEM)
+                ShopAtItemLevel(percents, ilvl, bonus, price);
+        }
         if (shownPrice != price)
             return fail("PRICE");
         if (throttle.Tokens < price)
@@ -778,23 +1257,116 @@ private:
         // ponytail: deliver first, then charge, like the Donate Vendor; safe while one account has one session
         // (the guarded UPDATE only keeps the balance from going below zero, it can't take the item back)
         bool mailed = false;
-        std::string error = many_in_one_donate::Deliver(player, type, param1, f[2].GetUInt32(), f[3].GetString(), price, &mailed);
+        std::string error = type == PRODUCT_BUNDLE ? DeliverBundle(player, param1, &mailed)
+            : many_in_one_donate::Deliver(player, type, param1, f[2].GetUInt32(), bonus, price, &mailed);
         if (!error.empty())
         {
+            if (type == PRODUCT_BUNDLE)     // which part is in the way
+                SendShop(player, "ERR " + ShopName(error));
             if (error == BAGS_FULL)
                 return fail("BAGS");
+            if (error == NO_ARTIFACT)
+                return fail("NOART");
+            if (error == ARTIFACT_MAX)
+                return fail("LIMIT");
             if (error.find("already") != std::string::npos)
                 return fail("OWNED");
+            if (type != PRODUCT_BUNDLE)
+                SendShop(player, "ERR " + ShopName(error));
+            return fail("FAILED");
+        }
+
+        Charge(player, throttle, productId, type == PRODUCT_ITEM ? param1 : 0, price);
+        SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(productId) + " " + std::to_string(throttle.Tokens) + (mailed ? " MAIL" : ""));
+    }
+
+    // after a delivery: takes the tokens, logs it (donate_history: product, item entry) and reads the new balance
+    static void Charge(Player* player, ShopThrottle& throttle, uint32 productId, uint32 itemEntry, uint32 price)
+    {
+        uint32 accountId = player->GetSession()->GetAccountId();
+        player->SaveToDB();     // the delivery is saved before the tokens go (a crash in between must not charge for nothing)
+        LoginDatabase.DirectPExecute("UPDATE `account` SET `donate` = `donate` - %u WHERE `id` = %u AND `donate` >= %u", price, accountId, price);
+        LoginDatabase.DirectPExecute("INSERT INTO `donate_history` (`account`, `char_guid`, `product`, `item`, `token`) VALUES (%u, %u, %u, %u, %u)",
+            accountId, player->GetGUIDLow(), productId, itemEntry, price);
+        throttle.Tokens = GetTokens(accountId);
+    }
+
+    // MORPH <productId> | MORPH 0: wear an owned morph or the race's own look again (free)
+    static void Morph(Player* player, ShopThrottle& throttle, uint32 productId, uint32 reqId)
+    {
+        throttle.Tokens = GetTokens(player->GetSession()->GetAccountId());
+        std::string error = UseMorph(player, productId);
+        if (error.empty())
+        {
+            SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(productId) + " " + std::to_string(throttle.Tokens));
+            return;
+        }
+        if (error != MORPH_UNKNOWN)
+            SendShop(player, "ERR " + ShopName(error));
+        SendShop(player, "FAIL " + std::to_string(reqId) + (error == MORPH_UNKNOWN ? " GONE " : " FAILED ") + std::to_string(throttle.Tokens));
+    }
+
+    // PERKS: the perks for the item at bag/slot (none if there is no equipment item), then PEND
+    static void Perks(Player* player, uint32 bag, uint32 slot)
+    {
+        Item* item = ShopBagItem(player, bag, slot);
+        if (item)
+        {
+            std::vector<ShopPerk> perks = ShopPerkList(player);
+            for (ShopPerk const& perk : perks)
+            {
+                bool has = ItemHasBonus(item, perk.Bonus);
+                uint32 flags = !has && !PerkError(item, perk.Bonus, ShopPerkGroup(perks, perk)).empty() ? PERK_BLOCKED : 0;
+                SendShop(player, "PERK " + std::to_string(perk.Id) + " " + std::to_string(perk.Price) + " " + (has ? "1" : "0")
+                    + " #" + std::to_string(flags) + " " + ShopName(perk.Name));
+            }
+        }
+        SendShop(player, "PEND " + std::to_string(bag) + " " + std::to_string(slot) + " " + std::to_string(item ? item->GetEntry() : 0));
+    }
+
+    // PERKADD (charged like BUY, no refund row) and PERKDEL (free; the tokens paid for the perk are not given back)
+    static void Perk(Player* player, ShopThrottle& throttle, bool add, uint32 bag, uint32 slot, uint32 perkId, uint32 shownPrice, uint32 reqId)
+    {
+        throttle.Tokens = GetTokens(player->GetSession()->GetAccountId());
+        auto fail = [&](char const* code) { SendShop(player, "FAIL " + std::to_string(reqId) + " " + code + " " + std::to_string(throttle.Tokens)); };
+
+        Item* item = ShopBagItem(player, bag, slot);
+        if (!item)
+            return fail("NOITEM");
+        std::vector<ShopPerk> perks = ShopPerkList(player);
+        auto perk = std::find_if(perks.begin(), perks.end(), [perkId](ShopPerk const& p) { return p.Id == perkId; });
+        if (perk == perks.end())
+            return fail("GONE");
+
+        if (!add)
+        {
+            if (!ItemHasBonus(item, perk->Bonus))
+            {
+                SendShop(player, "ERR This item doesn't have this bonus.");
+                return fail("FAILED");
+            }
+            RemovePerk(player, item, perk->Bonus);
+            ChatHandler(player->GetSession()).SendSysMessage("The bonus was removed from the item. Relog before equipping it.");
+            SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(perkId) + " " + std::to_string(throttle.Tokens));
+            return;
+        }
+
+        if (shownPrice != perk->Price)
+            return fail("PRICE");
+        if (throttle.Tokens < perk->Price)
+            return fail("NOFUNDS");
+        if (ItemHasBonus(item, perk->Bonus))
+            return fail("OWNED");
+        std::string error = PerkError(item, perk->Bonus, ShopPerkGroup(perks, *perk));
+        if (!error.empty())
+        {
             SendShop(player, "ERR " + ShopName(error));
             return fail("FAILED");
         }
 
-        player->SaveToDB();     // the delivery is saved before the tokens go (a crash in between must not charge for nothing)
-        LoginDatabase.DirectPExecute("UPDATE `account` SET `donate` = `donate` - %u WHERE `id` = %u AND `donate` >= %u", price, accountId, price);
-        LoginDatabase.DirectPExecute("INSERT INTO `donate_history` (`account`, `char_guid`, `product`, `item`, `token`) VALUES (%u, %u, %u, %u, %u)",
-            accountId, player->GetGUIDLow(), productId, type == PRODUCT_ITEM ? param1 : 0, price);
-        throttle.Tokens = GetTokens(accountId);
-        SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(productId) + " " + std::to_string(throttle.Tokens) + (mailed ? " MAIL" : ""));
+        AddPerk(player, item, perk->Bonus);
+        Charge(player, throttle, perkId, item->GetEntry(), perk->Price);
+        SendShop(player, "OK " + std::to_string(reqId) + " " + std::to_string(perkId) + " " + std::to_string(throttle.Tokens));
     }
 };
 
@@ -933,12 +1505,6 @@ private:
         return player->GetItemByPos(INVENTORY_SLOT_BAG_0, INVENTORY_SLOT_ITEM_START);
     }
 
-    static bool HasBonus(Item* item, uint32 bonusId)
-    {
-        std::vector<uint32> const& bonuses = item->GetDynamicValues(ITEM_DYNAMIC_FIELD_BONUS_LIST_IDS);
-        return std::find(bonuses.begin(), bonuses.end(), bonusId) != bonuses.end();
-    }
-
     static void ShowRemoveMenu(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
@@ -949,7 +1515,7 @@ private:
                 do
                 {
                     Field* f = result->Fetch();
-                    if (HasBonus(item, f[1].GetUInt32()))
+                    if (ItemHasBonus(item, f[1].GetUInt32()))
                         player->ADD_GOSSIP_ITEM_EXTENDED(GossipOptionNpc::None, "Delete bonus \"" + f[0].GetString() + "\"", SERVICE_SENDER_REMOVE, f[1].GetUInt32(),
                             "Are you sure you want to delete this bonus? You will not receive the tokens spent on it.", 0, false);
                 } while (result->NextRow());
@@ -971,7 +1537,7 @@ private:
         Field* f = result->Fetch();
         uint8 type = f[0].GetUInt8();
         uint32 param = f[1].GetUInt32();
-        uint32 group = f[2].GetUInt32();
+        uint32 groupId = f[2].GetUInt32();
         uint32 price = f[3].GetUInt32();
 
         if (type == SERVICE_AT_LOGIN)
@@ -996,51 +1562,40 @@ private:
             Notify(player, "Put the item in the first slot of your backpack!");
             return;
         }
-        // the item loader (ObjectMgr::DeleteBugBonus) strips sockets and tertiary stats from legendary and artifact items
-        if (item->GetTemplate()->GetQuality() >= ITEM_QUALITY_LEGENDARY && (param == 1808 || (param >= 40 && param <= 42)))
+        std::vector<uint32> group;
+        if (groupId)
         {
-            Notify(player, "Legendary and artifact items can't get this bonus.");
-            return;
-        }
-
-        if (HasBonus(item, param))
-        {
-            Notify(player, "You already have this bonus!");
-            return;
-        }
-        if (group)
-        {
-            if (QueryResult others = LoginDatabase.PQuery("SELECT `param` FROM `donate_services` WHERE `type` = %u AND `grp` = %u AND `id` <> %u", uint32(SERVICE_ITEM_BONUS), group, serviceId))
+            if (QueryResult others = LoginDatabase.PQuery("SELECT `param` FROM `donate_services` WHERE `type` = %u AND `grp` = %u AND `id` <> %u", uint32(SERVICE_ITEM_BONUS), groupId, serviceId))
             {
                 do
                 {
-                    if (HasBonus(item, others->Fetch()[0].GetUInt32()))
-                    {
-                        Notify(player, "You already have another similar bonus!");
-                        return;
-                    }
+                    group.push_back(others->Fetch()[0].GetUInt32());
                 } while (others->NextRow());
             }
+        }
+
+        std::string error = PerkError(item, param, group);   // the same checks as the shop's perks
+        if (!error.empty())
+        {
+            Notify(player, error);
+            return;
         }
         if (!TakeTokens(player, price))
             return;
 
-        item->AddBonuses(param);
-        item->SetState(ITEM_CHANGED, player);
+        AddPerk(player, item, param);
         Notify(player, "Bonus successfully imposed!");
     }
 
     static void RemoveBonus(Player* player, uint32 bonusId)
     {
         Item* item = FirstBackpackItem(player);
-        if (!item || !HasBonus(item, bonusId))
+        if (!item || !ItemHasBonus(item, bonusId))
         {
             Notify(player, "You don't have this bonus!");
             return;
         }
-        // ponytail: the item's cached stats only rebuild from the database, hence the relog
-        item->RemoveDynamicValue(ITEM_DYNAMIC_FIELD_BONUS_LIST_IDS, bonusId);
-        item->SetState(ITEM_CHANGED, player);
+        RemovePerk(player, item, bonusId);
         Notify(player, "This bonus has been successfully deleted! Relog before equipping the item.");
     }
 
@@ -1581,12 +2136,18 @@ public:
 
     std::vector<ChatCommand> GetCommands() const override
     {
+        static std::vector<ChatCommand> morphCommandTable =
+        {
+            { "use",     SEC_PLAYER, false, &HandleMorphUse,    "" },
+            { "remove",  SEC_PLAYER, false, &HandleMorphRemove, "" },
+        };
         static std::vector<ChatCommand> donateCommandTable =
         {
             { "add",     SEC_ADMINISTRATOR, true, &HandleAdd,     "" },
             { "take",    SEC_ADMINISTRATOR, true, &HandleTake,    "" },
             { "balance", SEC_ADMINISTRATOR, true, &HandleBalance, "" },
             { "itemdump", SEC_ADMINISTRATOR, true, &HandleItemDump, "" },
+            { "morph",   SEC_PLAYER, false, nullptr, "", morphCommandTable },
         };
         static std::vector<ChatCommand> commandTable =
         {
@@ -1667,6 +2228,27 @@ private:
     {
         if (uint32 accountId = ParseArgs(handler, args, nullptr))
             handler->PSendSysMessage("Balance: %u tokens", GetTokens(accountId));
+        return true;
+    }
+
+    // .donate morph use <productId>: a morph bought in the shop (the number is in the shop's chat line after the purchase)
+    static bool HandleMorphUse(ChatHandler* handler, char const* args)
+    {
+        uint32 productId = args ? uint32(atoul(args)) : 0;
+        if (!productId)
+        {
+            handler->SendSysMessage("Usage: .donate morph use <number>  (the number is shown when you buy the morph in the shop)");
+            return true;
+        }
+        std::string error = UseMorph(handler->GetSession()->GetPlayer(), productId);
+        handler->SendSysMessage(error.empty() ? "Morph applied. To remove it, write .donate morph remove" : error.c_str());
+        return true;
+    }
+
+    static bool HandleMorphRemove(ChatHandler* handler, char const* /*args*/)
+    {
+        UseMorph(handler->GetSession()->GetPlayer(), 0);
+        handler->SendSysMessage("Morph removed.");
         return true;
     }
 };
