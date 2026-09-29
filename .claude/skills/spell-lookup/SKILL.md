@@ -90,4 +90,6 @@ casts 227876, which summons 76168 at the spot (SummonProperties 4089); `spell_au
 248439); `spell_script_names` has `spell_warr_ravager` on 227876 (ticks the damage 156287 from each summon) and
 `spell_warr_ravager_t20` on 156287; `spell_visual` has 227876; `ApplySpellFix({227876})` in SpellMgr.cpp; the visual
 needed the owner's weapon in the summon's hand (display 56304 is an empty rig that only draws the right-hand item) in
-`Spell::SummonGuardian`. Check every place.
+`Spell::SummonGuardian`; the red trail/circle is only in display 55644 (Warrior_Ravager.m2, 56304 is
+Warrior_Ravager_notrail.m2), set by aura 177466 (`spell_warr_ravager_visual`) from `creature_template_addon.auras`
+(its `spell_pet_auras` rows never apply: the Ravager is a guardian, not a pet). Check every place.
