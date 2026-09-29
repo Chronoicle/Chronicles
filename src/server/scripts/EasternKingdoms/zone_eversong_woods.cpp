@@ -445,11 +445,16 @@ public:
     bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
     {
         if (quest->GetQuestId() == QUEST_UNEXPECTED_RESULT)
-        {
-            CAST_AI(npc_apprentice_mirveda::npc_apprentice_mirvedaAI, creature->AI())->Summon = true;
-            CAST_AI(npc_apprentice_mirveda::npc_apprentice_mirvedaAI, creature->AI())->PlayerGUID = player->GetGUID();
-        }
+            CAST_AI(npc_apprentice_mirveda::npc_apprentice_mirvedaAI, creature->AI())->StartEvent(player);
         return true;
+    }
+
+    // #88: talking to her with the quest still open (event lost after a relog, a reset or a failed attempt) starts it again
+    bool OnGossipHello(Player* player, Creature* creature) override
+    {
+        if (player->GetQuestStatus(QUEST_UNEXPECTED_RESULT) == QUEST_STATUS_INCOMPLETE)
+            CAST_AI(npc_apprentice_mirveda::npc_apprentice_mirvedaAI, creature->AI())->StartEvent(player);
+        return false;
     }
 
     CreatureAI* GetAI(Creature* creature) const
@@ -475,6 +480,16 @@ public:
         }
 
         void EnterCombat(Unit* /*who*/) override {}
+
+        void StartEvent(Player* player)
+        {
+            if (Summon || !Summons.empty())
+                return; // already running
+
+            KillCount = 0;
+            PlayerGUID = player->GetGUID();
+            Summon = true;
+        }
 
         void JustSummoned(Creature* summoned) override
         {
