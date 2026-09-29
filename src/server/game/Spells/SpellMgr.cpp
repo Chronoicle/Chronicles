@@ -3754,6 +3754,13 @@ void SpellMgr::LoadSpellCustomAttr()
         spellInfo->Effects[EFFECT_0]->TargetA = TARGET_UNIT_TARGET_ENEMY;
     });
 
+    // Neltharion's Lair: Piercing Shards (Vileshard Hulk) and Landslide (Dargrul) are aimed where the caster faces at
+    // the start of the cast; the caster must not turn after the player during the cast (#13)
+    ApplySpellFix({226296, 226304, 200700}, [](SpellInfo* spellInfo)
+    {
+        spellInfo->GetMisc()->MiscData.Attributes[5] |= SPELL_ATTR5_DONT_TURN_DURING_CAST;
+    });
+
     // Talon Strike
     ApplySpellFix({203560}, [](SpellInfo* spellInfo)
     {

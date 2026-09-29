@@ -25300,10 +25300,15 @@ void Unit::FocusTarget(Spell const* focusSpell, ObjectGuid target)
 
     _focusSpell = focusSpell;
 
-    SetGuidValue(UNIT_FIELD_TARGET, target);
-
+    // The client turns a casting creature towards UNIT_FIELD_TARGET, so a spell that must not turn the caster keeps the
+    // field empty until ReleaseFocus (like TrinityCore). Hulks / Dargrul turned during Piercing Shards / Landslide (#13)
     if (focusSpell->GetSpellInfo()->HasAttribute(SPELL_ATTR5_DONT_TURN_DURING_CAST))
+    {
+        SetGuidValue(UNIT_FIELD_TARGET, ObjectGuid::Empty);
         AddUnitState(UNIT_STATE_ROTATING);
+    }
+    else
+        SetGuidValue(UNIT_FIELD_TARGET, target);
 }
 
 bool Unit::IsFocusing(Spell const* focusSpell)

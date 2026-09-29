@@ -196,6 +196,9 @@ struct boss_dargrul_the_underking : public BossAI
                     break;
                 case EVENT_LANDSLIDE:
                     listGuid.clear();
+                    // aim once at the target, then stand still: Landslide no longer turns him during the cast (#13, SpellMgr)
+                    if (Unit* victim = me->getVictim())
+                        me->SetFacingToObject(victim);
                     DoCast(SPELL_LANDSLIDE);
                     events.RescheduleEvent(EVENT_LANDSLIDE, 16000);
                     events.RescheduleEvent(EVENT_MOLTEN_CRASH, 3000);

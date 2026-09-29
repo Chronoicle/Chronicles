@@ -116,13 +116,46 @@ struct boss_rokmora : public BossAI
         if (!introDone && me->IsWithinDistInMap(who, 40.0f))
         {
             introDone = true;
-            for (ObjectGuid guid : { navarroggGuid, ularoggGuid })
-                if (Creature* npc = ObjectAccessor::GetCreature(*me, guid))
-                    npc->DespawnOrUnsummon(22000);
+            // They ran off past Rokmora on retail instead of vanishing where they stood (#13): the sniffed run-off paths
+            // from TrinityCore's Rokmora intro (paths 10530000 / 10070000), started 3 s after the conversation's last
+            // line (10.8 s), despawn at the end
+            static G3D::Vector3 const ularoggRunOff[] =
+            {
+                {2884.442f, 1397.453f, -2.405085f}, {2871.429f, 1382.590f, -2.403809f}, {2864.820f, 1372.012f, -2.044964f},
+                {2847.353f, 1358.851f, -0.155559f}, {2828.669f, 1352.583f, 0.956536f}, {2816.361f, 1353.323f, 4.334983f}
+            };
+            static G3D::Vector3 const navarroggRunOff[] =
+            {
+                {2899.390f, 1406.309f, -2.405086f}, {2886.757f, 1399.142f, -2.405085f}, {2876.358f, 1391.255f, -2.405085f},
+                {2865.902f, 1373.759f, -2.163703f}, {2858.577f, 1366.910f, -1.521540f}, {2840.839f, 1355.285f, -0.344364f},
+                {2830.136f, 1352.953f, 0.727656f}, {2822.574f, 1353.080f, 2.647024f}
+            };
+            RunOff(ularoggGuid, ularoggRunOff, std::end(ularoggRunOff) - std::begin(ularoggRunOff));
+            RunOff(navarroggGuid, navarroggRunOff, std::end(navarroggRunOff) - std::begin(navarroggRunOff));
 
             DoCast(me, 209374, true); //Convers
             DoCast(SPELL_INTRO_EMERGE);
         }
+    }
+
+    void RunOff(ObjectGuid guid, G3D::Vector3 const* runOff, size_t count)
+    {
+        Creature* npc = ObjectAccessor::GetCreature(*me, guid);
+        if (!npc)
+            return;
+
+        npc->AddDelayedEvent(13800, [npc, runOff, count]
+        {
+            npc->InterruptNonMeleeSpells(false);
+            npc->GetMotionMaster()->MoveIdle();
+            Movement::PointsArray path(1, G3D::Vector3(npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ())); // replaced by the real start
+            path.insert(path.end(), runOff, runOff + count);
+            Movement::MoveSplineInit init(*npc);
+            init.MovebyPath(path);
+            init.SetWalk(false);
+            int32 duration = init.Launch();
+            npc->DespawnOrUnsummon(uint32(std::max(duration, 0)) + 1000);
+        });
     }
 
     void SpellFinishCast(const SpellInfo* spell)
@@ -337,7 +370,8 @@ struct npc_nl_vileshard_hulk : public ScriptedAI
     }
 
     // Piercing Shards: stand still and do not turn while casting. Effect 0 targets the enemy target (6), so keep the
-    // victim: StopAttack() clears it and a plain DoCast() then had no target and never cast (#13)
+    // victim: StopAttack() clears it and a plain DoCast() then had no target and never cast (#13). The spells carry
+    // SPELL_ATTR5_DONT_TURN_DURING_CAST (SpellMgr), so the cast no longer turns the Hulk after the target.
     void CastPiercingShards(uint32 spellId)
     {
         Unit* victim = me->getVictim();

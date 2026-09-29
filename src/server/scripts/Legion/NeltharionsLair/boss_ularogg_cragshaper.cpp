@@ -66,18 +66,22 @@ struct boss_ularogg_cragshaper : public BossAI
     bool intro = true;
     bool firstIdolSummoned = false; // the jump casts the first summon on landing
     Position platformHome;
-    std::vector<Position> freeCircles;
+    std::vector<Position> usedSpots; // idol spots taken in the current shuffle tick
     uint32 lastShuffleHit = 0;
 
-    // The pull moves his home to the room centre; on a wipe he goes back up to his platform and jumps down again next pull (#13)
+    // The pull moves his home to the room centre. On a wipe he despawns and comes back on his platform (his spawn
+    // point) 5 s later instead of walking up there, and jumps down again on the next pull (#13)
     void EnterEvadeMode() override
     {
-        if (!intro)
+        bool const pulled = !intro;
+        if (pulled)
         {
             intro = true;
             me->SetHomePosition(platformHome);
         }
         BossAI::EnterEvadeMode();
+        if (pulled && me->IsAlive())
+            me->DespawnOrUnsummon(0, Seconds(5));
     }
 
     void Reset() override
@@ -149,18 +153,27 @@ struct boss_ularogg_cragshaper : public BossAI
         {
             case SPELL_STANCE_MOUNTAIN_FILTER:
             {
-                // Shuffle the idols over the floor circles: the centre (jump target) and the four summon spots from
-                // spell_target_position, one idol per circle per tick. Was a random point anywhere within 30 yd (#13).
-                if (getMSTimeDiff(lastShuffleHit, getMSTime()) > 1000 || freeCircles.empty())
-                {
-                    freeCircles = {
-                        { 2838.15f, 1667.87f, -40.82f }, { 2842.44f, 1660.35f, -40.83f }, { 2834.18f, 1677.19f, -40.82f },
-                        { 2831.69f, 1665.48f, -40.70f }, { 2844.77f, 1672.62f, -40.84f } };
-                    Trinity::Containers::RandomShuffle(freeCircles);
-                }
+                // The idols move to random spots inside the darker ring around the middle circle, never onto the middle
+                // circle or the outer floor (James, #13; the 5 fixed spots kept them in the middle). Ring 11-20 yd from the
+                // room centre: the idols spawn 7-9 yd out and DestinyCore's (sniffed-looking) idol spots reach 20 yd.
+                // Spots of one tick stay 6 yd apart.
+                if (getMSTimeDiff(lastShuffleHit, getMSTime()) > 1000)
+                    usedSpots.clear();
                 lastShuffleHit = getMSTime();
-                target->CastSpell(freeCircles.back(), SPELL_STANCE_MOUNTAIN_MOVE, true);
-                freeCircles.pop_back();
+
+                Position const centre = { 2838.15f, 1667.87f, -40.82f };
+                Position spot = centre;
+                for (uint8 attempt = 0; attempt < 10; ++attempt)
+                {
+                    float const angle = frand(0.0f, 2.0f * float(M_PI));
+                    float const dist = std::sqrt(frand(11.0f * 11.0f, 20.0f * 20.0f)); // uniform over the ring's area
+                    spot.Relocate(centre.GetPositionX() + dist * std::cos(angle), centre.GetPositionY() + dist * std::sin(angle), centre.GetPositionZ());
+                    if (std::none_of(usedSpots.begin(), usedSpots.end(), [&spot](Position const& used) { return used.GetExactDist2d(&spot) < 6.0f; }))
+                        break;
+                }
+                me->UpdateGroundPositionZ(spot.GetPositionX(), spot.GetPositionY(), spot.m_positionZ);
+                usedSpots.push_back(spot);
+                target->CastSpell(spot, SPELL_STANCE_MOUNTAIN_MOVE, true);
                 break;
             }
             case SPELL_STRIKE_MOUNTAIN_2:
@@ -387,6 +400,7 @@ struct npc_nl_understone_drummer : public ScriptedAI
     {
         drumsMove = true;
         drumsCast = true;
+        pos.Relocate(0.0f, 0.0f, 0.0f);
         events.Reset();
     }
 
@@ -425,13 +439,11 @@ struct npc_nl_understone_drummer : public ScriptedAI
             }
         }
 
-        if (drumsCast)
+        // pos is set once EVENT_1 sent him to his drum
+        if (drumsCast && !drumsMove && pos.GetPositionX() != 0.0f && me->GetExactDist2d(&pos) < 2.0f)
         {
-            if (Creature* drums = me->FindNearestCreature(92387, 3.0f, true))
-            {
-                events.RescheduleEvent(EVENT_2, 1000);
-                drumsCast = false;
-            }
+            events.RescheduleEvent(EVENT_2, 1000);
+            drumsCast = false;
         }
 
         if (uint32 eventId = events.ExecuteEvent())
@@ -440,13 +452,15 @@ struct npc_nl_understone_drummer : public ScriptedAI
             {
                 case EVENT_1:
                 {
+                    // Out of combat he stays at his own spot; for War Drums he runs to his drum and plays it from the side
+                    // facing his spawn point, 3 yd away. Was drum x - 3, behind or beside one of the drums (#13)
                     if (Creature* drums = me->FindNearestCreature(92387, 40.0f, true))
                     {
                         if (drums->IsAlive())
                         {
-                            pos = me->FindNearestCreature(92387, 40.0f, true)->GetPosition();
-                            pos.m_positionX -= 3.0f;
-                            me->GetMotionMaster()->MovePoint(1, pos, false);
+                            float const angle = drums->GetAngle(&me->GetHomePosition());
+                            pos.Relocate(drums->GetPositionX() + 3.0f * std::cos(angle), drums->GetPositionY() + 3.0f * std::sin(angle), drums->GetPositionZ());
+                            me->GetMotionMaster()->MovePoint(1, pos);
                         }
                     }
                     break;
@@ -491,7 +505,20 @@ class spell_barrel_ride_plr_move : public AuraScript
             };
             Movement::PointsArray path;
             path.push_back(G3D::Vector3(player->GetPositionX(), player->GetPositionY(), player->GetPositionZ())); // replaced by the real start
-            path.insert(path.end(), std::begin(ride), std::end(ride));
+            // The recorded points zigzag 5-10 yd left and right of the river's course, so the smooth curve swung back and
+            // forth (James, #13). One 1-2-1 smoothing pass over x/y halves that. Heights stay, and the first point, the
+            // drop (last) and the edge before it are kept as recorded.
+            size_t const count = std::end(ride) - std::begin(ride);
+            for (size_t i = 0; i < count; ++i)
+            {
+                G3D::Vector3 p = ride[i];
+                if (i > 0 && i + 2 < count)
+                {
+                    p.x = (ride[i - 1].x + 2.0f * ride[i].x + ride[i + 1].x) * 0.25f;
+                    p.y = (ride[i - 1].y + 2.0f * ride[i].y + ride[i + 1].y) * 0.25f;
+                }
+                path.push_back(p);
+            }
             player->GetMotionMaster()->MoveIdle();
             Movement::MoveSplineInit init(*player);
             init.MovebyPath(path);

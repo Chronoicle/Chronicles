@@ -94,6 +94,7 @@ struct boss_naraxas : public BossAI
 
         DoCast(me, SPELL_INTRO_MYSTIC, true);
         me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_IMMUNE_TO_PC);
+        me->SetVisible(false); // still seen standing before the roleplay: not visible at all until she emerges (#13)
     }
     bool stacksdone = false;
     uint8 berserkPct = 0;
@@ -108,7 +109,7 @@ struct boss_naraxas : public BossAI
         me->RemoveAurasDueToSpell(SPELL_GAIN_ENERGY);
         me->RemoveAurasDueToSpell(SPELL_FRENZY);
         me->RemoveAurasDueToSpell(SPELL_RAVENOUS);
-        me->SetPower(POWER_MANA, 0);
+        ResetEnergy();
         stacksdone = false;
         berserkPct = 21;
         checkMeleeTimer = 2000;
@@ -117,9 +118,19 @@ struct boss_naraxas : public BossAI
             sum->SetReactState(REACT_PASSIVE);
     }
 
+    // She is a vehicle (Spiked Tongue seat) and Vehicle::Install makes a vehicle's display power energy, so her mana
+    // (Gain Energy 200086 fills mana) stayed 0/0 and Spiked Tongue never came (Server.log "energy 0/0", #13)
+    void ResetEnergy()
+    {
+        me->SetPowerType(POWER_MANA);
+        me->SetMaxPower(POWER_MANA, 100);
+        me->SetPower(POWER_MANA, 0);
+    }
+
     void EnterCombat(Unit* /*who*/) override
     {
         _EnterCombat();
+        ResetEnergy();
         DoCast(me, SPELL_GAIN_ENERGY, true);
 
         events.RescheduleEvent(EVENT_RANCID_MAW, 8000);
@@ -185,6 +196,7 @@ struct boss_naraxas : public BossAI
         if (!introDone1 && me->IsWithinDistInMap(who, 80.0f))
         {
             introDone1 = true;
+            me->SetVisible(true);                           // hidden since spawn (Submerge)
             me->CastSpell(me, 209629, true);                // conversation 1914: the mystic's scream, he must stay visible for it
             me->RemoveAurasDueToSpell(SPELL_INTRO_MYSTIC);  // ends the submerged animation loop (kit 66786)
             // 209641 has SPELL_ATTR4_TRIGGERED, so the core always casts it instantly and its 4.4 s precast
@@ -321,6 +333,11 @@ struct boss_naraxas : public BossAI
         if (energyCheckTimer <= diff)
         {
             energyCheckTimer = 1000;
+            if (me->GetPowerType() != POWER_MANA || me->GetMaxPower(POWER_MANA) != 100) // a stat update can reset it
+            {
+                me->SetPowerType(POWER_MANA);
+                me->SetMaxPower(POWER_MANA, 100);
+            }
             if (!me->HasAura(SPELL_GAIN_ENERGY))
                 DoCast(me, SPELL_GAIN_ENERGY, true);
             if (me->GetPower(POWER_MANA) >= 100)
