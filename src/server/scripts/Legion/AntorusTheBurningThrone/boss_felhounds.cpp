@@ -122,6 +122,11 @@ struct boss_felhounds_encounters : public BossAI
     {
         _Reset();
         me->RemoveAllAuras();
+        // The core never gives world creatures a display power (Creature::GetPowerIndex only knows GetPowerType(),
+        // which stays mana), so these class-4 hounds had no energy: every SetPower was dropped and the 33/66/100
+        // abilities (Siphon/Enflamed Corruption, Consuming Sphere, Desolate Path, Weight of Darkness, Molten Touch)
+        // never happened (#25)
+        me->SetPowerType(POWER_ENERGY);
         me->SetPower(POWER_ENERGY, 0);
         me->SetReactState(REACT_AGGRESSIVE);
         darkRes = false;
@@ -227,6 +232,14 @@ struct boss_felhounds_encounters : public BossAI
             else
                 checkCombatTimer -= diff;
         }
+    }
+
+    // Decay / Smouldering land through a 45-degree frontal cone, but the server only turns a creature when it moves,
+    // so a tank who shifted around a standing hound was outside the cone and never got the debuff (#25)
+    void FaceTank()
+    {
+        if (Unit* tank = SelectTarget(SELECT_TARGET_TOPAGGRO, 0, 100.0f, true))
+            me->SetFacingToObject(tank);
     }
 
     void CreateTouchedList()
@@ -465,6 +478,7 @@ struct npc_felhounds_shatug : public boss_felhounds_encounters
                     events.RescheduleEvent(EVENT_CORRUPTING_DMG, 2500);
                     break;
                 case EVENT_CORRUPTING_DMG:
+                    FaceTank();
                     DoCastTopAggro(SPELL_CORRUPTING_MAW_DMG, true);
                     DoCastTopAggro(SPELL_DECAY, true);
                     break;
@@ -631,6 +645,7 @@ struct npc_felhounds_fharg : public boss_felhounds_encounters
                     events.RescheduleEvent(EVENT_BURNING_MAW_DMG, 2500);
                     break;
                 case EVENT_BURNING_MAW_DMG:
+                    FaceTank();
                     DoCastTopAggro(SPELL_SMOULDERING, true);
                     DoCastTopAggro(SPELL_BURNING_MAW_DMG, true);
                     break;
@@ -829,19 +844,11 @@ class spell_felhounds_corruption_filter : public SpellScript
         }
     }
 
-    // The dummy only names the mark (base points 248815 / 248819); nothing applied it, so Enflamed Corruption and
-    // Siphon Corruption never marked anyone and their explosions on expiry never happened (#25)
-    void HandleDummy(SpellEffIndex /*effIndex*/)
-    {
-        if (Unit* caster = GetCaster())
-            if (Unit* target = GetHitUnit())
-                caster->CastSpell(target, GetSpellInfo()->Id == 244471 ? SPELL_ENFLAME_CORRUPTION_MARK : SPELL_SIPHONED_MARK, true);
-    }
+    // The marks 248815 / 248819 are applied by spell_dummy_trigger (244471 / 244578, option 11)
 
     void Register()
     {
         OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_felhounds_corruption_filter::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
-        OnEffectHitTarget += SpellEffectFn(spell_felhounds_corruption_filter::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
     }
 };
 
@@ -1067,6 +1074,9 @@ class spell_felhounds_molten_touch : public AuraScript
 
     void OnUpdate(uint32 diff, AuraEffect* auraEffect)
     {
+        if (!GetCaster())
+            return;
+
         if (updateTeleportTimer)
         {
             if (updateTeleportTimer <= diff)
@@ -1409,14 +1419,22 @@ struct at_felhounds_consuming_sphere : AreaTriggerAI
         if (caster->m_spell_targets[SPELL_CONSUMING_SPHERE_FILTER].empty())
             return;
 
+        // Never ran before the hounds had energy (#25): a wind trigger that failed to spawn (nullptr) or an index past
+        // the spline would crash in SendMovementForce
+        uint32 oldIdx = despawn ? tempId : oldId;
+        if (oldIdx >= windAt.size() || newId >= windAt.size())
+            return;
+
         for (auto guid : caster->m_spell_targets[SPELL_CONSUMING_SPHERE_FILTER])
         {
             if (auto player = Player::GetPlayer(*caster, guid))
             {
                 if (player->GetDistance(at) < 100.0f)
                 {
-                    player->SendMovementForce(windAt[despawn ? tempId : oldId]); //Disable ForceMove
-                    player->SendMovementForce(windAt2[despawn ? tempId : oldId]); //Disable ForceMove
+                    if (windAt[oldIdx])
+                        player->SendMovementForce(windAt[oldIdx]); //Disable ForceMove
+                    if (windAt2[oldIdx])
+                        player->SendMovementForce(windAt2[oldIdx]); //Disable ForceMove
 
                     if (player->IsAlive() && !despawn)
                     {

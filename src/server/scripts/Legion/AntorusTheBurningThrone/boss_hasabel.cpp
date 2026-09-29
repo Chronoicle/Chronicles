@@ -137,9 +137,7 @@ enum Actions
 {
     ACTION_SPAWN_GUARD                      = 1,
     ACTION_GATEWAY_EMPOWERED_DMG,
-    ACTION_GATEWAY_NORMAL_DMG,
-    ACTION_RUN_CATASTROPHIC,
-    ACTION_DISABLE_CATASTROPHIC
+    ACTION_GATEWAY_NORMAL_DMG
 };
 
 enum Misc
@@ -198,6 +196,9 @@ struct boss_hasabel : BossAI
     {
         _Reset();
         me->RemoveAllAuras();
+        // World creatures never get a display power in this core, so her energy did not exist: the energize ticks
+        // and Empty Energy's 67% were dropped and she never reached 100 for Collapsing World (#29)
+        me->SetPowerType(POWER_ENERGY);
         me->SetPower(POWER_ENERGY, 0);
         me->SetReactState(REACT_AGGRESSIVE);
         me->CastSpell(me, SPELL_EMPTY_ENERGY, true);
@@ -277,9 +278,6 @@ struct boss_hasabel : BossAI
 
     void SpellHitTarget(Unit* target, SpellInfo const* spellInfo) override
     {
-        if (spellInfo->Id == SPELL_ACTIVATE_XOROTH || spellInfo->Id == SPELL_ACTIVATE_RANCORA || spellInfo->Id == SPELL_ACTIVATE_NATHREZA)
-            TC_LOG_INFO("server.antorus", "Hasabel: activate spell %u hit %u", spellInfo->Id, target->GetEntry()); // ponytail: temporary, #29
-
         switch (spellInfo->Id)
         {
             case SPELL_ACTIVATE_XOROTH:
@@ -327,7 +325,7 @@ struct boss_hasabel : BossAI
                 healthPct = 61;
                 Talk(SAY_OPEN_PORTAL_XOROTH);
                 Talk(SAY_WARN_OPEN_PORTAL_XOROTH);
-                { SpellCastResult res = me->CastSpell(me, SPELL_ACTIVATE_XOROTH, true); TC_LOG_INFO("server.antorus", "Hasabel: portal XOROTH at %.1f%% health, activate result %u", me->GetHealthPct(), uint32(res)); } // ponytail: temporary, #29
+                me->CastSpell(me, SPELL_ACTIVATE_XOROTH, true);
                 events.RescheduleEvent(EVENT_TRANSPORT_PORTAL, 2000);
             }
             else if (healthPct == 61)
@@ -335,14 +333,14 @@ struct boss_hasabel : BossAI
                 healthPct = 31;
                 Talk(SAY_OPEN_PORTAL_RANCORA);
                 Talk(SAY_WARN_OPEN_PORTAL_RANCORA);
-                { SpellCastResult res = me->CastSpell(me, SPELL_ACTIVATE_RANCORA, true); TC_LOG_INFO("server.antorus", "Hasabel: portal RANCORA at %.1f%% health, activate result %u", me->GetHealthPct(), uint32(res)); } // ponytail: temporary, #29
+                me->CastSpell(me, SPELL_ACTIVATE_RANCORA, true);
             }
             else if (healthPct == 31)
             {
                 healthPct = 0;
                 Talk(SAY_OPEN_PORTAL_NATHREZA);
                 Talk(SAY_WARN_OPEN_PORTAL_NATHREZA);
-                { SpellCastResult res = me->CastSpell(me, SPELL_ACTIVATE_NATHREZA, true); TC_LOG_INFO("server.antorus", "Hasabel: portal NATHREZA at %.1f%% health, activate result %u", me->GetHealthPct(), uint32(res)); } // ponytail: temporary, #29
+                me->CastSpell(me, SPELL_ACTIVATE_NATHREZA, true);
             }
         }
     }
@@ -376,22 +374,6 @@ struct boss_hasabel : BossAI
                 me->AddDelayedCombat(delay, [this, pos]() -> void { me->SummonCreature(NPC_TRIG_FELCRUSH_PORTAL, pos, TEMPSUMMON_TIMED_DESPAWN, 12000); });
                 delay += 2000;
             }
-        }
-    }
-
-    void ActivateCatastrophic(bool active)
-    {
-        if (active)
-        {
-            DoActionSummon(NPC_GATEWAY_XOROTH_ENTER, ACTION_RUN_CATASTROPHIC);
-            DoActionSummon(NPC_GATEWAY_RANCORA_ENTER, ACTION_RUN_CATASTROPHIC);
-            DoActionSummon(NPC_GATEWAY_NATHREZA_ENTER, ACTION_RUN_CATASTROPHIC);
-        }
-        else
-        {
-            DoActionSummon(NPC_GATEWAY_XOROTH_ENTER, ACTION_DISABLE_CATASTROPHIC);
-            DoActionSummon(NPC_GATEWAY_RANCORA_ENTER, ACTION_DISABLE_CATASTROPHIC);
-            DoActionSummon(NPC_GATEWAY_NATHREZA_ENTER, ACTION_DISABLE_CATASTROPHIC);
         }
     }
 
@@ -451,6 +433,17 @@ struct boss_hasabel : BossAI
                 {
                     if (player && player->IsAlive())
                     {
+                        // The portal flight to a side platform dropped players out of combat (drink, out-of-combat
+                        // res mid-fight); keep everyone on the four platforms in the encounter's combat. 45 yd around
+                        // each platform centre: the trash room before her is 100+ yd away (#29)
+                        if (!player->isInCombat() && !player->isGameMaster() && std::any_of(std::begin(platformPos), std::end(platformPos),
+                            [player](Position const& pos) { return player->GetDistance(pos) <= 45.0f; }))
+                        {
+                            me->SetInCombatWith(player);
+                            player->SetInCombatWith(me);
+                            me->AddThreat(player, 0.0f);
+                        }
+
                         if (player->GetDistance(platformPos[0]) <= 40.0f)
                         {
                             hasPlayerNexusPlatform = true;
@@ -473,14 +466,11 @@ struct boss_hasabel : BossAI
                         me->NearTeleportTo(me->GetHomePosition());
                     else
                         me->GetMotionMaster()->MoveTargetedHome();
-
-                    ActivateCatastrophic(true);
                 }
                 else if (hasPlayerNexusPlatform && platformEmpty)
                 {
                     platformEmpty = false;
                     me->SetReactState(REACT_AGGRESSIVE);
-                    ActivateCatastrophic(false);
                 }
             }
             else
@@ -490,8 +480,14 @@ struct boss_hasabel : BossAI
         if (CheckHomeDistToEvade(diff, 35.0f))
             return;
 
+        // Nobody on the Nexus: she implodes it herself, each cast faster and stronger (the spell buffs its caster).
+        // The three invisible gateways used to cast it: no cast animation or visual, and triple damage (#29)
         if (platformEmpty)
+        {
+            if (!me->HasUnitState(UNIT_STATE_CASTING) && !me->isMoving())
+                me->CastSpell(me, SPELL_CATASTROPHIC_IMPLOSION, false);
             return;
+        }
 
         events.Update(diff);
 
@@ -536,9 +532,6 @@ struct npc_hasabel_gateways : public ScriptedAI
     {
         me->SetReactState(REACT_PASSIVE);
     }
-
-    bool catastrophicActive = false;
-    uint32 catastrophicTimer = 0;
 
     void Reset() {}
 
@@ -668,29 +661,9 @@ struct npc_hasabel_gateways : public ScriptedAI
                 break;
             }
         }
-
-        if (actionID == ACTION_RUN_CATASTROPHIC)
-            catastrophicActive = true;
-        else if (actionID == ACTION_DISABLE_CATASTROPHIC)
-            catastrophicActive = false;
     }
 
-    void UpdateAI(uint32 diff) override
-    {
-        if (me->HasUnitState(UNIT_STATE_CASTING))
-            return;
-
-        if (catastrophicActive)
-        {
-            if (catastrophicTimer <= diff)
-            {
-                catastrophicTimer = 1000;
-                me->CastSpell(me, SPELL_CATASTROPHIC_IMPLOSION);
-            }
-            else
-                catastrophicTimer -= diff;
-        }
-    }
+    void UpdateAI(uint32 /*diff*/) override {}
 };
 
 //122211, 122212, 122213
