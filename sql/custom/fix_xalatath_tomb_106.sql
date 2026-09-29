@@ -25,8 +25,11 @@ INSERT INTO world.smart_scripts (entryorguid, source_type, id, link, Difficultie
   event_param1, event_param2, event_param3, event_param4, event_param5, action_type, action_param1, action_param2, action_param3,
   action_param4, action_param5, action_param6, target_type, target_param1, target_param2, target_param3, target_param4,
   target_x, target_y, target_z, target_o, comment) VALUES
-(-369668, 0, 0, 1, '', 60, 0, 100, 1, 1000, 1000, 0, 0, 0, 28, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 'Shadow Bunny (tomb passage) - Update on scenario 991 stage 7+ - Remove Shadow Defense Field (#106)'),
-(-369668, 0, 1, 0, '', 61, 0, 100, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 15, 251349, 15, 0, 0, 0, 0, 0, 0, 'Shadow Bunny (tomb passage) - Link - Open Scenario Blockers 136651/136652 (#106)');
+(-369668, 0, 0, 1, '', 60, 0, 100, 1, 1000, 1000, 0, 0, 0, 28, 200984, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 'Shadow Bunny (tomb passage) - Update on scenario 991 stage 7+ - Remove Shadow Defense Field (#106)'),
+(-369668, 0, 1, 0, '', 61, 0, 100, 0, 0, 0, 0, 0, 0, 9, 0, 0, 0, 0, 0, 0, 15, 251349, 15, 0, 0, 0, 0, 0, 0, 'Shadow Bunny (tomb passage) - Link - Open Scenario Blockers 136651/136652 (#106)'),
+-- A guid script replaces the entry script: keep the entry's data-set handler (its other row runs only in the warrior
+-- scenario 1037, step 6, and its timed list 10146102 is empty).
+(-369668, 0, 2, 0, '', 38, 0, 100, 1, 1, 1, 0, 0, 0, 28, 200984, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 'Shadow Bunny (tomb passage) - Data Set 1 1 - Remove Shadow Defense Field (as entry 101461, #106)');
 
 DELETE FROM world.conditions WHERE SourceTypeOrReferenceId = 22 AND SourceGroup = 1 AND SourceEntry = -369668 AND SourceId = 0;
 INSERT INTO world.conditions (SourceTypeOrReferenceId, SourceGroup, SourceEntry, SourceId, ElseGroup, ConditionTypeOrReference, ConditionTarget, ConditionValue1, ConditionValue2, ConditionValue3, NegativeCondition, ErrorTextId, ScriptName, Comment) VALUES
