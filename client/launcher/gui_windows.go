@@ -123,9 +123,11 @@ func run(root string, args []string, test bool) {
 	say = func(text string) { eval("setStatus", text) }
 	progress = func(text string, pct float64) { eval("setProgress", text, pct) }
 
-	// setup: no client here. The player picks where it goes (saved in launcher.json right away: an interrupted install
-	// goes on there on the next start, without asking again); once it is there, a copy of this launcher in that folder
-	// takes over. False: this launcher should exit (handed over, or the player cancelled).
+	// setup: no client here. The player chooses (install dialog in ui.html): install the game into a folder they pick,
+	// or pick the 7.3.5 client they already have. The folder is saved in launcher.json right away (an interrupted install
+	// goes on there on the next start, without asking again); once the client is there, a copy of this launcher in that
+	// folder takes over. False: this launcher should exit (handed over, or the player quit).
+	installChoice := make(chan string, 1)
 	setup := func(man Manifest) bool {
 		base, files := fetchClient(man)
 		dir := cfg.GameFolder
@@ -134,15 +136,33 @@ func run(root string, args []string, test bool) {
 			for _, f := range files {
 				size += f.Size
 			}
-			say("World of Warcraft: Legion is not installed yet: choose where to install it")
-			title := fmt.Sprintf("World of Warcraft: Legion is not installed yet (%.1f GB). Choose where to install it: "+
-				"a Chronicles folder is created there.", float64(size)/1e9)
-			picked := make(chan string, 1)
-			w.Dispatch(func() { picked <- pickFolder(hwnd, title) })
-			if dir = <-picked; dir == "" {
-				return false
+			say("World of Warcraft: Legion is not installed yet")
+			eval("askInstall", fmt.Sprintf("%.1f GB", float64(size)/1e9))
+			for dir = ""; dir == ""; {
+				choice := <-installChoice
+				if choice == "quit" {
+					return false
+				}
+				title := fmt.Sprintf("Choose where to install World of Warcraft: Legion (%.1f GB): a Chronicles folder is "+
+					"created there.", float64(size)/1e9)
+				if choice == "existing" {
+					title = "Choose your World of Warcraft: Legion 7.3.5 folder (the one with Wow-64.exe and .build.info)."
+				}
+				picked := make(chan string, 1)
+				w.Dispatch(func() { picked <- pickFolder(hwnd, title) })
+				p := <-picked
+				switch {
+				case p == "": // cancelled: choose again
+				case choice == "existing" && !isClient(p):
+					eval("installMsg", "That folder has no World of Warcraft: Legion 7.3.5 client (build 26972). "+
+						"Choose the folder with Wow-64.exe and .build.info, or install the game.")
+				case choice == "existing":
+					dir = p
+				default:
+					dir = installDir(p)
+				}
 			}
-			dir = installDir(dir)
+			eval("closeInstall")
 			cfg.GameFolder = dir // also replaces a launcher.json that named a folder without a client
 			b, _ := json.Marshal(cfg)
 			os.WriteFile(cfgPath, b, 0644) // without it, picking the same folder again goes on there too (installDir)
@@ -168,7 +188,8 @@ func run(root string, args []string, test bool) {
 		return false
 	}
 
-	repairing := len(args) > 0 && args[0] == "repair" // check every client file first
+	var repairing atomic.Bool // check every client file first ("Launcher.exe repair" or the Repair button)
+	repairing.Store(len(args) > 0 && args[0] == "repair")
 	var busy atomic.Bool
 	var ready atomic.Bool
 	check := func() {
@@ -188,8 +209,7 @@ func run(root string, args []string, test bool) {
 			w.Dispatch(w.Terminate) // another launcher took over, or no client wanted
 			return
 		}
-		if repairing {
-			repairing = false // a failed repair is not run again on every refresh
+		if repairing.Swap(false) { // a failed repair is not run again on every refresh
 			repair(root, man)
 		}
 		prepare(root, man, test)
@@ -232,17 +252,38 @@ func run(root string, args []string, test bool) {
 			w.Dispatch(w.Terminate)
 		}()
 	})
+	w.Bind("installChoice", func(choice string) { // the install dialog's buttons: install | existing | quit
+		select {
+		case installChoice <- choice:
+		default: // setup is still busy with the last one
+		}
+	})
 	w.Bind("getFolder", func() string { return root })
+	// bindings run on the window thread, so the modal folder dialog can open right here
+	w.Bind("browseFolder", func() string {
+		return pickFolder(hwnd, "Choose your World of Warcraft: Legion 7.3.5 folder (the one with Wow-64.exe and .build.info).")
+	})
 	w.Bind("setFolder", func(dir string) string {
 		dir = strings.Trim(strings.TrimSpace(dir), `"`)
-		if _, err := os.Stat(filepath.Join(dir, ".build.info")); err != nil {
-			return "That folder has no .build.info: pick the World of Warcraft folder (the one with Wow-64.exe)."
+		if !isClient(dir) {
+			return "That folder has no World of Warcraft: Legion 7.3.5 client: pick the folder with Wow-64.exe and .build.info."
 		}
 		b, _ := json.Marshal(launcherConfig{GameFolder: dir})
 		if err := os.WriteFile(cfgPath, b, 0644); err != nil {
 			return "Cannot save the setting: " + err.Error()
 		}
 		root = dir
+		go check()
+		return ""
+	})
+	w.Bind("repairClient", func() string {
+		if busy.Load() {
+			return "Wait until the update is done."
+		}
+		if !installed(root) {
+			return "There is no client in this folder to repair."
+		}
+		repairing.Store(true)
 		go check()
 		return ""
 	})

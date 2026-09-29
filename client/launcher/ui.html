@@ -114,7 +114,7 @@
   /* settings (SettingsForm.cs) */
   .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; }
   .overlay.open { display: flex; }
-  .dialog { width: 520px; background: var(--panel); border: 1px solid var(--border); padding: 22px 24px; }
+  .dialog { width: 640px; background: var(--panel); border: 1px solid var(--border); padding: 22px 24px; }
   .dialog h2 { font: 600 15px "Segoe UI Semibold", "Segoe UI", sans-serif; color: var(--accent);
     text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px; }
   .dialog label { display: block; color: var(--text-2); font-size: 12px; margin-bottom: 6px; }
@@ -123,10 +123,19 @@
   .dialog input:focus { border-color: var(--accent); }
   .hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
   .dialog .row { display: flex; gap: 10px; margin-top: 20px; }
-  .dialog .row .btn { height: 36px; padding: 0 18px; }
+  .dialog .row .btn { height: 36px; padding: 0 16px; white-space: nowrap; }
   .dialog .row .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
   .dialog .row .spacer { flex: 1; }
   .dialog .msg { margin-top: 12px; font-size: 12px; min-height: 16px; }
+  .folder-row { display: flex; gap: 8px; }
+  .folder-row input { flex: 1; }
+  .folder-row .btn { height: 34px; padding: 0 14px; }
+  .dialog p.lead { color: var(--text-2); line-height: 1.55; margin-bottom: 18px; }
+  .choices { display: flex; flex-direction: column; gap: 10px; }
+  .choices .btn { height: 44px; }
+  .choices .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .choices .btn.primary:hover { background: var(--accent-hover); }
+  .dialog .quit { display: block; margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
@@ -177,15 +186,33 @@
       <div class="dialog">
         <h2>Settings</h2>
         <label for="folder">World of Warcraft folder</label>
-        <input id="folder" spellcheck="false">
-        <div class="hint">The folder with Wow-64.exe and .build.info. Paste its path, e.g. C:\Games\World of Warcraft</div>
+        <div class="folder-row">
+          <input id="folder" spellcheck="false">
+          <button class="btn" onclick="browseClicked()">Browse…</button>
+        </div>
+        <div class="hint">The folder with Wow-64.exe and .build.info, e.g. C:\Games\Chronicles</div>
         <div class="row">
+          <button class="btn" onclick="repairClicked()">Repair game files</button>
           <button class="btn" onclick="restoreClicked()">Restore original client</button>
           <span class="spacer"></span>
           <button class="btn" onclick="closeSettings()">Cancel</button>
           <button class="btn primary" onclick="saveSettings()">Save</button>
         </div>
         <div class="msg" id="settingsMsg"></div>
+      </div>
+    </div>
+
+    <div class="overlay" id="install">
+      <div class="dialog">
+        <h2>Install World of Warcraft: Legion</h2>
+        <p class="lead">The game is not installed yet. The launcher can download and install it for you, or use a
+          World of Warcraft: Legion 7.3.5 client you already have.</p>
+        <div class="choices">
+          <button class="btn primary" id="installBtn" onclick="installChoice('install')">Install the game</button>
+          <button class="btn" onclick="installChoice('existing')">I already have the game: choose its folder</button>
+        </div>
+        <div class="msg" id="installMsg" style="color: var(--err)"></div>
+        <a class="quit" onclick="installChoice('quit')">Quit</a>
       </div>
     </div>
   </div>
@@ -277,6 +304,15 @@
     if (a) { e.preventDefault(); openUrl(a.dataset.url); }
   });
 
+  // ---- install dialog (Go's setup waits for installChoice)
+  function askInstall(size) {
+    $("installBtn").textContent = "Install the game (" + size + ")";
+    $("installMsg").textContent = "";
+    $("install").classList.add("open");
+  }
+  function installMsg(text) { $("installMsg").textContent = text; }
+  function closeInstall() { $("install").classList.remove("open"); }
+
   // ---- play / settings
   function playClicked() { if (state === "ready") { $("play").disabled = true; play(); } else if (state === "error") refresh(); }
   async function openSettings() {
@@ -289,6 +325,15 @@
     const err = await setFolder($("folder").value);
     if (err) { $("settingsMsg").style.color = "var(--err)"; $("settingsMsg").textContent = err; }
     else closeSettings();
+  }
+  async function browseClicked() {
+    const dir = await browseFolder();
+    if (dir) $("folder").value = dir;
+  }
+  async function repairClicked() {
+    const err = await repairClient();
+    if (err) { $("settingsMsg").style.color = "var(--err)"; $("settingsMsg").textContent = err; }
+    else closeSettings(); // the progress shows under the news
   }
   async function restoreClicked() {
     if (!confirm("Put the original client files back? The launcher's updates stop being used until you update again.")) return;

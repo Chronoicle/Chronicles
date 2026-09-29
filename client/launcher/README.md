@@ -14,8 +14,9 @@ for testing the update on the server. Publishing = copy to `~/cdn/launcher/Launc
 ## Client install and repair
 
 Started from a folder without a client (no `.build.info`) while the manifest has a `"client"` list (without one it
-says to put Launcher.exe in the World of Warcraft folder, as before), the launcher installs the whole client. The
-player picks a folder; the client goes into the picked folder itself when it is empty, is named Chronicles, holds a
+says to put Launcher.exe in the World of Warcraft folder, as before), the launcher asks: "Install the game" or "I already
+have the game: choose its folder" (the picked folder must hold a 7.3.5 client; Cancel goes back to the choice). To install,
+the player picks a folder; the client goes into the picked folder itself when it is empty, is named Chronicles, holds a
 7.3.5 client (a retail or Classic `.build.info` does not count) or holds an interrupted install (no `.build.info`, but
 `Data/` or a `.part` file), else into `<picked>\Chronicles`. That folder is saved in `launcher.json` right away, so the
 next start goes on there without asking. The free space is checked, every listed file is downloaded (4 at a time,
@@ -24,7 +25,8 @@ retried (waits up to 30 s) until 10 minutes pass without a byte. Then it copies 
 `Launcher.exe` (another `Launcher.exe` there is kept as `Launcher.exe.bak`), starts that copy (which updates the client
 as usual and shows Play) and exits.
 
-`Launcher.exe repair` (in the client folder) checks the client against the list, then updates as usual. The rule (see
+Settings (the gear button): the game folder with a Browse button, and "Repair game files" (the same as
+`Launcher.exe repair`). `Launcher.exe repair` (in the client folder) checks the client against the list, then updates as usual. The rule (see
 `repair` in `client.go`): it never touches `.build.info`, `Data/data/shmem` or `*.launcher-backup`, and never
 overwrites a file in `Data/data/` (the launcher's updates and the game change those: new archives and index versions,
 shmem, old index versions deleted). In `Data/data/` it only downloads a listed file that is missing and needed: a
