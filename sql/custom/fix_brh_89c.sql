@@ -16,5 +16,6 @@ UPDATE world.creature_template_wdb SET Displayid2 = 11686 WHERE Entry = 111706 A
 --    navmesh, 3.8 yd from where the left boulders start). npc_brh_wyrmtongue_trickster makes it passive while the
 --    boulders roll and has it yell the retreat line (creature_text 98900 group 1) once someone reaches the top of
 --    the first staircase, then cower, like the two at the top of the second. Free guid inside the BRH block.
+DELETE FROM world.creature WHERE guid = 11565685;
 INSERT INTO world.creature (guid, id, map, zoneId, areaId, spawnMask, phaseMask, PhaseId, position_x, position_y, position_z, orientation, spawntimesecs)
 VALUES (11565685, 98900, 1501, 7805, 7805, 8388870, 1, '', 3175.74, 7314.63, 129.81, 4.29, 14400);
