@@ -884,12 +884,7 @@ bool StaticTransport::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* m
     if (!m_goValue.Transport.StopFrames->empty() && transportPeriod)
     {
         hasStopFrame = true;
-        deltaTimer = GameTime::GetGameTimeMS() % transportPeriod;
-
-        // Need transport offset for offlike use
-        SetUInt32Value(GAMEOBJECT_FIELD_LEVEL, GameTime::GetGameTimeMS() - deltaTimer);
-
-        // moveSpeed = float((*m_goValue.Transport.StopFrames)[0]) / (isMapObject ? 60000.0f : 20000.0f);
+        MoveToStopState(GetGoState());
     }
 
     SetGoAnimProgress(animprogress);
@@ -899,6 +894,21 @@ bool StaticTransport::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* m
 
     this->setActive(true);
     return true;
+}
+
+// Stoppable elevator (type 11 with stop frames, e.g. the Antoran High Command platform 278815): the client moves it
+// from the path progress it had at the last state change (high half of the dynamic flags) to the stop frame of its
+// state (24 = progress 0, 25 + n = stop frame n), arriving at the server time in GAMEOBJECT_FIELD_LEVEL. Level used to
+// be set to "now" on every update, so every ride ended the moment it started (#26).
+void StaticTransport::MoveToStopState(GOState state)
+{
+    uint32 frame = uint32(state - GO_STATE_TRANSPORT_STOPPED);
+    stateTargetProgress = state >= GO_STATE_TRANSPORT_STOPPED && frame < m_goValue.Transport.StopFrames->size() ? (*m_goValue.Transport.StopFrames)[frame] : 0;
+    stateChangeTime = GameTime::GetGameTimeMS();
+    stateChangeProgress = m_goValue.Transport.PathProgress % GetTransportPeriod();
+    SetUInt32Value(GAMEOBJECT_FIELD_LEVEL, stateChangeTime + uint32(std::abs(int32(stateChangeProgress) - int32(stateTargetProgress))));
+    SetUInt16Value(OBJECT_FIELD_DYNAMIC_FLAGS, 1, uint16(float(stateChangeProgress) / float(GetTransportPeriod()) * 65535.0f));
+    SetGoState(state);
 }
 
 void StaticTransport::BuildUpdate(UpdateDataMapType& data_map)
@@ -939,39 +949,44 @@ void StaticTransport::Update(uint32 diff)
     if (!transportPeriod)
         return;
 
-    if (isMapObject && GetGoState() != GO_STATE_TRANSPORT_ACTIVE || !IsMoving())
+    if (!IsMoving() || (!hasStopFrame && isMapObject && GetGoState() != GO_STATE_TRANSPORT_ACTIVE))
         return;
 
-    if (GetGoState() == GO_STATE_TRANSPORT_ACTIVE)
-        m_goValue.Transport.PathProgress += diff * moveSpeed;
-
-    uint32 progress = m_goValue.Transport.PathProgress % transportPeriod;
+    uint32 progress = GameTime::GetGameTimeMS() % transportPeriod;
 
     if (hasStopFrame)
     {
-        UpdateUInt32Value(GAMEOBJECT_FIELD_LEVEL, GameTime::GetGameTimeMS());
-        FrameUpdateTimer += diff;
-        if (FrameUpdateTimer >= (isMapObject ? 60000.0f : 20000.0f))
+        // same interpolation as the client: forward along the path from the progress at the last state change to
+        // the stop frame of the state, arriving at GAMEOBJECT_FIELD_LEVEL (see MoveToStopState)
+        GOState state = GetGoState();
+        uint32 now = GameTime::GetGameTimeMS();
+        uint32 arrival = GetUInt32Value(GAMEOBJECT_FIELD_LEVEL);
+        progress = stateTargetProgress;
+        if (now < arrival)
         {
-            if (GetGoState() != GO_STATE_TRANSPORT_ACTIVE)
-                SetTransportState(GO_STATE_TRANSPORT_ACTIVE);
-            else
-            {
-                SetTransportState(GO_STATE_TRANSPORT_STOPPED);
-                nextStopFrame++;
-                if (nextStopFrame >= m_goValue.Transport.StopFrames->size())
-                    nextStopFrame = 0;
+            float from = float(stateChangeProgress) / float(transportPeriod);
+            float to = state == GO_STATE_TRANSPORT_ACTIVE ? 1.0f : float(stateTargetProgress) / float(transportPeriod);
+            float span = to - from;
+            if (span < 0.0f)
+                span += 1.0f;
+            float pct = from + span * float(now - stateChangeTime) / float(arrival - stateChangeTime);
+            if (pct >= 1.0f)
+                pct -= 1.0f;
+            progress = uint32(pct * float(transportPeriod)) % transportPeriod;
+        }
+        m_goValue.Transport.PathProgress = progress;
 
-                // moveSpeed = float(transportPeriod) / (isMapObject ? 60000.0f : 20000.0f);
-            }
-
-            FrameUpdateTimer -= (isMapObject ? 60000.0f : 20000.0f);
+        // ride to the next floor every 20 s (60 s for map objects), from the top floor back to the first
+        FrameUpdateTimer += diff;
+        uint32 cycle = isMapObject ? 60000 : 20000;
+        if (FrameUpdateTimer >= cycle)
+        {
+            FrameUpdateTimer -= cycle;
+            MoveToStopState(uint32(state - GO_STATE_TRANSPORT_ACTIVE) >= m_goValue.Transport.StopFrames->size() ? GO_STATE_TRANSPORT_ACTIVE : GOState(state + 1));
         }
     }
     else
-        progress = GameTime::GetGameTimeMS() % transportPeriod;
-
-    SetUInt16Value(OBJECT_FIELD_DYNAMIC_FLAGS, 1, int16(float(progress) / float(transportPeriod) * 65535.0f), false);
+        SetUInt16Value(OBJECT_FIELD_DYNAMIC_FLAGS, 1, int16(float(progress) / float(transportPeriod) * 65535.0f), false);
 
     RelocateToProgress(progress);
 }

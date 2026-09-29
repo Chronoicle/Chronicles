@@ -129,8 +129,10 @@ void PointMovementGenerator<Player>::MovementInform(Player& owner)
 template<>
 void PointMovementGenerator<Creature>::MovementInform(Creature& owner)
 {
+    // a charge at an explicit unit target runs along a pre-generated path under EVENT_CHARGE_PREPATH, but scripts wait
+    // for EVENT_CHARGE (Felblade Shocktrooper Bladestorm after Demonic Charge never started, #28)
     if (owner.AI())
-        owner.AI()->MovementInform(POINT_MOTION_TYPE, _movementId);
+        owner.AI()->MovementInform(POINT_MOTION_TYPE, _movementId == EVENT_CHARGE_PREPATH ? uint32(EVENT_CHARGE) : _movementId);
 }
 
 template void PointMovementGenerator<Player>::DoInitialize(Player&);

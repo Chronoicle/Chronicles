@@ -277,6 +277,10 @@ public:
                 for(const auto& guid : introFirstBossGuids)
                     if (Creature* cre = instance->GetCreature(guid))
                     {
+                        // the teleport pod only appears with Garothi's death (SetBossState below), not with the intro (#98)
+                        if (cre->GetEntry() == NPC_TELEPORT_OF_LIGHTFORGED_1)
+                            continue;
+
                         cre->SetVisible(true);
                         cre->CastSpell(cre, SPELL_SPAWN);
 
@@ -298,7 +302,7 @@ public:
                             continue;
                         }
 
-                        if (cre->GetEntry() == NPC_LIGHTFORGED_WIREFRAME_1 || cre->GetEntry() == NPC_TELEPORT_OF_LIGHTFORGED_1)
+                        if (cre->GetEntry() == NPC_LIGHTFORGED_WIREFRAME_1)
                             continue;
 
 

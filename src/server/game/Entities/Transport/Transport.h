@@ -144,6 +144,7 @@ class TC_GAME_API StaticTransport : public Transport
         void BuildUpdate(UpdateDataMapType& data_map) override;
         void RelocateToProgress(uint32 progress);
         void UpdatePosition(float x, float y, float z, float o);
+        void MoveToStopState(GOState state);
 
         uint32 GetTransportPeriod() const override;
 
@@ -153,6 +154,9 @@ class TC_GAME_API StaticTransport : public Transport
         uint32 FrameUpdateTimer;
         uint32 deltaTimer;
         float moveSpeed;
+        uint32 stateChangeTime = 0;
+        uint32 stateChangeProgress = 0;
+        uint32 stateTargetProgress = 0;
 };
 
 #endif

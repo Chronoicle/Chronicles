@@ -144,7 +144,7 @@ struct npc_atbt_battleship : public ScriptedAI
     }
 };
 
-// 128289
+// 128289, 130137
 struct npt_atbt_teleport : public ScriptedAI
 {
     npt_atbt_teleport(Creature* cre) : ScriptedAI(cre) {}
@@ -162,6 +162,20 @@ struct npt_atbt_teleport : public ScriptedAI
 
         who->CastSpell(who, 253773, true);
         who->GetMotionMaster()->MoveIdle();
+
+        // Garothi pod: no retail path anywhere (spell 257872 path 631108), so a straight flight to the Lightforged
+        // Beacon hub (path 13013700, ~16 s); the 10 s Gateway aura is stretched to cover it (#98)
+        if (me->GetEntry() == NPC_TELEPORT_OF_LIGHTFORGED_1)
+        {
+            if (Aura* gateway = who->GetAura(253773))
+            {
+                gateway->SetMaxDuration(20000);
+                gateway->SetDuration(20000);
+            }
+            who->GetMotionMaster()->MovePath(13013700, false);
+            return;
+        }
+
         who->GetMotionMaster()->MovePath(me->GetPositionX() < -3100.0f ? 12871196 : 12871197, false, frand(-2, 2), frand(-2, 2));
     }
 };

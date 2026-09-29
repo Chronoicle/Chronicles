@@ -341,7 +341,6 @@ struct boss_antoran_high_command : BossAI
 
                 auto newCommand = Creature::GetCreature(*me, commandVector[phase]);
                 auto newCapsule = Creature::GetCreature(*me, commandVector[phase + 3]);
-                TC_LOG_INFO("server.antoran", "High Command: switch to stage %u (officer %s, pod %s)", phase, newCommand ? "found" : "MISSING", newCapsule ? "found" : "MISSING"); // ponytail: temporary, #28
 
                 if (newCommand && newCapsule)
                 {
@@ -588,7 +587,6 @@ struct boss_antoran_high_command_generic : ScriptedAI
         switch (spellId)
         {
             case SPELL_ENERGY_FILL:
-                TC_LOG_INFO("server.antoran", "High Command: %u energy full (in combat %u), assuming command", me->GetEntry(), me->isInCombat()); // ponytail: temporary, #28
                 events.Reset();
                 me->StopAttack(false, true);
                 me->CastSpell(me, SPELL_ASSUME_COMMAND);
@@ -1434,6 +1432,29 @@ class spell_command_psychic_assault : public AuraScript
     }
 };
 
+//254219 Defensive Countermeasures (Mythic pod ability): still "does nothing" with a Screaming Shrike targeted, and a
+// failed cast by the pod reaches nobody (Spell::SendCastResult only answers player casters). Logs every cast that
+// reaches the server, so the next Mythic test shows whether it arrives and with which target (#28).
+// ponytail: temporary diagnostic, remove once Defensive Countermeasures is confirmed or fixed
+class spell_command_defensive_countermeasures : public SpellScript
+{
+    PrepareSpellScript(spell_command_defensive_countermeasures);
+
+    SpellCastResult CheckCast()
+    {
+        Unit* caster = GetCaster();
+        Unit* target = GetExplTargetUnit();
+        TC_LOG_INFO("server.antoran", "High Command: Defensive Countermeasures by %u at %u, dist %.1f, LOS %u",
+            caster->GetEntry(), target ? target->GetEntry() : 0, target ? caster->GetDistance(target) : 0.0f, target ? uint32(caster->IsWithinLOSInMap(target)) : 0);
+        return SPELL_CAST_OK;
+    }
+
+    void Register() override
+    {
+        OnCheckCast += SpellCheckCastFn(spell_command_defensive_countermeasures::CheckCast);
+    }
+};
+
 void AddSC_boss_antoran()
 {
     RegisterCreatureAI(boss_antoran_high_command);
@@ -1452,4 +1473,5 @@ void AddSC_boss_antoran()
     RegisterSpellScript(spell_command_felshield_or_beacon);
     RegisterSpellScript(spell_command_fusillade);
     RegisterAuraScript(spell_command_psychic_assault);
+    RegisterSpellScript(spell_command_defensive_countermeasures);
 }
