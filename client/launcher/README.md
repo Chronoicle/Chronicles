@@ -25,8 +25,12 @@ retried (waits up to 30 s) until 10 minutes pass without a byte. Then it copies 
 `Launcher.exe` (another `Launcher.exe` there is kept as `Launcher.exe.bak`), starts that copy (which updates the client
 as usual and shows Play) and exits.
 
-Settings (the gear button): the game folder with a Browse button, and "Repair game files" (the same as
-`Launcher.exe repair`). `Launcher.exe repair` (in the client folder) checks the client against the list, then updates as usual. The rule (see
+Settings (the gear button): the game folder with a Browse button, "Repair game files" (the same as
+`Launcher.exe repair`) and a download speed limit (Unlimited / 1-50 MB/s, saved as `limit_mbps` in `launcher.json`,
+applied at once: one limit shared by all parallel downloads). While something downloads, a pause button (⏸/▶) sits
+next to Play: pausing cancels the running requests (the install's `.part` files keep what came), resuming continues
+them with Range like after a kill; game update files are small and come again from the start. Closing the launcher
+while paused is safe. The status line shows the speed (and the limit). See `transfer.go`. `Launcher.exe repair` (in the client folder) checks the client against the list, then updates as usual. The rule (see
 `repair` in `client.go`): it never touches `.build.info`, `Data/data/shmem` or `*.launcher-backup`, and never
 overwrites a file in `Data/data/` (the launcher's updates and the game change those: new archives and index versions,
 shmem, old index versions deleted). In `Data/data/` it only downloads a listed file that is missing and needed: a

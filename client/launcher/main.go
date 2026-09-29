@@ -14,6 +14,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
@@ -160,6 +161,9 @@ type tracker struct {
 	label        string
 	done, total  int64
 	start, shown time.Time
+	sampled      time.Time // last speed sample
+	sampledDone  int64
+	speed        float64 // bytes per second, smoothed over the last seconds (a pause lets it fall)
 }
 
 // grow adds n bytes to the total (a file that has to come again).
@@ -183,6 +187,18 @@ func (t *tracker) add(n int64) {
 		return
 	}
 	t.shown = time.Now()
+	if t.sampled.IsZero() {
+		t.sampled, t.sampledDone = t.start, 0
+	}
+	if dt := t.shown.Sub(t.sampled).Seconds(); dt >= 1 {
+		rate := max(float64(t.done-t.sampledDone)/dt, 0)
+		if t.speed == 0 {
+			t.speed = rate
+		} else {
+			t.speed = 0.6*t.speed + 0.4*rate
+		}
+		t.sampled, t.sampledDone = t.shown, t.done
+	}
 	pct, text := 0.0, t.label
 	if t.total > 0 {
 		pct = min(100, 100*float64(t.done)/float64(t.total))
@@ -191,12 +207,24 @@ func (t *tracker) add(n int64) {
 			unit, div = "GB", 1e9
 		}
 		text += fmt.Sprintf("  •  %.1f / %.1f %s", float64(t.done)/div, float64(t.total)/div, unit)
-		if secs := time.Since(t.start).Seconds(); secs > 1 && t.done > 0 && t.done < t.total {
-			left := time.Duration(float64(t.total-t.done)/(float64(t.done)/secs)) * time.Second
+		if t.speed > 0 && t.done < t.total {
+			text += "  •  " + speedText(t.speed)
+			if limit := dl.Limit(); limit > 0 && dl.busy() { // not while checking files (repair)
+				text += " (limit " + speedText(float64(limit)) + ")"
+			}
+			left := time.Duration(float64(t.total-t.done)/t.speed) * time.Second
 			text += "  •  " + left.Round(time.Second).String() + " left"
 		}
 	}
 	progress(text, pct)
+}
+
+// speedText: "850 KB/s", "4.2 MB/s"
+func speedText(bps float64) string {
+	if bps < 1e6 {
+		return fmt.Sprintf("%.0f KB/s", bps/1e3)
+	}
+	return fmt.Sprintf("%.1f MB/s", bps/1e6)
 }
 
 // ---------------------------------------------------------------- update
@@ -431,14 +459,28 @@ func download(path string, t *tracker) []byte {
 		if err == nil {
 			return b
 		}
+		if t != nil && dl.waitResume() { // paused: this file comes again from the start, not counted as a try
+			try--
+			continue
+		}
 		lastErr = err
 		time.Sleep(2 * time.Second)
 	}
 	panic(fmt.Sprintf("cannot download %s: %v (is the server up?)", path, lastErr))
 }
 
+// With a tracker the download counts as a transfer: the bandwidth limit applies and Pause cancels it (see transfer.go).
 func get(path string, t *tracker) ([]byte, error) {
-	resp, err := (&http.Client{Timeout: 10 * time.Minute}).Get(server + path)
+	ctx := context.Background()
+	if t != nil {
+		defer dl.start()()
+		ctx = dl.reqContext()
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", server+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -455,8 +497,9 @@ func get(path string, t *tracker) ([]byte, error) {
 	var buf bytes.Buffer
 	got := int64(0)
 	chunk := make([]byte, 64<<10)
+	body := limited{ctx, resp.Body}
 	for {
-		n, err := resp.Body.Read(chunk)
+		n, err := body.Read(chunk)
 		buf.Write(chunk[:n])
 		got += int64(n)
 		t.add(int64(n))

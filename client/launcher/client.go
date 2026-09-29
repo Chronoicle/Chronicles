@@ -275,6 +275,10 @@ func getFile(src, dst string, f File, t *tracker) {
 			t.grow(f.Size)
 			continue
 		}
+		if dl.waitResume() { // paused: the .part keeps what came, go on from there
+			wait, last = time.Second, time.Now()
+			continue
+		}
 		if got > 0 {
 			wait, last = time.Second, time.Now()
 		}
@@ -307,7 +311,8 @@ func getPart(src, part string, f File, t *tracker) (int64, error) {
 	}
 	var got int64
 	if have < f.Size {
-		ctx, cancel := context.WithCancel(context.Background())
+		defer dl.start()()
+		ctx, cancel := context.WithCancel(dl.reqContext()) // cancelled by Pause too
 		defer cancel()
 		stall := time.AfterFunc(time.Minute, cancel) // no data for a minute: give this try up
 		defer stall.Stop()
@@ -334,7 +339,7 @@ func getPart(src, part string, f File, t *tracker) (int64, error) {
 		default:
 			return 0, errors.New(resp.Status)
 		}
-		got, err = io.CopyBuffer(io.MultiWriter(fd, h, t, watchdog{stall}), io.LimitReader(resp.Body, f.Size-have), make([]byte, 1<<20))
+		got, err = io.CopyBuffer(io.MultiWriter(fd, h, t, watchdog{stall}), limited{ctx, io.LimitReader(resp.Body, f.Size-have)}, make([]byte, 1<<20))
 		if err == nil && have+got < f.Size {
 			err = io.ErrUnexpectedEOF
 		}
