@@ -3451,6 +3451,8 @@ public:
                     case 73899:
                     case 100787:
                     case 118215:
+                    case 193455: // Cobra Shot, hunters' "Steady Shot" practice (#104: Steady Shot is not in 7.3.5)
+                    case 185358: // Arcane Shot
                     {
                         player->KilledMonsterCredit(44175, ObjectGuid::Empty);
                         break;

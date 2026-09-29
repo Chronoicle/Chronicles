@@ -393,10 +393,12 @@ public:
 
                 switch (spell->Id)
                 {
-                    case 589: 
-                    case 172: 
+                    case 589:
+                    case 172:
                     case 100:
                     case 8921:
+                    case 193455: // Cobra Shot, hunters' "Steady Shot" practice (#104: Steady Shot is not in 7.3.5)
+                    case 185358: // Arcane Shot
                     {
                         player->KilledMonsterCredit(44175, ObjectGuid::Empty);
                         break;
