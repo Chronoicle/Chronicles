@@ -1,0 +1,12 @@
+-- #106 follow-up (gabrielf03d): Shadow Priest artifact scenario 991 "Blade in Twilight" (map 1539, priest phase 5737).
+-- Undo: undo_xalatath_portal_106.sql
+--
+-- The Portal to Dalaran City (gameobject 247351, summoned by Zakajz 102039's timed list, smart_scripts source_type 9
+-- id 2, 11 s after Dark Drain hits him at the end of the scenario) kept replaying its "appear" animation. Its model (display 8834, Creature_SpellPortal_LargeShadow.m2)
+-- is a spell-effect model: anim 0 Stand (1.7 s) is the one-shot opening (flashes + the portal surface fading in),
+-- 158 Hold is the steady loop, 159 Decay the fade-out. A gameobject without a state anim loops Stand, so the portal
+-- "opened" again every 1.7 s. Retail keeps such gameobjects in their loop with a state anim kit (Demon Portal 246706:
+-- kit 3761 = Open once, then Opened looped); AnimKit 4304 is the same for this model: anim 0 once, then 158 looped.
+-- The Portal to Tol Barad 251699 (Destruction Warlock artifact scenario, map 0 phase 6938) uses the same model and
+-- template setup, so it gets the same kit.
+UPDATE world.gameobject_template SET SpellStateAnimKitID = 4304 WHERE entry IN (247351, 251699);
