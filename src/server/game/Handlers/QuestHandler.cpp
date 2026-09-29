@@ -420,7 +420,7 @@ void WorldSession::HandleQuestGiverChooseReward(WorldPackets::Quest::QuestGiverC
                 }
             }
 
-            if (!itemValid)
+            if (!itemValid && !_player->HasSelectableQuestPackageItem(quest->PackageID))
             {
                 if (std::vector<QuestPackageItemEntry const*> const* questPackageItems = sDB2Manager.GetQuestPackageItemsFallback(quest->PackageID))
                 {

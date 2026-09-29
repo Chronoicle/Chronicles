@@ -18891,7 +18891,7 @@ bool Player::CanRewardQuest(Quest const* quest, uint32 reward, bool msg)
             }
         }
 
-        if (!hasFilteredQuestPackageReward)
+        if (!hasFilteredQuestPackageReward && !HasSelectableQuestPackageItem(quest->PackageID))
         {
             if (std::vector<QuestPackageItemEntry const*> const* questPackageItems = sDB2Manager.GetQuestPackageItemsFallback(quest->PackageID))
             {
@@ -19147,6 +19147,17 @@ bool Player::CanSelectQuestPackageItem(QuestPackageItemEntry const* questPackage
     return false;
 }
 
+// The package's fallback items are only for a player who fits none of its class/spec items (#110)
+bool Player::HasSelectableQuestPackageItem(uint32 questPackageId) const
+{
+    if (std::vector<QuestPackageItemEntry const*> const* questPackageItems = sDB2Manager.GetQuestPackageItems(questPackageId))
+        for (QuestPackageItemEntry const* questPackageItem : *questPackageItems)
+            if (CanSelectQuestPackageItem(questPackageItem))
+                return true;
+
+    return false;
+}
+
 void Player::RewardQuestPackage(uint32 questPackageId, uint32 onlyItemId /*= 0*/)
 {
     bool hasFilteredQuestPackageReward = false;
@@ -19170,7 +19181,7 @@ void Player::RewardQuestPackage(uint32 questPackageId, uint32 onlyItemId /*= 0*/
         }
     }
 
-    if (!hasFilteredQuestPackageReward)
+    if (!hasFilteredQuestPackageReward && !HasSelectableQuestPackageItem(questPackageId))
     {
         if (std::vector<QuestPackageItemEntry const*> const* questPackageItems = sDB2Manager.GetQuestPackageItemsFallback(questPackageId))
         {
