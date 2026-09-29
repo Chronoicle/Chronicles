@@ -48,6 +48,7 @@
 #include "Log.h"
 #include "MapManager.h"
 #include "MiscPackets.h"
+#include "MoveSpline.h"
 #include "MoveSplineInitArgs.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
@@ -1962,15 +1963,21 @@ void Spell::EffectJumpDest(SpellEffIndex effIndex)
         arrivalCast.Target = !delayCast->TargetGUID.IsEmpty() ? delayCast->TargetGUID : m_caster->GetGUID();
     }
     m_caster->GetMotionMaster()->MoveJump(*destTarget, speedXY, speedZ, m_spellInfo->Id, !m_targets.GetObjectTargetGUID().IsEmpty(), &arrivalCast);
+
+    // Heroic Leap: the leap animation (AnimKit 10793) is only in the AuraStart kit 68536 of its visual 39239, and the spell
+    // has no aura, so the warrior stood still in the air (#51). Play that kit for the flight; the landing 52174 has its own.
+    if (m_spellInfo->Id == 6544 && !m_caster->movespline->Finalized())
+        m_caster->SendPlaySpellVisualKit(68536, 0, m_caster->movespline->Duration());
 }
 
 void Spell::CalculateJumpSpeeds(uint8 i, float dist, float & speedXY, float & speedZ)
 {
     // Players (retail formula, as in TrinityCore master): MiscValue is the minimum jump height in 0.1 yd, MiscValueB
-    // the maximum, the horizontal speed comes from the run speed and the arc from the flight time. The formula below
-    // used MiscValue as the vertical speed: Heroic Leap (17) got 1.7 yd/s, a flat slide with only the landing (#51)
+    // the maximum, the horizontal speed comes from the run speed and the arc from the flight time.
+    // Not Heroic Leap: ApplySpellFix sets its MiscValue to 150, so this made a 15 yd high, ~2 s leap; the formula below
+    // gives the ~6 yd arc the reporter preferred (#51). The missing part was the animation (EffectJumpDest).
     SpellEffectInfo const* effect = m_spellInfo->GetEffect(i, m_diffMode);
-    if (m_caster->IsPlayer())
+    if (m_caster->IsPlayer() && m_spellInfo->Id != 6544)
     {
         float multiplier = effect->Amplitude > 0.0f ? effect->Amplitude : 1.0f;
         speedXY = std::min(playerBaseMoveSpeed[MOVE_RUN] * 3.0f * multiplier, std::max(28.0f, m_caster->GetSpeed(MOVE_RUN) * 4.0f));
