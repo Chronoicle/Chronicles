@@ -23,8 +23,8 @@ DELETE FROM world.spell_script_names WHERE spell_id = 257376 AND ScriptName = 's
 INSERT INTO world.spell_script_names (spell_id, ScriptName) VALUES (257376, 'spell_item_terminus_legion_bombardment');
 -- Legion Cruiser: copy of the Ravager summon row (76168), level 110, Legion health scaling, not selectable/attackable.
 DELETE FROM world.creature_template WHERE entry = 129063;
-CREATE TEMPORARY TABLE tmp_ct_56 AS SELECT * FROM world.creature_template WHERE entry = 76168;
-UPDATE tmp_ct_56 SET entry = 129063, minlevel = 110, maxlevel = 110, HealthScalingExpansion = 6, unit_class = 1,
+CREATE TEMPORARY TABLE world.tmp_ct_56 AS SELECT * FROM world.creature_template WHERE entry = 76168;
+UPDATE world.tmp_ct_56 SET entry = 129063, minlevel = 110, maxlevel = 110, HealthScalingExpansion = 6, unit_class = 1,
   unit_flags = 33555202, AIName = '', ScriptName = '';
-INSERT INTO world.creature_template SELECT * FROM tmp_ct_56;
-DROP TEMPORARY TABLE tmp_ct_56;
+INSERT INTO world.creature_template SELECT * FROM world.tmp_ct_56;
+DROP TEMPORARY TABLE world.tmp_ct_56;
