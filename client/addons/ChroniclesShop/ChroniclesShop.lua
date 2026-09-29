@@ -116,6 +116,7 @@ local perkItem                      -- { bag, slot, entry, link, perks } of the 
 local perkNote                      -- text of the empty perks editor
 local incomingPerks = {}            -- PERKs being received, until PEND
 local Refresh, UpdateRows, ShowConfirm, Preview, UpdatePreviewButtons
+local popup                         -- the confirmation (created below, used by Request's timeout)
 
 RegisterAddonMessagePrefix(PREFIX)
 
@@ -214,6 +215,7 @@ local function Request(info, build)
     C_Timer.After(5, function()
         if pending == reqId then   -- no answer yet: the server may still deliver it
             pending = nil
+            popup.buy:Enable()   -- the open confirmation gets its button back
             Error("The shop has not answered yet. Check your balance before buying again.")
             UpdateRows()
         end
@@ -337,13 +339,17 @@ search:HookScript("OnTextChanged", function()
     UpdateRows()
 end)
 
--- item level of the shown list (from ILV); a choice is kept for every list until the shop closes
-local ilvlDrop = CreateFrame("Frame", "ChroniclesShopItemLevel", frame, "UIDropDownMenuTemplate")
-ilvlDrop:SetPoint("RIGHT", search, "LEFT", 4, -3)
-UIDropDownMenu_SetWidth(ilvlDrop, 110)
-ilvlDrop:Hide()
+-- item level of the shown list (from ILV): "< Item level 985 >" steps through the levels ILV listed; the choice is
+-- kept for every list until the shop closes. Plain buttons, not UIDropDownMenu: an addon using the shared dropdown
+-- taints it and blocks Blizzard's unit menu actions (Set Focus, raid marks)
+local ilvlBar = CreateFrame("Frame", nil, frame)
+ilvlBar:SetSize(170, 22)
+ilvlBar:SetPoint("RIGHT", search, "LEFT", -10, 0)
+ilvlBar:Hide()
+ilvlBar.text = ilvlBar:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+ilvlBar.text:SetPoint("CENTER")
 
-local function SelectIlvl(_, level)
+local function SelectIlvl(level)
     selIlvl = level
     wipe(lists)       -- every item-level list changes price and item level
     wipe(requested)
@@ -351,18 +357,36 @@ local function SelectIlvl(_, level)
     Refresh()
 end
 
-UIDropDownMenu_Initialize(ilvlDrop, function(self, level)
+-- step = 1: the next lower level, -1: the next higher (ILV lists them highest first)
+local function StepIlvl(step)
     local info = shownCat and ilvInfo[shownCat]
     if not info then return end
-    for _, ilvl in ipairs(info.levels) do
-        local button = UIDropDownMenu_CreateInfo()
-        button.text = "Item level " .. ilvl
-        button.arg1 = ilvl
-        button.checked = ilvl == info.current
-        button.func = SelectIlvl
-        UIDropDownMenu_AddButton(button, level)
+    for i, ilvl in ipairs(info.levels) do
+        if ilvl == info.current and info.levels[i + step] then
+            SelectIlvl(info.levels[i + step])
+            return
+        end
     end
-end)
+end
+
+local function IlvlButton(text, point, step)
+    local b = CreateFrame("Button", nil, ilvlBar, "UIPanelButtonTemplate")
+    b:SetSize(24, 22)
+    b:SetPoint(point)
+    b:SetText(text)
+    b:SetScript("OnClick", function() StepIlvl(step) end)
+    return b
+end
+ilvlBar.lower = IlvlButton("<", "LEFT", 1)
+ilvlBar.higher = IlvlButton(">", "RIGHT", -1)
+
+local function UpdateIlvlBar(info)
+    ilvlBar:SetShown(info ~= nil)
+    if not info then return end
+    ilvlBar.text:SetText("Item level " .. info.current)
+    ilvlBar.lower:SetEnabled(info.levels[#info.levels] ~= info.current)
+    ilvlBar.higher:SetEnabled(info.levels[1] ~= info.current)
+end
 
 -- UpdateMicroButtons disables the Shop button while Blizzard's store is off (Bpay.Enabled = 0): turn it back on
 local function UpdateMicroButton()
@@ -774,11 +798,7 @@ UpdateRows = function()
         end
     end
     search:SetShown(searchable)
-    local ilv = shownCat and lists[shownCat] and ilvInfo[shownCat]
-    ilvlDrop:SetShown(ilv ~= nil)
-    if ilv then
-        UIDropDownMenu_SetText(ilvlDrop, "Item level " .. ilv.current)
-    end
+    UpdateIlvlBar(shownCat and lists[shownCat] and ilvInfo[shownCat] or nil)
 
     local mode = LIST_MODES[listMode]
     local used = 0
@@ -875,7 +895,7 @@ UpdatePreviewButtons = function()
 end
 
 -- ---------------------------------------------------------------- confirmation
-local popup = CreateFrame("Frame", nil, frame)
+popup = CreateFrame("Frame", nil, frame)
 popup:SetSize(360, 200)
 popup:SetPoint("CENTER")
 popup:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -1197,7 +1217,6 @@ frame:SetScript("OnHide", function()
     popup:Hide()
     search:ClearFocus()
     artPanel.count:ClearFocus()
-    CloseDropDownMenus()
     UpdateMicroButton()
 end)
 
