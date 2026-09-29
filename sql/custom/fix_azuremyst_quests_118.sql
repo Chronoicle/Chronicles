@@ -6,19 +6,19 @@
 -- 1) Inoculation (9303): the Inoculating Crystal (22962, spell 29528, a 3 s aura on Nestlewood Owlkin 16518) gave the
 --    credit on hit. The old SmartAI was a broken merge (ids 1 and 2 twice): credit at once, then despawn in 5 s or a
 --    summoned 16534. Now: on hit the owlkin runs around (Self Fear 31365) for the crystal's 3 s, then emotes, turns into
---    Inoculated Nestlewood Owlkin 16534 (UpdateEntry), the player who used the crystal gets the credit, and it despawns
---    15 s later (visible 10 s + 5 s) and respawns as a normal owlkin (spawntimesecs). Phase 1 keeps a pending 3 s timer
---    from firing after the owlkin died and respawned (OnReset sets phase 0).
+--    Inoculated Nestlewood Owlkin 16534 (UpdateEntry), the closest player within 30 yd gets the credit (looked up then:
+--    this core's STORE_TARGET_LIST keeps raw pointers, a player logging out during the 3 s would crash it), and it
+--    despawns 15 s later (visible 10 s + 5 s) and respawns as a normal owlkin (spawntimesecs). Phase 1 keeps a pending
+--    3 s timer from firing after the owlkin died and respawned (OnReset sets phase 0).
 DELETE FROM world.smart_scripts WHERE entryorguid = 16518 AND source_type = 0;
 INSERT INTO world.smart_scripts (entryorguid, source_type, id, link, Difficulties, event_type, event_phase_mask, event_chance, event_flags, event_param1, event_param2, event_param3, event_param4, event_param5, action_type, action_param1, action_param2, action_param3, action_param4, action_param5, action_param6, target_type, target_param1, target_param2, target_param3, target_param4, target_x, target_y, target_z, target_o, comment) VALUES
-(16518,0,0,1,'',8,0,100,1,29528,0,0,0,0,22,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - On Spellhit Inoculate Nestlewood Owlkin - Set Event Phase 1'),
-(16518,0,1,2,'',61,0,100,0,0,0,0,0,0,64,1,0,0,0,0,0,7,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Store Invoker'),
+(16518,0,0,2,'',8,0,100,1,29528,0,0,0,0,22,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - On Spellhit Inoculate Nestlewood Owlkin - Set Event Phase 1'),
 (16518,0,2,3,'',61,0,100,0,0,0,0,0,0,11,31365,2,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Cast Self Fear (runs around)'),
 (16518,0,3,0,'',61,0,100,0,0,0,0,0,0,67,1,3000,3000,0,0,100,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Timed Event 1 in 3 s (crystal aura duration)'),
 (16518,0,4,5,'',59,1,100,0,1,0,0,0,0,28,31365,0,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - On Timed Event 1 (Phase 1) - Remove Self Fear'),
 (16518,0,5,6,'',61,0,100,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Say Line 0 (emote)'),
 (16518,0,6,7,'',61,0,100,0,0,0,0,0,0,36,16534,0,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Update Entry Inoculated Nestlewood Owlkin'),
-(16518,0,7,8,'',61,0,100,0,0,0,0,0,0,33,16534,0,0,0,0,0,12,1,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Quest Credit Inoculated Nestlewood Owlkin (stored player)'),
+(16518,0,7,8,'',61,0,100,0,0,0,0,0,0,33,16534,0,0,0,0,0,21,30,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Quest Credit Inoculated Nestlewood Owlkin (closest player)'),
 (16518,0,8,0,'',61,0,100,0,0,0,0,0,0,41,10000,0,0,0,0,0,1,0,0,0,0,0,0,0,0,'Nestlewood Owlkin - Link - Despawn in 10 s');
 
 -- 2) Primal Strike (26969): Primal Strike 73899 was removed in 7.0.3 (no SkillLineAbility / SpecializationSpells row),
