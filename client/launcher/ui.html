@@ -148,6 +148,8 @@
   .btn.play:disabled { background: var(--iron-button); color: var(--muted); text-shadow: none;
     box-shadow: inset 0 0 0 1px rgba(114,207,66,.25), inset 0 -8px 14px rgba(0,0,0,.4); }
   .btn.gear { width: 54px; height: 54px; font-size: 20px; }
+  .btn.gear[hidden] { display: none; }
+  .bar-row.paused .fill { filter: grayscale(.8) brightness(.7); box-shadow: none; }
   .tagline { margin-top: 16px; color: var(--text-2); font-size: 10px; font-weight: 600; letter-spacing: .28em; line-height: 1.8;
     text-transform: uppercase; text-align: center; text-shadow: 0 1px 3px #000; }
 
@@ -190,6 +192,12 @@
   .folder-row { display: flex; gap: 8px; }
   .folder-row input { flex: 1; }
   .folder-row .btn { height: 36px; padding: 0 14px; }
+  .dialog label.gap { margin-top: 18px; }
+  .dialog select { width: 220px; height: 36px; padding: 0 10px; background: rgba(5,8,6,.6); border: 2px solid rgba(114,207,66,.28);
+    color: #fff; font: inherit; outline: none; cursor: pointer; }
+  .dialog select:focus { background: rgba(5,8,6,.78); border-color: var(--fel);
+    box-shadow: 0 0 0 1px rgba(114,207,66,.25), 0 0 20px rgba(114,207,66,.2); }
+  .dialog select option { background: #0b0f0b; color: var(--text); }
   .dialog p.lead { color: var(--text-2); line-height: 1.6; margin-bottom: 20px; }
   .choices { display: flex; flex-direction: column; gap: 10px; }
   .choices .btn { height: 46px; font-size: 14px; }
@@ -226,6 +234,7 @@
         <div class="bar-row" id="barRow"><div class="bar"><div class="fill" id="fill"></div></div><span class="pct" id="pct">0%</span></div>
         <div class="buttons">
           <span class="play-glow"><button class="btn play" id="play" disabled onclick="playClicked()">Play</button></span>
+          <button class="btn gear" id="pause" title="Pause download" hidden onclick="pauseClicked()">⏸</button>
           <button class="btn gear" title="Settings" onclick="openSettings()">⚙</button>
         </div>
       </div>
@@ -248,6 +257,13 @@
           <button class="btn" onclick="browseClicked()">Browse…</button>
         </div>
         <div class="hint">The folder with Wow-64.exe and .build.info, e.g. C:\Games\Chronicles</div>
+        <label class="gap" for="limit">Download speed limit</label>
+        <select id="limit" onchange="limitChanged()">
+          <option value="0">Unlimited</option><option value="1">1 MB/s</option><option value="2">2 MB/s</option>
+          <option value="5">5 MB/s</option><option value="10">10 MB/s</option><option value="20">20 MB/s</option>
+          <option value="50">50 MB/s</option>
+        </select>
+        <div class="hint">Applies at once, also to a download that is running.</div>
         <div class="row">
           <button class="btn" onclick="repairClicked()">Repair game files</button>
           <button class="btn" onclick="restoreClicked()">Restore original client</button>
@@ -277,6 +293,7 @@
 <script>
   const $ = id => document.getElementById(id);
   let news = [], state = "busy";
+  let paused = false, downloading = false, hideTimer = 0, lastProgress = "";
 
   // window: drag by the title bar
   $("titlebar").addEventListener("mousedown", e => { if (e.button === 0 && !e.target.closest("button")) drag(); });
@@ -284,25 +301,52 @@
   // ---- called from Go
   function setStatus(text) { const s = $("status"); s.className = "status"; s.textContent = text; }
   function setProgress(text, pct) {
-    if (text) setStatus(text);
+    if (text) { lastProgress = text; if (!paused) setStatus(text); } // paused: the status keeps "Paused"
     $("barRow").classList.remove("hidden");
     $("fill").style.width = pct + "%";
     $("pct").textContent = Math.floor(pct) + "%";
   }
+  // pause button: shown at once while bytes flow, hidden ~2 s after they stop (Go flickers between files)
+  function setDownloading(on) {
+    downloading = on;
+    clearTimeout(hideTimer);
+    if (on) $("pause").hidden = false;
+    else hideTimer = setTimeout(() => { if (!downloading && !paused) $("pause").hidden = true; }, 2000);
+  }
+  function setPaused(on) {
+    paused = on;
+    const b = $("pause");
+    b.textContent = on ? "▶" : "⏸"; b.title = on ? "Resume download" : "Pause download";
+    $("barRow").classList.toggle("paused", on);
+    if (on) {
+      b.hidden = false;
+      // only "Paused  •  12.4 / 72.2 GB": no speed or time left while nothing moves
+      const parts = lastProgress.split("  •  ");
+      setStatus(parts.length > 1 ? "Paused  •  " + parts[1] : "Paused");
+    } else {
+      if (lastProgress) setStatus(lastProgress);
+      if (!downloading) setDownloading(false);
+    }
+  }
+  function clearPause() { // setBusy / setReady / setError
+    paused = downloading = false; clearTimeout(hideTimer);
+    $("pause").hidden = true; $("pause").textContent = "⏸"; $("pause").title = "Pause download";
+    $("barRow").classList.remove("paused");
+  }
   function setBusy() {
-    state = "busy";
+    state = "busy"; clearPause();
     $("play").disabled = true; $("play").textContent = "Updating";
     $("fill").style.width = "0%"; $("pct").textContent = "0%";
     $("barRow").classList.add("hidden");
   }
   function setReady() {
-    state = "ready";
+    state = "ready"; clearPause();
     $("play").disabled = false; $("play").textContent = "Play";
     $("status").classList.add("ok");
     setTimeout(() => { if (state === "ready") $("barRow").classList.add("hidden"); }, 1200);
   }
   function setError(msg) {
-    state = "error";
+    state = "error"; clearPause();
     const s = $("status"); s.className = "status err"; s.textContent = msg;
     $("barRow").classList.add("hidden");
     $("play").disabled = false; $("play").textContent = "Retry";
@@ -370,10 +414,19 @@
 
   // ---- play / settings
   function playClicked() { if (state === "ready") { $("play").disabled = true; play(); } else if (state === "error") refresh(); }
+  function pauseClicked() { if (paused) resumeDownload(); else pauseDownload(); } // Go answers with setPaused
   async function openSettings() {
     $("folder").value = await getFolder();
+    const lim = String(await getLimit() || 0), sel = $("limit");
+    if (![...sel.options].some(o => o.value === lim)) sel.add(new Option(lim + " MB/s", lim)); // a value set elsewhere
+    sel.value = lim;
     $("settingsMsg").textContent = "";
     $("settings").classList.add("open");
+  }
+  async function limitChanged() { // applied live, not on Save (Save checks the folder, which fails mid-install)
+    const err = await setLimit(Number($("limit").value));
+    $("settingsMsg").style.color = "var(--err)";
+    $("settingsMsg").textContent = err || "";
   }
   function closeSettings() { $("settings").classList.remove("open"); }
   async function saveSettings() {

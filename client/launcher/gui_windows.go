@@ -50,10 +50,15 @@ var (
 	coTaskMemFree    = syscall.NewLazyDLL("ole32.dll").NewProc("CoTaskMemFree")
 )
 
-const configFile = "launcher.json" // next to Launcher.exe: {"game_folder": "..."}
+const configFile = "launcher.json" // next to Launcher.exe: {"game_folder": "...", "limit_mbps": 5}
+
+// minLimitMBps is the lowest speed limit: below it an in-memory download (a game update file, the launcher's own
+// update: get() has a 10 minute timeout for the whole body) could not finish in time and would use up its tries.
+const minLimitMBps = 0.5
 
 type launcherConfig struct {
-	GameFolder string `json:"game_folder"`
+	GameFolder string  `json:"game_folder"`
+	LimitMBps  float64 `json:"limit_mbps,omitempty"` // download speed limit in MB/s, 0 = unlimited
 }
 
 // oneLauncher makes sure only one launcher runs (two would download into the same .part files). A launcher that
@@ -77,6 +82,28 @@ func run(root string, args []string, test bool) {
 	var cfg launcherConfig
 	if b, err := os.ReadFile(cfgPath); err == nil && json.Unmarshal(b, &cfg) == nil && cfg.GameFolder != "" && !test {
 		root = cfg.GameFolder
+	}
+	if cfg.LimitMBps < 0 {
+		cfg.LimitMBps = 0
+	} else if cfg.LimitMBps > 0 {
+		cfg.LimitMBps = min(max(cfg.LimitMBps, minLimitMBps), 1000) // a hand-edited launcher.json
+	}
+	dl.SetLimit(int64(cfg.LimitMBps * 1e6))
+	// saveCfg changes cfg (setup's goroutine and the Settings bindings both do) and writes launcher.json through a
+	// .tmp file: a crash mid-write must not leave an empty launcher.json (the next start would forget the game folder)
+	var cfgMu sync.Mutex
+	saveCfg := func(change func()) error {
+		cfgMu.Lock()
+		defer cfgMu.Unlock()
+		change()
+		b, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(cfgPath+".tmp", b, 0644); err != nil {
+			return err
+		}
+		return os.Rename(cfgPath+".tmp", cfgPath)
 	}
 
 	if len(args) > 0 && args[0] == "restore" { // old way, from the first launcher's guide
@@ -123,6 +150,7 @@ func run(root string, args []string, test bool) {
 	}
 	say = func(text string) { eval("setStatus", text) }
 	progress = func(text string, pct float64) { eval("setProgress", text, pct) }
+	downloading = func(on bool) { eval("setDownloading", on) } // the pause button
 
 	// setup: no client here. The player chooses (install dialog in ui.html): install the game into a folder they pick,
 	// or pick the 7.3.5 client they already have. The folder is saved in launcher.json right away (an interrupted install
@@ -131,7 +159,9 @@ func run(root string, args []string, test bool) {
 	installChoice := make(chan string, 1)
 	setup := func(man Manifest) bool {
 		base, files := fetchClient(man)
+		cfgMu.Lock()
 		dir := cfg.GameFolder
+		cfgMu.Unlock()
 		if dir == "" || !started(dir) {
 			size := int64(0)
 			for _, f := range files {
@@ -164,17 +194,15 @@ func run(root string, args []string, test bool) {
 				}
 			}
 			eval("closeInstall")
-			cfg.GameFolder = dir // also replaces a launcher.json that named a folder without a client
-			b, _ := json.Marshal(cfg)
-			os.WriteFile(cfgPath, b, 0644) // without it, picking the same folder again goes on there too (installDir)
+			// also replaces a launcher.json that named a folder without a client; without it, picking the same folder
+			// again goes on there too (installDir)
+			saveCfg(func() { cfg.GameFolder = dir })
 		}
 		if !installed(dir) {
 			defer func() {
 				if r := recover(); r != nil {
 					if s, ok := r.(string); ok && strings.HasPrefix(s, noSpace) {
-						cfg.GameFolder = "" // the next refresh asks for another folder
-						b, _ := json.Marshal(cfg)
-						os.WriteFile(cfgPath, b, 0644)
+						saveCfg(func() { cfg.GameFolder = "" }) // the next refresh asks for another folder
 					}
 					panic(r)
 				}
@@ -204,6 +232,7 @@ func run(root string, args []string, test bool) {
 			}
 		}()
 		ready.Store(false)
+		dl.Resume() // setBusy clears the page's pause button: no download of this check may wait for it
 		eval("setBusy")
 		man, newer := checkLauncher(test)
 		if newer || (!test && !installed(root) && man.Client != "" && !setup(man)) {
@@ -260,6 +289,24 @@ func run(root string, args []string, test bool) {
 		}
 	})
 	w.Bind("getFolder", func() string { return root })
+	// pause / resume every download (transfer.go); quitting while paused is safe: the .part files keep what came
+	w.Bind("pauseDownload", func() { dl.Pause(); eval("setPaused", true) })
+	w.Bind("resumeDownload", func() { dl.Resume(); eval("setPaused", false) })
+	w.Bind("getLimit", func() float64 {
+		cfgMu.Lock()
+		defer cfgMu.Unlock()
+		return cfg.LimitMBps
+	})
+	w.Bind("setLimit", func(mbps float64) string { // applied at once, also to a running download
+		if mbps != 0 && (mbps < minLimitMBps || mbps > 1000) {
+			return "Choose a limit between 0.5 and 1000 MB/s, or Unlimited."
+		}
+		dl.SetLimit(int64(mbps * 1e6))
+		if err := saveCfg(func() { cfg.LimitMBps = mbps }); err != nil {
+			return "Cannot save the setting: " + err.Error()
+		}
+		return ""
+	})
 	// bindings run on the window thread, so the modal folder dialog can open right here
 	w.Bind("browseFolder", func() string {
 		return pickFolder(hwnd, "Choose your World of Warcraft: Legion 7.3.5 folder (the one with Wow-64.exe and .build.info).")
@@ -269,8 +316,7 @@ func run(root string, args []string, test bool) {
 		if !isClient(dir) {
 			return "That folder has no World of Warcraft: Legion 7.3.5 client: pick the folder with Wow-64.exe and .build.info."
 		}
-		b, _ := json.Marshal(launcherConfig{GameFolder: dir})
-		if err := os.WriteFile(cfgPath, b, 0644); err != nil {
+		if err := saveCfg(func() { cfg.GameFolder = dir }); err != nil {
 			return "Cannot save the setting: " + err.Error()
 		}
 		root = dir
