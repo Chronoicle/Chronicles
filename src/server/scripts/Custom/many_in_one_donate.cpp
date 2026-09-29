@@ -588,7 +588,8 @@ public:
 //                     | PERKS <bag> <slot> | PERKADD <bag> <slot> <perkId> <shownPrice> <reqId> <itemEntry>
 //                     | PERKDEL <bag> <slot> <perkId> <reqId> <itemEntry> (free)
 //   server -> client: CLOSED | BAL <tokens> | CAT <id> <parentId> <order> #<flags> <name> ... CEND
-//                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name> ...
+//                     | ITEM <productId> <type> <param1> <price> <ilvl> <bonuses> #<flags> <display> <name>
+//                       [BPART <productId> <text> ... after a type 11 starter pack: its contents] ...
 //                       [ILV <categoryId> <current> <ilvl>,<ilvl>,...] LEND <categoryId> <count>
 //                     | PERK <perkId> <price> <has> #<flags> <name> ... PEND <bag> <slot> <itemEntry>
 //                     | OK <reqId> <productId|perkId> <tokens> [MAIL]
@@ -928,6 +929,9 @@ static std::string DeliverBundle(Player* player, uint32 bundleId, bool* mailed)
             parts.push_back({ type, f[1].GetUInt32(), f[2].GetUInt32(), f[3].GetString() });
     } while (result->NextRow());
 
+    // a level the character already has is skipped: the rest of a starter pack is still worth it at 110
+    parts.erase(std::remove_if(parts.begin(), parts.end(), [player](ShopPart const& part)
+        { return part.Type == PRODUCT_LEVEL && player->getLevel() >= part.Param1; }), parts.end());
     if (parts.empty())
         return "You already have everything in this bundle";
     for (ShopPart const& part : parts)
@@ -1188,6 +1192,43 @@ private:
         SendShop(player, "CEND");
     }
 
+    // a starter pack's contents for the addon's banner: "BPART <productId> <text>" per part, same items counted together
+    static void SendBundleParts(Player* player, uint32 productId, uint32 bundleId)
+    {
+        QueryResult result = LoginDatabase.PQuery("SELECT `type`, `param1`, `bonus` FROM `donate_bundle_items` WHERE `bundle` = %u ORDER BY `sort`", bundleId);
+        if (!result)
+            return;
+        std::vector<std::pair<std::string, uint32>> lines;   // text, how many times in a row
+        do
+        {
+            Field* f = result->Fetch();
+            uint32 param1 = f[1].GetUInt32();
+            std::string bonus = f[2].GetString(), text;
+            switch (f[0].GetUInt8())
+            {
+                case PRODUCT_LEVEL: text = "Level " + std::to_string(param1); break;
+                case PRODUCT_GOLD: text = std::to_string(param1) + " gold"; break;
+                case PRODUCT_ITEM:
+                    if (ItemTemplate const* proto = sObjectMgr->GetItemTemplate(param1))
+                        text = proto->GetName()->Get(player->GetSession()->GetSessionDbLocaleIndex());
+                    break;
+                case BUNDLE_GEARSET:
+                    text = "A gear set for your specialization" + (bonus.compare(0, 5, "ilvl:") == 0 ? " (item level " + bonus.substr(5) + ")" : std::string());
+                    break;
+                case BUNDLE_ARTIFACTS: text = "All artifact weapons of your class"; break;
+                default: break;
+            }
+            if (text.empty())
+                continue;
+            if (!lines.empty() && lines.back().first == text)
+                ++lines.back().second;
+            else
+                lines.emplace_back(text, 1);
+        } while (result->NextRow());
+        for (auto const& line : lines)
+            SendShop(player, "BPART " + std::to_string(productId) + " " + ShopName((line.second > 1 ? std::to_string(line.second) + "x " : "") + line.first));
+    }
+
     // the category's products; ilvl = the item level for its products sold by item level (0 or not in the table: their own)
     static void List(Player* player, uint32 category, uint32 ilvl)
     {
@@ -1236,6 +1277,8 @@ private:
                 SendShop(player, "ITEM " + std::to_string(f[0].GetUInt32()) + " " + std::to_string(type) + " " + std::to_string(param1) + " " + std::to_string(price)
                     + " " + std::to_string(itemLevel) + " " + (bonuses.empty() ? "-" : bonuses) + " #" + std::to_string(flags)
                     + " " + std::to_string(ShopDisplay(type, param1)) + " " + ShopName(name));
+                if (type == PRODUCT_BUNDLE)
+                    SendBundleParts(player, f[0].GetUInt32(), param1);
                 ++count;
             } while (result->NextRow());
         }
