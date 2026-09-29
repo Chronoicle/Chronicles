@@ -52,6 +52,10 @@ var (
 
 const configFile = "launcher.json" // next to Launcher.exe: {"game_folder": "...", "limit_mbps": 5}
 
+// minLimitMBps is the lowest speed limit: below it an in-memory download (a game update file, the launcher's own
+// update: get() has a 10 minute timeout for the whole body) could not finish in time and would use up its tries.
+const minLimitMBps = 0.5
+
 type launcherConfig struct {
 	GameFolder string  `json:"game_folder"`
 	LimitMBps  float64 `json:"limit_mbps,omitempty"` // download speed limit in MB/s, 0 = unlimited
@@ -79,15 +83,27 @@ func run(root string, args []string, test bool) {
 	if b, err := os.ReadFile(cfgPath); err == nil && json.Unmarshal(b, &cfg) == nil && cfg.GameFolder != "" && !test {
 		root = cfg.GameFolder
 	}
+	if cfg.LimitMBps < 0 {
+		cfg.LimitMBps = 0
+	} else if cfg.LimitMBps > 0 {
+		cfg.LimitMBps = min(max(cfg.LimitMBps, minLimitMBps), 1000) // a hand-edited launcher.json
+	}
 	dl.SetLimit(int64(cfg.LimitMBps * 1e6))
-	// saveCfg changes cfg (setup's goroutine and the Settings bindings both do) and writes launcher.json
+	// saveCfg changes cfg (setup's goroutine and the Settings bindings both do) and writes launcher.json through a
+	// .tmp file: a crash mid-write must not leave an empty launcher.json (the next start would forget the game folder)
 	var cfgMu sync.Mutex
 	saveCfg := func(change func()) error {
 		cfgMu.Lock()
 		defer cfgMu.Unlock()
 		change()
-		b, _ := json.Marshal(cfg)
-		return os.WriteFile(cfgPath, b, 0644)
+		b, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(cfgPath+".tmp", b, 0644); err != nil {
+			return err
+		}
+		return os.Rename(cfgPath+".tmp", cfgPath)
 	}
 
 	if len(args) > 0 && args[0] == "restore" { // old way, from the first launcher's guide
@@ -143,7 +159,9 @@ func run(root string, args []string, test bool) {
 	installChoice := make(chan string, 1)
 	setup := func(man Manifest) bool {
 		base, files := fetchClient(man)
+		cfgMu.Lock()
 		dir := cfg.GameFolder
+		cfgMu.Unlock()
 		if dir == "" || !started(dir) {
 			size := int64(0)
 			for _, f := range files {
@@ -280,8 +298,8 @@ func run(root string, args []string, test bool) {
 		return cfg.LimitMBps
 	})
 	w.Bind("setLimit", func(mbps float64) string { // applied at once, also to a running download
-		if mbps < 0 || mbps > 1000 {
-			return "Choose a limit between 1 and 1000 MB/s, or Unlimited."
+		if mbps != 0 && (mbps < minLimitMBps || mbps > 1000) {
+			return "Choose a limit between 0.5 and 1000 MB/s, or Unlimited."
 		}
 		dl.SetLimit(int64(mbps * 1e6))
 		if err := saveCfg(func() { cfg.LimitMBps = mbps }); err != nil {

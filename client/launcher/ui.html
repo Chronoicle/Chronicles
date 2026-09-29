@@ -320,8 +320,9 @@
     $("barRow").classList.toggle("paused", on);
     if (on) {
       b.hidden = false;
-      const i = lastProgress.indexOf("  •  ");
-      setStatus(i >= 0 ? "Paused" + lastProgress.slice(i) : "Paused");
+      // only "Paused  •  12.4 / 72.2 GB": no speed or time left while nothing moves
+      const parts = lastProgress.split("  •  ");
+      setStatus(parts.length > 1 ? "Paused  •  " + parts[1] : "Paused");
     } else {
       if (lastProgress) setStatus(lastProgress);
       if (!downloading) setDownloading(false);

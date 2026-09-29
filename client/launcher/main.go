@@ -183,6 +183,9 @@ func (t *tracker) add(n int64) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.done += n
+	if !t.shown.IsZero() && time.Since(t.shown) > 2*time.Second { // after a pause: no speed from before it
+		t.speed, t.sampled, t.sampledDone = 0, time.Now(), t.done
+	}
 	if time.Since(t.shown) < 100*time.Millisecond && t.done < t.total {
 		return
 	}
