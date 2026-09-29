@@ -599,8 +599,9 @@ bool PetAI::CanAttack(Unit* target)
     // Evaluates wether a pet can attack a specific
     // target based on CommandState, ReactState and other flags
 
-    // Returning - check first since pets returning ignore attacks
-    if (me->GetCharmInfo()->IsReturning())
+    // Returning because the player clicked Follow / Passive - ignore attacks until back. A pet running back on its
+    // own (its target died, nothing next) takes the owner's new target at once instead of reaching the owner first
+    if (me->GetCharmInfo()->IsReturning() && me->GetCharmInfo()->IsCommandFollow())
         return false;
 
     // Passive - check now so we don't have to worry about passive in later checks

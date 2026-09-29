@@ -54,7 +54,7 @@ void UnitActionBarEntry::SetAction(uint32 action)
     packedData = (packedData & 0xFF000000) | UNIT_ACTION_BUTTON_ACTION(action);
 }
 
-CharmInfo::CharmInfo(Unit* unit) : m_unit(unit), m_CommandState(COMMAND_FOLLOW), m_petnumber(0), m_isCommandAttack(false), m_isAtStay(false), m_isFollowing(false), m_isReturning(false)
+CharmInfo::CharmInfo(Unit* unit) : m_unit(unit), m_CommandState(COMMAND_FOLLOW), m_petnumber(0), m_isCommandAttack(false), m_isAtStay(false), m_isFollowing(false), m_isReturning(false), m_isCommandFollow(false)
 {
     for (auto& itr : m_charmspells)
         itr.SetActionAndType(0, ACT_DISABLED);
@@ -440,9 +440,10 @@ bool CharmInfo::IsFollowing()
     return m_isFollowing;
 }
 
-void CharmInfo::SetIsReturning(bool val)
+void CharmInfo::SetIsReturning(bool val, bool commanded)
 {
     m_isReturning = val;
+    m_isCommandFollow = val && commanded;
 }
 
 bool CharmInfo::IsReturning()
