@@ -743,7 +743,7 @@ UPDATE world.creature_template_wdb SET Name1 = 'Huan-Di', Title = 'Mysterious Wa
 UPDATE world.creature_template_wdb SET Name1 = 'Heart of Y''Shaarj' WHERE Entry = 200464;
 UPDATE world.creature_template_wdb SET Name1 = 'Sha of Chaos' WHERE Entry = 200465;
 UPDATE world.creature_template_wdb SET Name1 = 'Shop Item Refunds' WHERE Entry = 220011;
-UPDATE world.creature_template_wdb SET Name1 = 'Character Transfer' WHERE Entry = 220020;
+UPDATE world.creature_template_wdb SET Name1 = 'Character Transfer', Title = '' WHERE Entry = 220020;   -- title was another server's name (uwow.biz)
 UPDATE world.creature_template_wdb SET Name1 = 'Void Elf (M)' WHERE Entry = 230009;
 UPDATE world.creature_template_wdb SET Name1 = 'Void Elf (F)' WHERE Entry = 230010;
 UPDATE world.creature_template_wdb SET Name1 = 'Lightforged Draenei (M)' WHERE Entry = 230011;
@@ -773,7 +773,7 @@ UPDATE world.creature_template_wdb SET Name1 = 'Scarwing Ravager' WHERE Entry = 
 UPDATE world.creature_template_wdb SET Name1 = 'Vilefiend' WHERE Entry = 542102;
 UPDATE world.creature_template_wdb SET Name1 = 'Banelord' WHERE Entry = 542103;
 UPDATE world.creature_template_wdb SET Name1 = 'Abyssal Annihilator' WHERE Entry = 542104;
-UPDATE world.creature_template_wdb SET Name1 = 'Warbringer' WHERE Entry = 542105;
+UPDATE world.creature_template_wdb SET Name1 = 'Herald of War' WHERE Entry = 542105;
 UPDATE world.creature_template_wdb SET Name1 = 'Legion Brute' WHERE Entry = 542106;
 UPDATE world.creature_template_wdb SET Name1 = 'Legion Warship' WHERE Entry = 542107;
 UPDATE world.creature_template_wdb SET Name1 = 'Legion Warship' WHERE Entry = 542108;
