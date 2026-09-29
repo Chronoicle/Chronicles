@@ -46,6 +46,7 @@ public:
         uint32 illysannaIntroState = 0;
         uint32 KurtalosState = 0;;
         uint32 AmalgamState = 0;
+        uint32 boulderStairs1State = 0; // DONE once a player reached the top of the first staircase (#89)
         uint32 boulderStairs2State = 0; // DONE once a player reached the top of the second staircase (#89)
 
         void Initialize() override
@@ -127,6 +128,9 @@ public:
                 case DATA_KURTALOS_STATE:
                     KurtalosState = data;
                     break;
+                case DATA_STAIRS_BOULDER_1:
+                    boulderStairs1State = data; // SPECIAL: the trickster already yelled the retreat line (#89)
+                    break;
                 case DATA_STAIRS_BOULDER_2:
                     boulderStairs2State = data; // SPECIAL: a trickster already yelled the retreat line (#89)
                     break;
@@ -178,6 +182,8 @@ public:
                     return AmalgamState;
                 case DATA_ILLYSANNA_INTRO:
                     return illysannaIntroState;
+                case DATA_STAIRS_BOULDER_1:
+                    return boulderStairs1State;
                 case DATA_STAIRS_BOULDER_2:
                     return boulderStairs2State;
             }
@@ -230,6 +236,19 @@ public:
             return valid;
         }
 
+        bool HasPlayerNear(G3D::Vector3 const& pos, float dist)
+        {
+            bool valid = false;
+
+            instance->ApplyOnEveryPlayer([&](Player* player)
+            {
+                if (player && !player->isGameMaster() && player->GetDistance(pos.x, pos.y, pos.z) < dist)
+                    valid = true;
+            });
+
+            return valid;
+        }
+
         void CreatureDies(Creature* creature, Unit* /*killer*/) override
         {
             switch (creature->GetEntry())
@@ -256,11 +275,15 @@ public:
                     if (HasPlayerUpperThan(125.f))
                     {
                         events.CancelEvent(DATA_STAIRS_BOULDER_1);
+                        boulderStairs1State = DONE;
                         events.RescheduleEvent(DATA_STAIRS_BOULDER_2, 3000);
                         break;
                     }
 
-                    if (instance->GetPlayersCountExceptGMs())
+                    // #89: only while someone is within 60 yd of the middle of the staircase. The event runs from the
+                    // moment the instance opens, and only cells near players update, so boulders summoned while the
+                    // group was still at the first boss stood at the top and then all rolled down at once.
+                    if (HasPlayerNear(firstBoulderPos[0][3], 60.0f))
                     {
                         uint8 boulderSide = urand(0, 1);
                         Position pos = Position(firstBoulderPos[boulderSide][0].x, firstBoulderPos[boulderSide][0].y, firstBoulderPos[boulderSide][0].z);
@@ -285,7 +308,7 @@ public:
                         break;
                     }
 
-                    if (instance->GetPlayersCountExceptGMs())
+                    if (HasPlayerNear(secondBoulderPos[0][11], 60.0f)) // middle of the staircase, as above
                     {
                         uint8 boulderSide = urand(0, 1);
                         Position pos = Position(secondBoulderPos[boulderSide][0].x, secondBoulderPos[boulderSide][0].y, secondBoulderPos[boulderSide][0].z);
@@ -305,14 +328,7 @@ public:
                 {
                     // #89: only while someone is near the Felspite Dominators at the gate; the bats now fly path
                     // 10278100 (was empty, they idled at the gate) and would otherwise pile up all run long
-                    bool nearGate = false;
-                    instance->ApplyOnEveryPlayer([&](Player* player)
-                    {
-                        if (player && !player->isGameMaster() && player->GetDistance(3224.31f, 7335.72f, 226.0f) < 70.0f)
-                            nearGate = true;
-                    });
-
-                    if (nearGate)
+                    if (HasPlayerNear(G3D::Vector3(3224.31f, 7335.72f, 226.0f), 70.0f))
                     {
                         for (uint8 i = 0; i < 3; ++i)
                             AddDelayedEvent(1500 * i, [this, i] () -> void { instance->SummonCreature(NPC_EVENT_FEL_BAT, mashFelBatPos[i]); });

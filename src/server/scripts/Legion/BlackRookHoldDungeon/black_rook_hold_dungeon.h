@@ -78,7 +78,9 @@ enum eGameObjects
     GO_KURTALOS_DOOR            = 247498,
 };
 
-#define FIRST_BOULDER_PATH_SIZE 8
+// #89: the last 4 points roll on past the bottom step, through the doorway into the dead-end passage east of it
+// (navmesh floor, it ends at x ~3175) and break there; they used to break on the last stair
+#define FIRST_BOULDER_PATH_SIZE 12
 G3D::Vector3 const firstBoulderPos[2][FIRST_BOULDER_PATH_SIZE] =
 {
     // Right Boulder path
@@ -90,7 +92,11 @@ G3D::Vector3 const firstBoulderPos[2][FIRST_BOULDER_PATH_SIZE] =
         { 3157.04f, 7307.55f, 115.01f },
         { 3154.86f, 7312.13f, 110.30f },
         { 3155.53f, 7316.91f, 105.78f },
-        { 3158.11f, 7321.12f, 102.68f }
+        { 3158.11f, 7321.12f, 102.68f },
+        { 3161.00f, 7324.50f, 101.10f },
+        { 3165.00f, 7325.00f, 100.90f },
+        { 3169.00f, 7325.00f, 100.00f },
+        { 3173.00f, 7325.00f,  99.00f }
     },
     // Left Boulder path
     {
@@ -101,7 +107,11 @@ G3D::Vector3 const firstBoulderPos[2][FIRST_BOULDER_PATH_SIZE] =
         { 3151.37f, 7303.29f, 114.75f },
         { 3148.49f, 7311.23f, 110.23f },
         { 3148.49f, 7319.23f, 106.04f },
-        { 3153.75f, 7326.27f, 102.70f }
+        { 3153.75f, 7326.27f, 102.70f },
+        { 3158.50f, 7327.50f, 103.40f },
+        { 3163.00f, 7326.50f, 101.50f },
+        { 3168.00f, 7326.00f, 100.30f },
+        { 3173.00f, 7326.00f,  99.10f }
     }
 };
 

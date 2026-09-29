@@ -65,15 +65,17 @@ uint32 AnimRand[3] =
 
 Position const centrPos = {3251.35f, 7582.79f, 12.75f};
 
+// #89: same 7 directions, but 15 yd from the centre on the room's floor (navmesh floor 12.86 ends 16.5-25 yd out on
+// these angles). They were 38 yd out, inside the walls: hidden for the first half of their float to the boss.
 Position const soulsPos[7] =
 {
-    {3288.37f, 7593.30f, 14.10f, 3.45f},
-    {3259.17f, 7620.32f, 14.10f, 4.53f},
-    {3239.09f, 7618.44f, 14.10f, 5.05f},
-    {3213.97f, 7587.99f, 14.10f, 6.12f},
-    {3215.85f, 7567.98f, 14.10f, 0.36f},
-    {3245.75f, 7541.42f, 14.10f, 1.41f},
-    {3265.50f, 7543.86f, 14.10f, 1.90f}
+    {3265.78f, 7586.89f, 14.10f, 3.45f},
+    {3254.41f, 7597.47f, 14.10f, 4.53f},
+    {3246.47f, 7596.97f, 14.10f, 5.05f},
+    {3236.49f, 7584.86f, 14.10f, 6.12f},
+    {3237.51f, 7577.01f, 14.10f, 0.36f},
+    {3249.34f, 7567.93f, 14.10f, 1.41f},
+    {3256.47f, 7568.69f, 14.10f, 1.90f}
 };
 
 //98542

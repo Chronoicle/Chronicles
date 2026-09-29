@@ -688,25 +688,30 @@ struct npc_brh_wyrmtongue_scavenger : public ScriptedAI
     }
 };
 
-//98900 (#89): the two at the top of the second staircase roll the boulders. Hostile (template faction) but passive:
-//they never fight back. Silent while the boulders roll; once the group reaches the top one of them yells the retreat
-//line and both cower around their spot. The others are plain melee trash.
+//98900 (#89): the one at the top of the first staircase and the two at the top of the second roll the boulders.
+//Hostile (template faction) but passive: they never fight back. Silent while the boulders roll; once the group reaches
+//the top of their staircase one of them yells the retreat line and they cower around their spot. The others are plain
+//melee trash.
 struct npc_brh_wyrmtongue_trickster : public ScriptedAI
 {
     npc_brh_wyrmtongue_trickster(Creature* creature) : ScriptedAI(creature)
     {
         instance = me->GetInstanceScript();
-        boulderTop = me->GetHomePosition().GetPositionZ() > 190.0f;
+        Position const& home = me->GetHomePosition();
+        if (home.GetPositionZ() > 190.0f)
+            stairsData = DATA_STAIRS_BOULDER_2;
+        else if (home.GetExactDist(firstBoulderPos[1][0].x, firstBoulderPos[1][0].y, firstBoulderPos[1][0].z) < 8.0f)
+            stairsData = DATA_STAIRS_BOULDER_1;
     }
 
     InstanceScript* instance;
-    bool boulderTop = false;
+    uint32 stairsData = 0; // the boulder event this one belongs to, 0 = plain trash
     bool scared = false;
     uint32 cowerTimer = 0;
 
     void Reset() override
     {
-        if (!boulderTop)
+        if (!stairsData)
             return;
 
         me->SetReactState(REACT_PASSIVE);
@@ -715,13 +720,13 @@ struct npc_brh_wyrmtongue_trickster : public ScriptedAI
 
     void AttackStart(Unit* who) override
     {
-        if (!boulderTop)
+        if (!stairsData)
             ScriptedAI::AttackStart(who);
     }
 
     void UpdateAI(uint32 diff) override
     {
-        if (!boulderTop)
+        if (!stairsData)
         {
             ScriptedAI::UpdateAI(diff);
             return;
@@ -732,14 +737,14 @@ struct npc_brh_wyrmtongue_trickster : public ScriptedAI
 
         if (!scared)
         {
-            uint32 state = instance ? instance->GetData(DATA_STAIRS_BOULDER_2) : 0;
+            uint32 state = instance ? instance->GetData(stairsData) : 0;
             if (state != DONE && state != SPECIAL)
                 return;
 
             scared = true;
             if (state == DONE)
             {
-                instance->SetData(DATA_STAIRS_BOULDER_2, SPECIAL); // only one of the pair yells
+                instance->SetData(stairsData, SPECIAL); // only one per staircase yells
                 Talk(1); // "Ahh! They coming! RUN!"
             }
             me->SetWalk(false);
