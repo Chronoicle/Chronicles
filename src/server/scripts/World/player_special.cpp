@@ -1014,6 +1014,46 @@ public:
     }
 };
 
+// Journeyman Riding is account-wide: once any character on the account has it, every character
+// of level 40+ gets it (with Apprentice Riding) at login or on reaching 40. Expert and higher stay per character.
+class player_account_journeyman_riding : public PlayerScript
+{
+public:
+    player_account_journeyman_riding() : PlayerScript("player_account_journeyman_riding") { }
+
+    enum
+    {
+        SPELL_APPRENTICE_RIDING = 33388,
+        SPELL_JOURNEYMAN_RIDING = 33391,
+        JOURNEYMAN_RIDING_LEVEL = 40,
+    };
+
+    void OnLogin(Player* player) override
+    {
+        Check(player);
+    }
+
+    void OnLevelChanged(Player* player, uint8 /*oldLevel*/) override
+    {
+        Check(player);
+    }
+
+    void Check(Player* player)
+    {
+        if (player->getLevel() < JOURNEYMAN_RIDING_LEVEL || player->HasSpell(SPELL_JOURNEYMAN_RIDING))
+            return;
+
+        // deleted characters have account 0, so they don't count
+        if (!CharacterDatabase.PQuery("SELECT 1 FROM character_spell cs JOIN characters c ON c.guid = cs.guid WHERE c.account = %u AND cs.spell = %u LIMIT 1",
+            player->GetSession()->GetAccountId(), uint32(SPELL_JOURNEYMAN_RIDING)))
+            return;
+
+        if (!player->HasSpell(SPELL_APPRENTICE_RIDING))
+            player->learnSpell(SPELL_APPRENTICE_RIDING, false);
+        player->learnSpell(SPELL_JOURNEYMAN_RIDING, false);
+    }
+};
+
 void AddSC_player_special_scripts()
 {
     new playerScriptPvpMisc();
@@ -1031,4 +1071,5 @@ void AddSC_player_special_scripts()
     new player_chineese_event();
     new player_clear_timed_titles();
     new player_invisible_status_mod_map_handler();
+    new player_account_journeyman_riding();
 };
