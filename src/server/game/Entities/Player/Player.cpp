@@ -31359,7 +31359,8 @@ static bool HasSpellAreaSpell(Player* player, uint32 spellId)
 
         for (ObjectGuid const& guid : *player->GetSummonList(spellInfo->Effects[i]->MiscValue))
             if (Creature* summon = ObjectAccessor::GetCreature(*player, guid))
-                if (summon->IsAlive())
+                // a summon left behind (far away) or phased out must not block a new one (companions, vehicles)
+                if (summon->IsAlive() && summon->InSamePhase(player) && summon->IsWithinDist(player, 100.0f))
                     return true;
     }
 
