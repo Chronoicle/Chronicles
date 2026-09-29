@@ -99,6 +99,7 @@ public:
         std::unordered_set<ObjectGuid> mobsForElevator{};
         std::vector<ObjectGuid> mobsToSeondPath{};
         std::vector<ObjectGuid> mobsAfterKingaroth{};
+        ObjectGuid magniGuid{};
 
         std::list<ObjectGuid> firstEventCounter{};
         std::list<ObjectGuid> secondEventCounter{};
@@ -170,6 +171,9 @@ public:
                 case NPC_COSMETIC_TORMENT:
                     cosmeticTormentList.push_back(creature->GetGUID());
                     break;
+                case 128169: // Magni Bronzebeard, the ride to Argus
+                    magniGuid = creature->GetGUID();
+                    break;
                 default:
                     break;
             }
@@ -217,6 +221,14 @@ public:
                 else if (creature->GetDistance(-2891.67f, 10768.20f, -90.77f) <= 10)
                     mobsForElevator.insert(creature->GetGUID());
             }
+        }
+
+        // Magni (gossip: teleport to Argus) is only summoned by Aggramar's death (boss_aggramar outroPos[0]); an instance
+        // loaded again with Aggramar already dead had no way to Argus (#98)
+        void OnPlayerEnter(Player* /*player*/) override
+        {
+            if (GetBossState(DATA_AGGRAMAR) == DONE && !instance->GetCreature(magniGuid))
+                instance->SummonCreature(128169, { -12646.00f, -2292.10f, 2514.26f, 1.44f });
         }
 
         void OnCreatureRemove(Creature* creature) override

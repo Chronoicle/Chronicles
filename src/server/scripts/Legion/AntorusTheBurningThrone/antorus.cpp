@@ -195,7 +195,9 @@ public:
             if (instance->GetBossState(i) != DONE)
                 isDone = false;
 
-        if (me->GetEntry() != 128304)
+        // Burning Throne only after Imonar and Kin'garoth (isDone above was computed but never used: the beacon
+        // right after Garothi skipped six bosses to Varimathras, #98)
+        if (isDone && me->GetEntry() != 128304)
             player->ADD_GOSSIP_ITEM_DB(21377, 1, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3); // Varimatras
 
         player->SEND_GOSSIP_MENU(32550, me->GetGUID());
