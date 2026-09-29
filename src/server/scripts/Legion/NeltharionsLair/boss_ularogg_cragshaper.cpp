@@ -458,7 +458,7 @@ struct npc_nl_understone_drummer : public ScriptedAI
                     {
                         if (drums->IsAlive())
                         {
-                            float const angle = drums->GetAngle(&me->GetHomePosition());
+                            float const angle = drums->GetAngle(me->GetHomePosition());
                             pos.Relocate(drums->GetPositionX() + 3.0f * std::cos(angle), drums->GetPositionY() + 3.0f * std::sin(angle), drums->GetPositionZ());
                             me->GetMotionMaster()->MovePoint(1, pos);
                         }
