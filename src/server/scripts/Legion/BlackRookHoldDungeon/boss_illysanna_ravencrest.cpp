@@ -672,6 +672,58 @@ struct npc_brh_wyrmtongue_scavenger : public ScriptedAI
     }
 };
 
+//98900 (#89): the ones at the top of the second staircase roll the boulders: neutral, yell while the boulders roll,
+//run around scared once the group reaches the top (boulder event stopped). The others are plain melee trash.
+struct npc_brh_wyrmtongue_trickster : public ScriptedAI
+{
+    npc_brh_wyrmtongue_trickster(Creature* creature) : ScriptedAI(creature)
+    {
+        instance = me->GetInstanceScript();
+        boulderTop = me->GetHomePosition().GetPositionZ() > 190.0f;
+    }
+
+    InstanceScript* instance;
+    bool boulderTop = false;
+    bool scared = false;
+    uint32 talkTimer = 0;
+
+    void Reset() override
+    {
+        if (!boulderTop)
+            return;
+
+        me->setFaction(7); // neutral: attackable, no aggro
+        scared = false;
+        talkTimer = urand(5000, 20000);
+    }
+
+    void UpdateAI(uint32 diff) override
+    {
+        if (boulderTop && !me->isInCombat() && instance)
+        {
+            if (instance->GetData(DATA_STAIRS_BOULDER_2) == DONE)
+            {
+                if (!scared)
+                {
+                    scared = true;
+                    me->SetWalk(false);
+                    me->GetMotionMaster()->MoveRandom(5.0f);
+                }
+            }
+            else if (talkTimer <= diff)
+            {
+                talkTimer = urand(15000, 30000);
+                if (me->FindNearestPlayer(80.0f))
+                    Talk(0); // "This time we'll hit for sure!"
+            }
+            else
+                talkTimer -= diff;
+        }
+
+        ScriptedAI::UpdateAI(diff);
+    }
+};
+
 //197394
 class spell_illysanna_periodic_energize : public AuraScript
 {
@@ -804,6 +856,7 @@ void AddSC_boss_illysanna_ravencrest()
     RegisterCreatureAI(npc_illysanna_trash_generic);
     RegisterCreatureAI(npc_brh_boulder);
     RegisterCreatureAI(npc_brh_wyrmtongue_scavenger);
+    RegisterCreatureAI(npc_brh_wyrmtongue_trickster);
     RegisterAuraScript(spell_illysanna_periodic_energize);
     RegisterAuraScript(spell_illysanna_eye_beams);
     RegisterSpellScript(spell_illysanna_dark_rush);

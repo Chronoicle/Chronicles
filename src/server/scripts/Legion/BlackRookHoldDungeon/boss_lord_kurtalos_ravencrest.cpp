@@ -229,8 +229,14 @@ struct boss_latosius : public BossAI
 
         if (spell->Id == SPELL_STINGING_SWARM)
         {
-            if (auto sum = target->SummonCreature(NPC_STINGING_SWARM, target->GetPosition()))
+            // summoned by the boss, not the target: a player-summoned creature gets the player as demon creator and
+            // _IsValidAssistTarget then lets that player heal it (Consecration healed the swarm, #89)
+            if (auto sum = me->SummonCreature(NPC_STINGING_SWARM, target->GetPosition()))
+            {
+                if (sum->IsAIEnabled)
+                    sum->AI()->SetGUID(target->GetGUID());
                 sum->EnterVehicle(target);
+            }
         }
     }
 
@@ -559,16 +565,22 @@ struct npc_kurtalos_stinging_swarm : public ScriptedAI
 
     InstanceScript* instance;
     uint16 checkTimer = 0;
+    ObjectGuid victimGuid;
 
     void Reset() override
     {
         checkTimer = 2000;
     }
 
+    void SetGUID(ObjectGuid const& guid, int32 /*id*/) override
+    {
+        victimGuid = guid;
+    }
+
     void JustDied(Unit* /*killer*/) override
     {
-        if (auto summoner = me->GetAnyOwner())
-            summoner->RemoveAurasDueToSpell(SPELL_STINGING_SWARM);
+        if (auto victim = ObjectAccessor::GetUnit(*me, victimGuid))
+            victim->RemoveAurasDueToSpell(SPELL_STINGING_SWARM);
     }
 
     void UpdateAI(uint32 diff) override

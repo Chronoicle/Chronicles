@@ -46,6 +46,7 @@ public:
         uint32 illysannaIntroState = 0;
         uint32 KurtalosState = 0;;
         uint32 AmalgamState = 0;
+        uint32 boulderStairs2State = 0; // DONE once a player reached the top of the second staircase (#89)
 
         void Initialize() override
         {
@@ -174,6 +175,8 @@ public:
                     return AmalgamState;
                 case DATA_ILLYSANNA_INTRO:
                     return illysannaIntroState;
+                case DATA_STAIRS_BOULDER_2:
+                    return boulderStairs2State;
             }
             return 0;
         }
@@ -275,6 +278,7 @@ public:
                     if (HasPlayerUpperThan(190.f))
                     {
                         events.CancelEvent(DATA_STAIRS_BOULDER_2);
+                        boulderStairs2State = DONE;
                         break;
                     }
 
