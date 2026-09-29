@@ -135,10 +135,13 @@ local function ItemLink(itemId, bonuses)
 end
 
 -- a title with your own name, like the title list shows it ("Conqueror Chron", "Chron of the Black Harvest").
--- The server sends the plain title; the client's own title list (GetTitleName, by mask ID) knows where the name goes.
--- ponytail: matched by the title's text; a title the list doesn't know is guessed ("of ..."/"the ..." after the name)
+-- The server sends the title's format ("%s, Lord of Blackrock"). An older server sent the plain title: then the
+-- client's title list is asked, but 7.3.5's GetTitleName returns it trimmed, so that is a guess ("of"/"the" after)
 local titleFormats
 local function TitleText(name)
+    if name:find("%s", 1, true) then
+        return (name:gsub("%%s", UnitName("player"), 1))
+    end
     if not titleFormats then
         titleFormats = {}
         for i = 1, GetNumTitles() do

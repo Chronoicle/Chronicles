@@ -1272,6 +1272,16 @@ private:
                     if (name.empty())   // the gear rows have no name in the catalogue
                         name = proto->GetName()->Get(player->GetSession()->GetSessionDbLocaleIndex());
                 }
+                else if (CharTitlesEntry const* title = type == PRODUCT_TITLE ? sCharTitlesStore.LookupEntry(param1) : nullptr)
+                {
+                    // the title's own format ("%s, Lord of Blackrock"): the addon puts the name at %s
+                    LocaleConstant locale = player->GetSession()->GetSessionDbLocaleIndex();
+                    char const* format = player->getGender() == GENDER_FEMALE ? title->Name1->Get(locale) : "";
+                    if (!*format)
+                        format = title->Name->Get(locale);
+                    if (*format)
+                        name = format;
+                }
 
                 uint32 flags = (ShopKnown(player, type, param1) ? SHOP_KNOWN : 0) | (f[6].GetUInt64() ? SHOP_NEW : 0);
                 SendShop(player, "ITEM " + std::to_string(f[0].GetUInt32()) + " " + std::to_string(type) + " " + std::to_string(param1) + " " + std::to_string(price)
