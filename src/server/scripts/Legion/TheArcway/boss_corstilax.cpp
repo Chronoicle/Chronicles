@@ -17,6 +17,7 @@ enum Spells
     SPELL_QUARANTINE_STUN       = 195804,
     SPELL_CLEANSING_FORCE       = 196115,
     SPELL_CLEANSING_FORCE_AT    = 196088,
+    SPELL_EXTERMINATE_STUN      = 203649,
     SPELL_DESTABILIZED_ORB      = 220481,
     SPELL_DESTABILIZED_ORB_AT   = 220482,
 
@@ -58,9 +59,10 @@ public:
         {
             _EnterCombat();
 
+            // (#40) retail timers (DBM): Suppression Protocol 5 s, Quarantine 22.5 s, Cleansing Force 30 s, then every 46 s
             events.RescheduleEvent(EVENT_PROTOCOL, 5000);
-            events.RescheduleEvent(EVENT_QUARANTINE, 20000);
-            events.RescheduleEvent(EVENT_CLEANSING_FORCE, 28000); 
+            events.RescheduleEvent(EVENT_QUARANTINE, 22500);
+            events.RescheduleEvent(EVENT_CLEANSING_FORCE, 30000);
             events.RescheduleEvent(EVENT_ENERGY_BURST, 30000);
             events.RescheduleEvent(EVENT_DESTABILIZED_ORB, 13000);
         }
@@ -131,15 +133,15 @@ public:
                 {
                     case EVENT_PROTOCOL:
                         DoCast(SPELL_SUPPRESSION_PROTOCOL);
-                        events.RescheduleEvent(EVENT_PROTOCOL, 36000);
+                        events.RescheduleEvent(EVENT_PROTOCOL, 46000); // (#40)
                         break;
                     case EVENT_QUARANTINE:
                         DoCast(SPELL_QUARANTINE);
-                        events.RescheduleEvent(EVENT_QUARANTINE, 48000);
+                        events.RescheduleEvent(EVENT_QUARANTINE, 46000); // (#40)
                         break;
                     case EVENT_CLEANSING_FORCE:
                         DoCast(SPELL_CLEANSING_FORCE);
-                        events.RescheduleEvent(EVENT_CLEANSING_FORCE, 32000);
+                        events.RescheduleEvent(EVENT_CLEANSING_FORCE, 46000); // (#40)
                         break;
                     case EVENT_ENERGY_BURST:
                         if (Creature* pipe = me->SummonCreature(NPC_PIPE_STALKER, 3101.87f, 4908.10f, 622.39f, 5.86f, TEMPSUMMON_TIMED_DESPAWN, 10000))
@@ -357,10 +359,42 @@ class spell_corstilax_cleansing_force : public SpellScriptLoader
         }
 };
 
+//203649 (#40) Exterminate stun: "stuns the target if they still have stacks of Nightwell Energy" (spell text)
+class spell_corstilax_exterminate_stun : public SpellScriptLoader
+{
+    public:
+        spell_corstilax_exterminate_stun() : SpellScriptLoader("spell_corstilax_exterminate_stun") { }
+
+        class spell_corstilax_exterminate_stun_SpellScript : public SpellScript
+        {
+            PrepareSpellScript(spell_corstilax_exterminate_stun_SpellScript);
+
+            void FilterTargets(std::list<WorldObject*>& targets)
+            {
+                targets.remove_if([](WorldObject* target)
+                {
+                    Unit* unit = target->ToUnit();
+                    return !unit || !unit->HasAura(SPELL_NIGHTWELL_ENERGY);
+                });
+            }
+
+            void Register() override
+            {
+                OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_corstilax_exterminate_stun_SpellScript::FilterTargets, EFFECT_0, TARGET_UNIT_SRC_AREA_ENEMY);
+            }
+        };
+
+        SpellScript* GetSpellScript() const override
+        {
+            return new spell_corstilax_exterminate_stun_SpellScript();
+        }
+};
+
 void AddSC_boss_corstilax()
 {
     new boss_corstilax();
     new npc_corstilax_suppression_protocol();
     new npc_corstilax_quarantine();
     new spell_corstilax_cleansing_force();
+    new spell_corstilax_exterminate_stun();
 }

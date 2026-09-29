@@ -87,6 +87,7 @@ public:
         }
 
         SummonList summons;
+        bool introDone = false;
         bool specialPhase = false;
         bool specialPhaseComplete = false;
 
@@ -110,7 +111,7 @@ public:
         {
             events.RescheduleEvent(EVENT_A_BLAST, 3000);
             events.RescheduleEvent(EVENT_CHRONO_SHARDS, 6000);
-            events.RescheduleEvent(EVENT_FORCE_BOMB, 26000);
+            events.RescheduleEvent(EVENT_FORCE_BOMB, 17000); // (#40) DBM: first ~16.7 s
         }
 
         void EnterEvadeMode() override
@@ -149,7 +150,7 @@ public:
                         {
                             player->CastSpell(player, SPELL_BANISH_IN_TIME_TP, true);
                             player->CastSpell(player, SPELL_BANISH_IN_TIME_TIMER, true);
-                            Talk(SAY_TIME_EMOTE);
+                            Talk(SAY_TIME_EMOTE, player->GetGUID()); // (#40) boss whisper needs a target
                         }
             }
         }
@@ -158,6 +159,13 @@ public:
         {
             if (spell->Id == SPELL_FORCE_BOMB)
                 DoCast(target, SPELL_FORCE_BOMB_AT, true);
+        }
+
+        // (#40) Force Bomb expired: the bomb explodes (AT action 203087) and leaves the expanding Force Nova ring (AT 5903, spell text "creates a Force Nova")
+        void OnAreaTriggerDespawn(uint32 spellId, Position pos, bool duration) override
+        {
+            if (spellId == SPELL_FORCE_BOMB_AT && duration)
+                me->CastSpell(pos, SPELL_FORCE_BOMB_AT_2, true);
         }
 
         void DamageTaken(Unit* attacker, uint32& damage, DamageEffectType dmgType) override
@@ -191,6 +199,20 @@ public:
 
         void UpdateAI(uint32 diff) override
         {
+            // (#40) the instance makes him visible once the first four bosses are dead: clear the withered and rats from his arena
+            if (!introDone && me->IsVisible())
+            {
+                introDone = true;
+                for (uint32 entry : {98732u, 98733u}) // Plagued Rat, Withered Fiend
+                {
+                    std::list<Creature*> trash;
+                    me->GetCreatureListWithEntryInGrid(trash, entry, 45.0f);
+                    for (Creature* mob : trash)
+                        if (mob->IsAlive() && !mob->isInCombat())
+                            mob->DespawnOrUnsummon();
+                }
+            }
+
             if (!UpdateVictim())
                 return;
 
@@ -208,14 +230,16 @@ public:
                         events.RescheduleEvent(EVENT_A_BLAST, 6000);
                         break;
                     case EVENT_CHRONO_SHARDS:
-                        for(uint8 i = 0; i < 3; i++)
+                        for(uint8 i = 0; i < 3; i++) // 203254 summons one shard per cast; spell text says "Chrono Shards" (plural)
                             DoCast(SPELL_CHRONO_SHARDS);
-                        events.RescheduleEvent(EVENT_CHRONO_SHARDS, 6000);
+                        // (#40) was 6 s, shards live 8 s + 1 s so waves overlapped
+                        // ponytail: 15 s and 3 per wave are assumptions (DBM has no Chrono Shards timer), tune from a retail log
+                        events.RescheduleEvent(EVENT_CHRONO_SHARDS, 15000);
                         break;
                     case EVENT_FORCE_BOMB:
                         Talk(SAY_BOMB);
                         DoCast(SPELL_FORCE_BOMB);
-                        events.RescheduleEvent(EVENT_FORCE_BOMB, 16000);
+                        events.RescheduleEvent(EVENT_FORCE_BOMB, 32000); // (#40) DBM: ~31.8 s
                         break;
                     case EVENT_BANISH_IN_TIME:
                         Talk(SAY_TIME);

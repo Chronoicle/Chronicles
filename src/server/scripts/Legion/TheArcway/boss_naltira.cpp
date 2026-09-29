@@ -168,7 +168,8 @@ public:
                         break;
                     }
                     case 32:
-                        me->GetMotionMaster()->MoveTakeoff(2, me->GetPositionX(), me->GetPositionY(), 574.2f);
+                        // MoveLand ends in the ground anim tier; MoveTakeoff left her in the hover (hanging) pose (#40)
+                        me->GetMotionMaster()->MoveLand(2, Position(me->GetPositionX(), me->GetPositionY(), 574.2f));
                         break;
                 }
                 ++DiedSpidersCount;
@@ -183,6 +184,7 @@ public:
             if (id == 2)
             {
                 me->SetDisableGravity(false);
+                me->SetHomePosition(*me); // evade returns her to the floor, not the 575 spawn z in the air (#40)
                 me->RemoveAurasDueToSpell(SPELL_WEB_BEAM_BOSS);
                 me->SetReactState(REACT_AGGRESSIVE);
                 me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
@@ -239,8 +241,9 @@ public:
                     case EVENT_SUM_MANAFANG:
                         Position pos;
                         pos = me->GetRandomNearPosition(30.0f);
+                        pos.m_positionZ += 30.0f; // drops in from the ceiling instead of appearing on the floor (#40)
                         me->SummonCreature(NPC_VICIOUS_MANAFANG, pos);
-                        events.RescheduleEvent(EVENT_SUM_MANAFANG, 22000);
+                        events.RescheduleEvent(EVENT_SUM_MANAFANG, 30000); // retail ~30 s (DBM) (#40)
                         break;
                 }
             }
@@ -276,6 +279,27 @@ public:
         void IsSummonedBy(Unit* summoner) override
         {
             health = 0;
+            // Descend on a web like the intro manafangs, fight after landing (#40)
+            me->SetReactState(REACT_PASSIVE);
+            me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
+            SetFlyMode(true);
+
+            if (Creature* beamTarget = summoner->SummonCreature(68553, me->GetPosition(), TEMPSUMMON_TIMED_DESPAWN, 10000))
+                beamTarget->CastSpell(me, SPELL_WEB_BEAM_TRASH, true);
+
+            me->GetMotionMaster()->MoveLand(1, Position(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ() - 30.0f));
+        }
+
+        void MovementInform(uint32 type, uint32 id) override
+        {
+            if (type != EFFECT_MOTION_TYPE || id != 1)
+                return;
+
+            SetFlyMode(false);
+            me->RemoveAurasDueToSpell(SPELL_WEB_BEAM_TRASH);
+            me->SetHomePosition(*me);
+            me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_NOT_ATTACKABLE_1);
+            me->SetReactState(REACT_AGGRESSIVE);
             DoZoneInCombat(me, 100.0f);
             events.RescheduleEvent(EVENT_1, urand(10, 15) * IN_MILLISECONDS);
         }
@@ -382,8 +406,8 @@ public:
 
             AddDelayedEvent(500, [=] () -> void
             {
-                if (me)
-                    me->GetMotionMaster()->MoveTakeoff(1, me->GetPositionX(), me->GetPositionY(), 574.2f);
+                if (me) // MoveLand ends in the ground anim tier, MoveTakeoff kept the hanging pose (#40)
+                    me->GetMotionMaster()->MoveLand(1, Position(me->GetPositionX(), me->GetPositionY(), 574.2f));
             });
         }
 

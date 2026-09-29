@@ -153,8 +153,15 @@ public:
             if (!checkBossDone())
                 return;
 
+            // (#40) intro only once: SetBossState runs this on Vandros's own pull, wipe and death too
+            if (GetBossState(DATA_VANDROS) != NOT_STARTED)
+                return;
+
             if (Creature* vandros = instance->GetCreature(VandrosGUID))
             {
+                if (vandros->IsVisible()) // (#40) already introduced (wipe resets his state to NOT_STARTED)
+                    return;
+
                 vandros->AI()->ZoneTalk(0);
                 vandros->SetReactState(REACT_AGGRESSIVE);
                 vandros->SetVisible(true);

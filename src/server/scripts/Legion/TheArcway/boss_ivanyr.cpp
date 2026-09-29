@@ -89,11 +89,12 @@ public:
         void EnterCombat(Unit* /*who*/) override
         {
             Talk(SAY_AGGRO); //Stay back! It's mine!
+            me->InterruptNonMeleeSpells(false); // (#40) end the 8h Spawn Visual channel, else UNIT_STATE_CASTING blocks UpdateAI forever
             _EnterCombat();
 
-            events.RescheduleEvent(EVENT_VOLATILE_MAGIC, 8000);
-            events.RescheduleEvent(EVENT_OVERCHARGE_MANA, 28000);
-            events.RescheduleEvent(EVENT_NETHER_LINK, 56000);
+            events.RescheduleEvent(EVENT_VOLATILE_MAGIC, 8000);   // (#40) first timers from DBM (retail): 7.7 s / 30 s / 17.5 s
+            events.RescheduleEvent(EVENT_OVERCHARGE_MANA, 30000);
+            events.RescheduleEvent(EVENT_NETHER_LINK, 17500);
             events.RescheduleEvent(EVENT_WITHERING_CONSUMPTION, 2000);
         }
 
@@ -183,7 +184,7 @@ public:
                     case EVENT_VOLATILE_MAGIC:
                         DoCast(SPELL_VOLATILE_MAGIC);
                         Talk(SAY_MAGIC);
-                        events.RescheduleEvent(EVENT_VOLATILE_MAGIC, 24000);
+                        events.RescheduleEvent(EVENT_VOLATILE_MAGIC, 32000); // (#40) DBM: 32 s
                         break;
                     case EVENT_OVERCHARGE_MANA:
                         me->StopAttack();
@@ -192,11 +193,11 @@ public:
                         break;
                     case EVENT_NETHER_LINK:
                         DoCast(SPELL_NETHER_LINK);
-                        events.RescheduleEvent(EVENT_NETHER_LINK, 33000);
+                        events.RescheduleEvent(EVENT_NETHER_LINK, 30000); // (#40) DBM: 30 s
                         break;
                     case EVENT_WITHERING_CONSUMPTION:
                         if (me->GetPower(POWER_MANA) > 0)
-                            events.RescheduleEvent(EVENT_NETHER_LINK, 2000);
+                            events.RescheduleEvent(EVENT_WITHERING_CONSUMPTION, 2000); // (#40) was EVENT_NETHER_LINK: mana check never repeated
                         else
                         {
                             events.Reset();
