@@ -357,6 +357,7 @@ public:
             me->SetDisableGravity(false);
             events.RescheduleEvent(EVENT_1, 12000);
             events.RescheduleEvent(EVENT_5, 14000);
+            events.RescheduleEvent(EVENT_6, 8000);
             phaseSecond = false;
             phaseThree = false;
         }
@@ -455,6 +456,15 @@ public:
                         DoCast(193559);
                         DoCast(193578);
                         events.RescheduleEvent(EVENT_5, 14000);
+                        break;
+                    case EVENT_6:
+                        // Swoop 193592 (her own jump; its trigger 191767 hits everyone in the path) was never cast.
+                        // Retail guides: she leaps through the tank. Land 8 yd behind the tank; the collision
+                        // search steps back from walls and ledges (#39).
+                        // ponytail: 8 s / 18 s timers are estimates (no retail log), tune from one
+                        if (Unit* victim = me->getVictim())
+                            me->CastSpell(victim->GetFirstCollisionPosition(8.0f, me->GetAngle(victim) - victim->GetOrientation()), 193592, false);
+                        events.RescheduleEvent(EVENT_6, 18000);
                         break;
                 }
             }

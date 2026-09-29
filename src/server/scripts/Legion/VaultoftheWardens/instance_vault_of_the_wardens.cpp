@@ -162,6 +162,9 @@ public:
                             for (auto guid : centryContainer)
                                 if (Creature* npc = instance->GetCreature(guid))
                                 {
+                                    // only Cordana's room: the Vault of the Betrayer statues (z > -270) keep their light (#39)
+                                    if (npc->GetPositionZ() > -270.0f)
+                                        continue;
                                     npc->RemoveAurasDueToSpell(197897);
                                     npc->RemoveAurasDueToSpell(204294);
                                 }

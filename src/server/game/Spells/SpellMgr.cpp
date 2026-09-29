@@ -4182,7 +4182,8 @@ void SpellMgr::LoadSpellCustomAttr()
         230403, //Aluriel: Fel Lash
         246706, //Kingaroth: Demolish
         244583, //Felhounds: Siphoned
-        196512  //Claw Frenzy
+        196512, //Claw Frenzy
+        202635  //VotW Grimhorn: Torment ("divided among all enemies within 5 yd", #39)
     }, [](SpellInfo* spellInfo)
     {
         spellInfo->AttributesCu[0] |= SPELL_ATTR0_CU_SHARE_DAMAGE;
