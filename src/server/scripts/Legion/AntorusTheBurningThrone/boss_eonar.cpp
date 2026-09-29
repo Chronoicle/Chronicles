@@ -433,6 +433,15 @@ struct npc_eonar_the_paraxis : public ScriptedAI
             events.RescheduleEvent(EVENT_FINAL_DOOM, 60000);
             finalDoomTimer = { 126000, 98000, 106000, 100000 };
         }
+        ResetFinalDoomCount();
+    }
+
+    // #54: a new attempt starts at Final Doom 1 with a new player count
+    void ResetFinalDoomCount()
+    {
+        playersAtPull = 0;
+        finalDoomCount = 0;
+        crystalsNeeded = 4;
     }
 
     void EnterEvadeMode() override
@@ -441,6 +450,7 @@ struct npc_eonar_the_paraxis : public ScriptedAI
         ScriptedAI::EnterEvadeMode();
         summons.DespawnAll();
         events.Reset();
+        ResetFinalDoomCount();
         instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, me);
         instance->SendEncounterUnit(ENCOUNTER_FRAME_INSTANCE_END, me);
         SwitchDoorState(false);
@@ -614,6 +624,18 @@ struct npc_eonar_the_paraxis : public ScriptedAI
     {
         if (spell->Id == SPELL_PURGE)
             SwitchDoorState(false);
+    }
+
+    // #54: the players CheckPlayers keeps the fight going for (alive, no GM, in the area or on the ship)
+    uint32 CountPlayers()
+    {
+        uint32 count = 0;
+        instance->instance->ApplyOnEveryPlayer([&](Player* player)
+        {
+            if (player->IsAlive() && !player->isGameMaster() && (player->GetCurrentAreaID() == 9333 || player->IsWithinBox({ -4206.80f, -10700.2f, 728.27f }, 100.0f, 100.0f, 20.0f)))
+                ++count;
+        });
+        return count;
     }
 
     // #54 (custom): Mythic crystals per Final Doom scale with the players at pull, 5 players per crystal, max 4
@@ -1105,13 +1127,7 @@ struct npc_eonar_the_paraxis : public ScriptedAI
                     instance->SendEncounterUnit(ENCOUNTER_FRAME_ENGAGE, me);
                     DoZoneInCombat();
 
-                    // #54: same players CheckPlayers keeps the fight going for
-                    playersAtPull = 0;
-                    instance->instance->ApplyOnEveryPlayer([&](Player* player)
-                    {
-                        if (player->IsAlive() && !player->isGameMaster() && (player->GetCurrentAreaID() == 9333 || player->IsWithinBox({ -4206.80f, -10700.2f, 728.27f }, 100.0f, 100.0f, 20.0f)))
-                            ++playersAtPull;
-                    });
+                    playersAtPull = CountPlayers(); // #54
                     break;
                 }
                 case EVENT_CHECK_PLAYERS:
@@ -1149,6 +1165,8 @@ struct npc_eonar_the_paraxis : public ScriptedAI
                         finalDoomTimer.pop_front();
                     }
 
+                    if (!playersAtPull) // #54: nobody counted at the pull (still loading in): count now
+                        playersAtPull = CountPlayers();
                     crystalsNeeded = GetCrystalsNeeded(++finalDoomCount);
                     if (!crystalsNeeded) // #54: too few players for this Final Doom, it is not cast
                         break;
