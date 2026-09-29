@@ -89,21 +89,27 @@ WorldPacket const* WorldPackets::BattlePet::QueryResponse::Write()
 {
     _worldPacket << BattlePetID;
     _worldPacket << CreatureID;
-    _worldPacket.AppendPackedTime(Timestamp);
-    if (!_worldPacket.WriteBit(Allow))
-        return &_worldPacket;
+    // unix time: the client compares it with the companion's UNIT_FIELD_BATTLE_PET_COMPANION_NAME_TIMESTAMP (a packed
+    // date never matched, so the summoned pet kept its default name)
+    _worldPacket << uint32(Timestamp);
+    _worldPacket.WriteBit(Allow);
 
-    _worldPacket.WriteBits(Name.size(), 8);
-    _worldPacket.WriteBit(HasDeclined);
+    // the bits stay together (no flush between them), like QueryPetNameResponse
+    if (Allow)
+    {
+        _worldPacket.WriteBits(Name.size(), 8);
+        _worldPacket.WriteBit(HasDeclined);
+
+        for (auto const& v : DeclinedNames)
+            _worldPacket.WriteBits(v.size(), 7);
+
+        for (auto const& v : DeclinedNames)
+            _worldPacket.WriteString(v);
+
+        _worldPacket.WriteString(Name);
+    }
+
     _worldPacket.FlushBits();
-
-    for (auto const& v : DeclinedNames)
-        _worldPacket.WriteBits(v.size(), 7);
-
-    for (auto const& v : DeclinedNames)
-        _worldPacket.WriteString(v);
-
-    _worldPacket.WriteString(Name);
 
     return &_worldPacket;
 }
