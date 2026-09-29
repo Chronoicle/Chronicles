@@ -3,144 +3,202 @@
 <head>
 <meta charset="utf-8">
 <title>Chronicles</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- media="print" + onload: the font never holds up the page script (a blocked or slow fonts server) -->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
-  /* Chronicles theme (Amibari's Theme.cs) */
+  /* Legion theme: the website's (chronicles-wow.com assets/css/legion.css), fel green on void black. The art/ files are
+     the website's img/legion/ ones, embedded by gui_windows.go. Cinzel + Inter from Google Fonts like the website;
+     without internet the serif / Segoe UI fallbacks show. */
   :root {
-    --bg: #0e1014; --sidebar: #101217; --panel: #16191f; --panel-alt: #20242b; --border: #30343c;
-    --divider: #262a32; --titlebar: #0c0e12; --accent: #d4a848; --accent-hover: #e4bc60; --accent-pressed: #b88c34;
-    --text: #ececec; --text-2: #949494; --muted: #606060; --ok: #5ec782; --err: #db625c; --on-accent: #120e08;
-    --display: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+    --fel: #72cf42; --fel-bright: #b6d149; --fel-core: #f8f4aa;
+    --text: #d8dcd2; --text-2: #9aa394; --muted: #737b6e; --err: #e5675f; --on-fel: #0b0f0b;
+    --glass: rgba(8,12,10,.82); --fel-line: rgba(114,207,66,.25);
+    --fel-title: linear-gradient(180deg, #f8f4aa 0%, #b6d149 32%, #72cf42 70%, #25411e 100%);
+    --fel-button: linear-gradient(180deg, #b6d149 0%, #72cf42 50%, #4d7f2c 100%);
+    --fel-button-hover: linear-gradient(180deg, #f8f4aa 0%, #b6d149 45%, #72cf42 100%);
+    --iron-button: linear-gradient(180deg, #34363e 0%, #272834 55%, #1e1e24 100%);
+    --corners:
+      linear-gradient(#72cf42,#72cf42) left top / 18px 2px no-repeat, linear-gradient(#72cf42,#72cf42) left top / 2px 18px no-repeat,
+      linear-gradient(#72cf42,#72cf42) right top / 18px 2px no-repeat, linear-gradient(#72cf42,#72cf42) right top / 2px 18px no-repeat,
+      linear-gradient(#72cf42,#72cf42) left bottom / 18px 2px no-repeat, linear-gradient(#72cf42,#72cf42) left bottom / 2px 18px no-repeat,
+      linear-gradient(#72cf42,#72cf42) right bottom / 18px 2px no-repeat, linear-gradient(#72cf42,#72cf42) right bottom / 2px 18px no-repeat;
+    --display: "Cinzel", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+    --sans: "Inter", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark; accent-color: #72cf42;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
-    font: 13px "Segoe UI", system-ui, sans-serif; user-select: none; cursor: default; }
-  body { display: flex; flex-direction: column; border: 1px solid var(--border); }
+  html, body { height: 100%; overflow: hidden; color: var(--text); font: 13px var(--sans); user-select: none; cursor: default; }
+  html { background: #050603; }
+  body { display: flex; flex-direction: column; border: 1px solid rgba(114,207,66,.35); position: relative;
+    background: url(art/fel-vignette.webp) center / 100% 100% no-repeat,
+      radial-gradient(ellipse at 50% 35%, rgba(5,6,3,.45) 0%, rgba(5,6,3,.72) 55%, rgba(5,6,3,.94) 100%),
+      url(art/bg-antorus.jpg) center / cover no-repeat, #050603; }
   button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-  button:disabled { cursor: default; opacity: .55; }
-  a { color: var(--accent); cursor: pointer; text-decoration: none; }
-  a:hover { text-decoration: underline; }
+  button:disabled { cursor: default; }
+  a { color: var(--fel-bright); cursor: pointer; text-decoration: none; }
+  a:hover { color: var(--fel-core); text-decoration: underline; }
+  ::selection { background: rgba(114,207,66,.35); color: #fff; }
 
-  .seal { border-radius: 50%; border: 2px solid var(--accent); overflow: hidden; flex: none;
-    box-shadow: 0 0 0 2px rgba(212,168,72,.27), 0 0 18px rgba(212,168,72,.25); }
+  .seal { border-radius: 50%; border: 1px solid var(--fel); overflow: hidden; flex: none;
+    box-shadow: 0 0 0 2px rgba(114,207,66,.18), 0 0 14px rgba(114,207,66,.35); }
   .seal img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .glow { font-family: var(--display); font-weight: bold; text-transform: uppercase; white-space: nowrap;
-    background: linear-gradient(#e8c46e, #a87624); -webkit-background-clip: text; background-clip: text; color: transparent;
-    filter: drop-shadow(0 0 5px rgba(212,168,72,.45)); }
+  .glow { font-family: var(--display); font-weight: 700; text-transform: uppercase; white-space: nowrap;
+    background: var(--fel-title); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 10px rgba(114,207,66,.35)) drop-shadow(0 2px 3px rgba(0,0,0,.9)); }
 
-  /* title bar */
-  .titlebar { height: 52px; flex: none; display: flex; align-items: center; background: var(--titlebar);
-    border-bottom: 1px solid rgba(212,168,72,.35); }
+  /* title bar (the website's header) */
+  .titlebar { height: 52px; flex: none; display: flex; align-items: center; position: relative; z-index: 2;
+    background: linear-gradient(180deg, rgba(11,15,11,.97), rgba(5,6,3,.97)); border-bottom: 1px solid rgba(114,207,66,.35);
+    box-shadow: 0 0 18px rgba(114,207,66,.12), 0 8px 24px rgba(0,0,0,.7); }
+  .titlebar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, #4d7f2c 15%, #b6d149 50%, #4d7f2c 85%, transparent);
+    box-shadow: 0 0 10px 1px rgba(114,207,66,.5); }
   .brand { display: flex; align-items: center; gap: 12px; padding-left: 14px; flex: 1; height: 100%; }
-  .brand .seal { width: 34px; height: 34px; border-width: 1px; box-shadow: 0 0 10px rgba(212,168,72,.25); }
-  .brand .glow { font-size: 20px; letter-spacing: 5.5px; }
+  .brand .seal { width: 34px; height: 34px; }
+  .brand .glow { font-size: 20px; letter-spacing: 5px; }
   .icon-btn { width: 34px; height: 34px; margin-right: 4px; color: var(--text-2); font-size: 17px; border-radius: 3px; }
-  .icon-btn:hover { color: var(--accent); background: rgba(255,255,255,.05); }
+  .icon-btn:hover { color: var(--fel-bright); background: rgba(114,207,66,.1); text-shadow: 0 0 8px rgba(114,207,66,.6); }
   .win-btn { width: 46px; height: 100%; color: var(--text-2); font-size: 14px; }
-  .win-btn:hover { background: rgba(255,255,255,.08); color: var(--text); }
-  .win-btn.close:hover { color: var(--err); }
+  .win-btn:hover { background: rgba(114,207,66,.1); color: var(--fel-bright); }
+  .win-btn.close:hover { background: rgba(229,103,95,.16); color: var(--err); }
 
   .body { flex: 1; display: flex; min-height: 0; position: relative; overflow: hidden; }
 
-  /* sidebar */
-  .sidebar { width: 268px; flex: none; background: var(--sidebar); border-right: 1px solid var(--divider);
-    padding: 36px 24px 20px; display: flex; flex-direction: column; align-items: center; }
-  .sidebar .seal { width: 132px; height: 132px; }
-  .sidebar .glow { font-size: 25px; letter-spacing: 4px; margin-top: 22px; }
-  .rule { width: 55%; height: 1.5px; background: rgba(212,168,72,.7); margin-top: 6px; }
-  .realm { margin-top: 26px; display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
-  .dot.on { background: var(--ok); box-shadow: 0 0 8px rgba(94,199,130,.6); }
-  .dot.off { background: var(--err); }
-  .side-foot { margin-top: auto; color: var(--muted); font-size: 11px; text-align: center; line-height: 1.6; }
+  /* sidebar: a glass panel with the Legion logo */
+  .sidebar { width: 268px; flex: none; padding: 40px 22px 20px; display: flex; flex-direction: column; align-items: center;
+    background: linear-gradient(180deg, rgba(114,207,66,.05), transparent 35%), var(--glass);
+    border-right: 1px solid var(--fel-line); box-shadow: inset -1px 0 0 rgba(182,209,73,.06), 8px 0 24px rgba(0,0,0,.45); }
+  .legion-logo { width: 220px; height: auto; animation: legion-glow 6s ease-in-out infinite; }
+  @keyframes legion-glow {
+    0%, 100% { filter: drop-shadow(0 0 10px rgba(114,207,66,.3)) drop-shadow(0 4px 10px rgba(0,0,0,.85)); }
+    50%      { filter: drop-shadow(0 0 22px rgba(114,207,66,.6)) drop-shadow(0 4px 10px rgba(0,0,0,.85)); }
+  }
+  .divider { width: 200px; height: auto; margin-top: 14px; opacity: .9; }
+  .realm { margin-top: 22px; display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 12px;
+    padding: 7px 14px; border: 1px solid rgba(114,207,66,.18); background: rgba(5,8,6,.6); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.on { background: var(--fel); box-shadow: 0 0 10px rgba(114,207,66,.8), 0 0 0 1px rgba(0,0,0,.6); }
+  .dot.off { background: var(--err); box-shadow: 0 0 8px rgba(229,103,95,.6); }
+  .side-foot { margin-top: auto; color: var(--muted); font-size: 11px; text-align: center; line-height: 1.6; letter-spacing: .5px; }
 
-  /* main area */
-  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 18px 22px;
-    background:
-      linear-gradient(rgba(8,10,13,.55), rgba(8,10,13,.16) 33%, rgba(8,10,13,.31) 66%, rgba(8,10,13,.86)),
-      linear-gradient(145deg, #30261a, #0c0c0c); }
-  .hero { height: 248px; flex: none; position: relative; cursor: pointer; border: 1px solid var(--border);
-    background: linear-gradient(to right, rgba(212,168,72,.16), transparent 50%), linear-gradient(72deg, #30281c, #100e0c);
-    padding: 34px 38px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
-  .hero:hover { border-color: rgba(212,168,72,.55); }
-  .hero .seal-bg { position: absolute; right: -40px; top: -40px; width: 330px; height: 330px; opacity: .10; border-radius: 50%; }
-  .kicker { color: var(--accent); font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-  .hero h1 { font: 600 28px "Segoe UI Semibold", "Segoe UI", sans-serif; margin: 8px 0 10px; max-width: 760px; }
-  .hero p { color: var(--text-2); font-size: 14px; max-width: 700px; line-height: 1.5;
+  /* main area: the art shows through */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 20px 24px 18px; }
+  .panel::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: var(--corners);
+    filter: drop-shadow(0 0 3px rgba(114,207,66,.7)); }
+  .hero { height: 286px; flex: none; position: relative; cursor: pointer; border: 1px solid var(--fel-line);
+    background: linear-gradient(90deg, rgba(5,8,6,.94) 0%, rgba(5,8,6,.78) 42%, rgba(5,8,6,.2) 100%),
+      linear-gradient(0deg, rgba(5,8,6,.85), transparent 55%), url(art/slide-broken-shore.jpg) 60% 30% / cover no-repeat;
+    box-shadow: 0 16px 36px rgba(0,0,0,.6), inset 0 0 50px rgba(114,207,66,.05), inset 0 1px 0 rgba(182,209,73,.08);
+    padding: 30px 36px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+    transition: border-color .15s, box-shadow .15s; }
+  .hero:hover { border-color: rgba(114,207,66,.6); box-shadow: 0 16px 36px rgba(0,0,0,.6), 0 0 24px rgba(114,207,66,.2); }
+  .kicker { color: var(--fel-bright); font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+  .hero h1 { font: 700 25px/1.25 var(--display); color: #eef2e6; margin: 8px 0 10px; max-width: 720px;
+    text-shadow: 0 0 14px rgba(114,207,66,.25), 0 2px 4px rgba(0,0,0,.9); }
+  .hero p { color: var(--text); opacity: .85; font-size: 14px; max-width: 640px; line-height: 1.5;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-  .cards { display: flex; gap: 14px; margin-top: 24px; height: 144px; flex: none; }
-  .card { flex: 1; min-width: 0; border: 1px solid var(--border); cursor: pointer; padding: 14px;
-    display: flex; flex-direction: column; justify-content: flex-end; }
-  .card:hover { border-color: rgba(212,168,72,.55); }
-  .card .date { color: var(--accent); font-size: 11px; }
+  .cards { display: flex; gap: 14px; margin-top: 18px; height: 148px; flex: none; }
+  .card { flex: 1; min-width: 0; cursor: pointer; padding: 14px; position: relative;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    background: linear-gradient(180deg, rgba(20,26,22,.88), rgba(5,8,6,.92)); border: 1px solid rgba(114,207,66,.18);
+    box-shadow: 0 10px 24px rgba(0,0,0,.5); transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .card:hover { border-color: rgba(114,207,66,.6); box-shadow: 0 10px 24px rgba(0,0,0,.5), 0 0 18px rgba(114,207,66,.22);
+    transform: translateY(-2px); }
+  .card .ico { position: absolute; top: 12px; left: 14px; width: 34px; height: 34px; background: center / cover;
+    border: 1px solid rgba(114,207,66,.45); box-shadow: 0 0 8px rgba(114,207,66,.25); }
+  .card:nth-child(1) .ico { background-image: url(art/icon-fel.png); }
+  .card:nth-child(2) .ico { background-image: url(art/icon-argus.png); }
+  .card:nth-child(3) .ico { background-image: url(art/icon-illidan.png); }
+  .card:nth-child(4) .ico { background-image: url(art/icon-kiljaeden.png); }
+  .card .date { color: var(--fel-bright); font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
   .card .t { font-weight: 600; margin-top: 4px; line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
   /* play bar */
   .playbar { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  .status { height: 18px; color: var(--text-2); font-size: 12px; white-space: nowrap; }
+  .status { height: 18px; color: var(--text); font-size: 12px; white-space: nowrap; text-shadow: 0 1px 3px #000; }
   .status.err { color: var(--err); white-space: normal; height: auto; max-width: 640px; text-align: center; }
-  .status.ok { color: var(--ok); }
+  .status.ok { color: var(--fel-bright); text-shadow: 0 0 10px rgba(114,207,66,.5), 0 1px 3px #000; }
   .bar-row { display: flex; align-items: center; gap: 10px; height: 14px; }
   .bar-row.hidden { visibility: hidden; }
-  .bar { width: 360px; height: 6px; background: var(--panel-alt); border: 1px solid var(--border); }
-  .fill { height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
-  .pct { width: 38px; color: var(--accent); font-weight: 600; font-size: 12px; }
+  .bar { width: 380px; height: 8px; background: rgba(5,8,6,.8); border: 1px solid rgba(114,207,66,.3); }
+  .fill { height: 100%; width: 0; background: var(--fel-button); box-shadow: 0 0 10px rgba(114,207,66,.7);
+    transition: width .15s linear; }
+  .pct { width: 38px; color: var(--fel-bright); font-weight: 600; font-size: 12px; }
   .bar-row::before { content: ""; width: 38px; } /* keeps the bar centered under the text */
   .buttons { display: flex; gap: 10px; margin-top: 4px; }
-  .btn { height: 48px; font: bold 14px "Segoe UI Semibold", "Segoe UI", sans-serif; border: 1px solid var(--border);
-    background: var(--panel); color: var(--text); }
-  .btn:hover:not(:disabled) { background: var(--panel-alt); }
-  .btn.play { width: 180px; background: var(--accent); color: var(--on-accent); border-color: var(--accent);
-    letter-spacing: 1px; text-transform: uppercase; }
-  .btn.play:hover:not(:disabled) { background: var(--accent-hover); }
-  .btn.play:active:not(:disabled) { background: var(--accent-pressed); }
-  .btn.gear { width: 48px; font-size: 20px; }
+  /* the website's .btn-game: cut corners (so no outer glow: inner glow + brightness instead), bold uppercase */
+  .btn { height: 48px; font: 800 12px var(--sans); letter-spacing: .04em; text-transform: uppercase; color: var(--text);
+    background: var(--iron-button); clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    box-shadow: inset 0 0 0 1px rgba(114,207,66,.45), inset 0 -8px 14px rgba(0,0,0,.4);
+    transition: box-shadow .15s, color .15s, filter .15s, transform .15s; }
+  .btn:hover:not(:disabled) { color: var(--fel-bright);
+    box-shadow: inset 0 0 0 1px rgba(114,207,66,.85), inset 0 0 16px rgba(114,207,66,.22); }
+  .btn.primary, .btn.play { background: var(--fel-button); color: var(--on-fel); text-shadow: 0 1px 0 rgba(248,244,170,.4);
+    box-shadow: inset 0 0 0 1px rgba(248,244,170,.35), inset 0 -8px 14px rgba(0,0,0,.25); }
+  .btn.primary:hover:not(:disabled), .btn.play:hover:not(:disabled) { color: var(--on-fel); filter: brightness(1.12);
+    box-shadow: inset 0 0 0 1px rgba(248,244,170,.6), inset 0 0 18px rgba(248,244,170,.35); }
+  .btn.play:hover:not(:disabled) { transform: translateY(-2px); }
+  .btn.play:active:not(:disabled) { filter: brightness(.9); transform: none; }
+  .play-glow { filter: drop-shadow(0 0 14px rgba(114,207,66,.45)); } /* the glow the clip-path cuts off */
+  .play-glow:has(.play:disabled) { filter: none; }
+  .btn.play { width: 210px; height: 54px; font-size: 17px; letter-spacing: .14em; }
+  .btn.play:disabled { background: var(--iron-button); color: var(--muted); text-shadow: none;
+    box-shadow: inset 0 0 0 1px rgba(114,207,66,.25), inset 0 -8px 14px rgba(0,0,0,.4); }
+  .btn.gear { width: 54px; height: 54px; font-size: 20px; }
+  .tagline { margin-top: 16px; color: var(--text-2); font-size: 10px; font-weight: 600; letter-spacing: .28em; line-height: 1.8;
+    text-transform: uppercase; text-align: center; text-shadow: 0 1px 3px #000; }
 
-  /* news drawer (NewsDrawer.cs) */
-  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 460px; background: rgba(15,17,22,.97);
-    border-left: 1px solid var(--divider); transform: translateX(100%); transition: transform .2s ease;
+  /* news drawer */
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 460px; z-index: 3;
+    background: linear-gradient(180deg, rgba(20,26,22,.98), rgba(5,8,6,.98)); border-left: 1px solid rgba(114,207,66,.35);
+    box-shadow: -12px 0 30px rgba(0,0,0,.6); transform: translateX(105%); transition: transform .2s ease;
     display: flex; flex-direction: column; }
   .drawer.open { transform: none; }
-  .drawer header { display: flex; align-items: flex-start; gap: 10px; padding: 20px 20px 14px; border-bottom: 1px solid var(--divider); }
+  .drawer header { display: flex; align-items: flex-start; gap: 10px; padding: 20px 20px 14px; border-bottom: 1px solid var(--fel-line); }
   .drawer header div { flex: 1; }
-  .drawer h2 { font: 600 16px "Segoe UI Semibold", "Segoe UI", sans-serif; margin-top: 4px; }
-  .drawer .content { overflow-y: auto; padding: 16px 20px 24px; user-select: text; line-height: 1.55; overflow-wrap: anywhere; }
-  .drawer h3 { font-size: 13px; color: var(--accent); margin: 14px 0 4px; }
+  .drawer h2 { font: 700 17px/1.3 var(--display); color: #eef2e6; margin-top: 6px; }
+  .drawer .content { overflow-y: auto; padding: 16px 20px 24px; user-select: text; line-height: 1.6; overflow-wrap: anywhere; }
+  .drawer h3 { font: 700 13px var(--display); letter-spacing: .5px; color: var(--fel-bright); margin: 16px 0 4px; }
   .drawer h3:first-child { margin-top: 0; }
-  .drawer .content p { color: #cfcfcf; }
-  ::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: var(--border); }
+  .drawer .content p { color: var(--text); }
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-track { background: #0b0f0b; }
+  ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #b6d149, #4d7f2c); }
 
-  /* settings (SettingsForm.cs) */
-  .overlay { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; }
+  /* dialogs (settings, install): the website's modal */
+  .overlay { position: absolute; inset: 0; z-index: 4; background: rgba(0,0,0,.6); backdrop-filter: blur(2px);
+    display: none; align-items: center; justify-content: center; }
   .overlay.open { display: flex; }
-  .dialog { width: 640px; background: var(--panel); border: 1px solid var(--border); padding: 22px 24px; }
-  .dialog h2 { font: 600 15px "Segoe UI Semibold", "Segoe UI", sans-serif; color: var(--accent);
-    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px; }
+  .dialog { width: 640px; position: relative; padding: 26px 28px; background: rgba(5,8,6,.96); border: 1px solid rgba(114,207,66,.3);
+    box-shadow: 0 20px 50px rgba(0,0,0,.8), inset 0 0 50px rgba(114,207,66,.05); }
+  .dialog h2 { font: 700 18px var(--display); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 18px;
+    background: var(--fel-title); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 8px rgba(114,207,66,.35)); }
   .dialog label { display: block; color: var(--text-2); font-size: 12px; margin-bottom: 6px; }
-  .dialog input { width: 100%; height: 34px; padding: 0 12px; background: var(--panel-alt); border: 1px solid var(--border);
-    color: var(--text); font: inherit; outline: none; user-select: text; }
-  .dialog input:focus { border-color: var(--accent); }
+  .dialog input { width: 100%; height: 36px; padding: 0 12px; background: rgba(5,8,6,.6); border: 2px solid rgba(114,207,66,.28);
+    color: #fff; font: inherit; outline: none; user-select: text; }
+  .dialog input:focus { background: rgba(5,8,6,.78); border-color: var(--fel);
+    box-shadow: 0 0 0 1px rgba(114,207,66,.25), 0 0 20px rgba(114,207,66,.2); }
   .hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
-  .dialog .row { display: flex; gap: 10px; margin-top: 20px; }
-  .dialog .row .btn { height: 36px; padding: 0 16px; white-space: nowrap; }
-  .dialog .row .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .dialog .row { display: flex; gap: 10px; margin-top: 22px; }
+  .dialog .row .btn { height: 38px; padding: 0 16px; white-space: nowrap; }
   .dialog .row .spacer { flex: 1; }
   .dialog .msg { margin-top: 12px; font-size: 12px; min-height: 16px; }
   .folder-row { display: flex; gap: 8px; }
   .folder-row input { flex: 1; }
-  .folder-row .btn { height: 34px; padding: 0 14px; }
-  .dialog p.lead { color: var(--text-2); line-height: 1.55; margin-bottom: 18px; }
+  .folder-row .btn { height: 36px; padding: 0 14px; }
+  .dialog p.lead { color: var(--text-2); line-height: 1.6; margin-bottom: 20px; }
   .choices { display: flex; flex-direction: column; gap: 10px; }
-  .choices .btn { height: 44px; }
-  .choices .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
-  .choices .btn.primary:hover { background: var(--accent-hover); }
+  .choices .btn { height: 46px; font-size: 14px; }
   .dialog .quit { display: block; margin-top: 14px; text-align: center; color: var(--muted); font-size: 12px; }
 </style>
 </head>
 <body>
   <div class="titlebar" id="titlebar">
-    <div class="brand"><div class="seal"><img src="LOGO_DATA_URI" alt=""></div><span class="glow">Chronicles</span></div>
+    <div class="brand"><div class="seal"><img src="art/logo.jpg" alt=""></div><span class="glow">Chronicles</span></div>
     <button class="icon-btn" title="Refresh" onclick="refresh()">⟳</button>
     <button class="win-btn" title="Minimize" onclick="minimize()">–</button>
     <button class="win-btn close" title="Close" onclick="quit()">✕</button>
@@ -148,16 +206,15 @@
 
   <div class="body">
     <aside class="sidebar">
-      <div class="seal"><img src="LOGO_DATA_URI" alt=""></div>
-      <div class="glow">WoW Legion</div>
-      <div class="rule"></div>
+      <img class="legion-logo" src="art/legion-logo.webp" alt="World of Warcraft: Legion">
+      <img class="divider" src="art/fel-divider-line.webp" alt="">
+      <div class="tagline">The Burning Legion has returned. Stand with the Broken Isles.</div>
       <div class="realm"><span class="dot" id="dot"></span><span id="realm">Checking realm...</span></div>
       <div class="side-foot">Legion 7.3.5 · build 26972</div>
     </aside>
 
     <main class="main">
-      <div class="hero" id="hero" onclick="openNews(0)">
-        <img class="seal-bg" src="LOGO_DATA_URI" alt="">
+      <div class="hero panel" id="hero" onclick="openNews(0)">
         <div class="kicker" id="heroKicker">Latest update</div>
         <h1 id="heroTitle">Welcome to Chronicles</h1>
         <p id="heroText"></p>
@@ -168,7 +225,7 @@
         <div class="status" id="status">Starting...</div>
         <div class="bar-row" id="barRow"><div class="bar"><div class="fill" id="fill"></div></div><span class="pct" id="pct">0%</span></div>
         <div class="buttons">
-          <button class="btn play" id="play" disabled onclick="playClicked()">Play</button>
+          <span class="play-glow"><button class="btn play" id="play" disabled onclick="playClicked()">Play</button></span>
           <button class="btn gear" title="Settings" onclick="openSettings()">⚙</button>
         </div>
       </div>
@@ -183,7 +240,7 @@
     </div>
 
     <div class="overlay" id="settings" onclick="if (event.target === this) closeSettings()">
-      <div class="dialog">
+      <div class="dialog panel">
         <h2>Settings</h2>
         <label for="folder">World of Warcraft folder</label>
         <div class="folder-row">
@@ -203,7 +260,7 @@
     </div>
 
     <div class="overlay" id="install">
-      <div class="dialog">
+      <div class="dialog panel">
         <h2>Install World of Warcraft: Legion</h2>
         <p class="lead">The game is not installed yet. The launcher can download and install it for you, or use a
           World of Warcraft: Legion 7.3.5 client you already have.</p>
@@ -263,14 +320,12 @@
     $("heroKicker").textContent = "Latest update" + (top.date ? " · " + top.date : "");
     $("heroTitle").textContent = top.title;
     $("heroText").textContent = plain((top.body[0] || {}).value || "");
-    const thumbs = [["#5a4628", "#1c160e"], ["#46321c", "#18120c"], ["#503e24", "#161410"], ["#40301c", "#12100c"]];
     const cards = $("cards"); cards.innerHTML = "";
     for (let i = 0; i < 4; i++) {
       const n = news.length > 1 ? 1 + i % (news.length - 1) : 0, item = news[n];
       const c = document.createElement("div");
       c.className = "card";
-      c.style.background = `linear-gradient(160deg, ${thumbs[i][0]}, ${thumbs[i][1]})`;
-      c.innerHTML = '<div class="date"></div><div class="t"></div>';
+      c.innerHTML = '<div class="ico"></div><div class="date"></div><div class="t"></div>';
       c.querySelector(".date").textContent = item.date || "";
       c.querySelector(".t").textContent = item.title;
       c.onclick = () => openNews(n);
@@ -341,8 +396,12 @@
     $("settingsMsg").style.color = err ? "var(--err)" : "var(--ok)";
     $("settingsMsg").textContent = err || "Original client restored.";
   }
-  document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSettings(); closeNews(); } });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { closeSettings(); closeNews(); }
+    if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) e.preventDefault(); // a reload would lose the install dialog
+  });
   document.addEventListener("contextmenu", e => e.preventDefault());
+  pageReady(); // Go starts the update check and the news now
 </script>
 </body>
 </html>

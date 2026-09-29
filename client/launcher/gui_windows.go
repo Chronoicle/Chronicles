@@ -1,10 +1,10 @@
-// The launcher window: ui.html (the Chronicles design by Amibari) in a borderless WebView2 window. The page calls the
+// The launcher window: ui.html (the website's Legion theme) in a borderless WebView2 window. The page calls the
 // Go functions bound below; Go updates the page with Eval (setStatus, setProgress, setReady, setError, setNews, setRealm).
 package main
 
 import (
 	"bytes"
-	_ "embed"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -23,8 +24,8 @@ import (
 //go:embed ui.html
 var uiHTML string
 
-//go:embed logo.jpg
-var logoJPG []byte
+//go:embed art
+var art embed.FS // the page's images (the website's img/legion/ art and the Chronicles seal)
 
 var (
 	user32           = syscall.NewLazyDLL("user32.dll")
@@ -307,16 +308,32 @@ func run(root string, args []string, test bool) {
 		return msg
 	})
 
-	html := strings.Replace(uiHTML, "LOGO_DATA_URI", "data:image/jpeg;base64,"+base64.StdEncoding.EncodeToString(logoJPG), -1)
-	w.SetHtml(html)
-	go refresh()
-	go check()
+	// the first update check and news once the page's script runs: Evals before that are lost (the page with its
+	// inlined art takes a moment), and one of them may be the install dialog. After 15 s they start anyway (a page
+	// script that never got there must not leave the launcher idle); once only.
+	var start sync.Once
+	begin := func() { start.Do(func() { go refresh(); go check() }) }
+	w.Bind("pageReady", begin)
+	time.AfterFunc(15*time.Second, begin)
+	w.SetHtml(inlineArt(uiHTML))
 	go func() {
 		for range time.Tick(30 * time.Second) {
 			refresh()
 		}
 	}()
 	w.Run()
+}
+
+// inlineArt turns the page's art/<file> references into data URIs of the embedded files: SetHtml has no folder to load
+// them from. (ui.html opened from its own folder, for a preview, loads them as they are.)
+func inlineArt(html string) string {
+	files, _ := art.ReadDir("art")
+	for _, f := range files {
+		b, _ := art.ReadFile("art/" + f.Name())
+		mime := map[string]string{".jpg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}[filepath.Ext(f.Name())]
+		html = strings.ReplaceAll(html, "art/"+f.Name(), "data:"+mime+";base64,"+base64.StdEncoding.EncodeToString(b))
+	}
+	return html
 }
 
 // borderless drops the Windows frame (the page draws its own title bar: drag, minimize, close) and sizes the window
