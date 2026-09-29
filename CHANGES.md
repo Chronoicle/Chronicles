@@ -4,6 +4,8 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-09-29 (Oslo)
 
+- Claude (desktop session) — website Legion theme deployed 00:41 UTC (owner request): `assets/css/legion.css`, Legion art from the client in `img/legion/`, home hero + 7-slide gallery, Legion realm logo, Font Awesome served from `assets/vendor/fontawesome` (was 404), account page expansion names, en tagline — live — undo: `tar -xzf ~/backup_website_live_before_legion_20260929_0041.tgz -C /var/www` + source backup `~/backup_website_src_before_legion_20260928_2302.tgz`.
+- Claude (desktop session) — patch server `~/cdn/cdn_server.py` streams files and serves `/client/` (the full client, 72.24 GB, `client.json`), manifest `client` key added; 15 s patch server outage 22:51 UTC while restarting it — live (old launchers ignore it) — undo: `cp ~/cdn/cdn_server.py.bak_before_client ~/cdn/cdn_server.py` + restart, manifest backup `manifest.json.bak_before_client_*`.
 - Claude (desktop session) — restart 22:31 UTC 2026-09-28 (owner OK, 60 s timer), worldserver dae4002: 8314b5b #81 #82 #79 #80 #83 #84 #85 #73, 92ea901 #79, 1ce1709 (#83/#84 SQL), 65fc5e4 + 03d3f1f #63, a4cd518 + 6cff2c5 #48, cae1a1f #49 (partial), 58afafc + d7dd417 #66, dae4002 atomic id counters, shop phase 2 #64 (d9ca3eb f151a81 d2f8c99 3a61899 b858261, GM accounts only); SQL applied right before: fix_imonar_81, fix_kingaroth_trash_visual_82, fix_broken_shore_79_80, fix_blood_elf_quests_83_84, fix_shrine_russian_85, fix_shop_catalog2_64, fix_antorus_trash_respawn_63, fix_psyfiend_48, fix_ashbringer_66 (fix_shop_new_flag_64 earlier, additive). No crash log at shutdown — live, changelog 1554259680237453313 — `git revert` the commits, the matching `sql/custom/undo_*.sql` files.
 
 ## 2026-09-28 (Oslo)
