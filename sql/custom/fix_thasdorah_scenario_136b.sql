@@ -33,13 +33,15 @@ INSERT INTO world.smart_scripts (entryorguid, source_type, id, link, event_type,
 (100397,   0, 64, 0,  61, 256, 0,    0,    0,    0,     45, 2,        2, 19, 101269, 0, 0, 0, 'Link - Send Data 2 2 to the Inquisitor'),
 (100397,   0, 65, 0,  38, 257, 9,    9,    0,    0,     80, 10039706, 2, 1,  0,      0, 0, 0, 'Data Set 9 9 - Run TS (capture walk)'),
 (10039706, 9, 0,  0,  0,  0,   0,    0,    0,    0,     24, 0,        0, 1,  0,      0, 0, 0, 'TS - Evade (leave any fight)'),
-(10039706, 9, 1,  0,  0,  0,   1000, 1000, 0,    0,     53, 1,        10039703, 1, 0, 0, 0, 0, 'TS - Start WP to the capture spot'),
+(10039706, 9, 1,  0,  0,  0,   3000, 3000, 0,    0,     53, 1,        10039703, 1, 0, 0, 0, 0, 'TS - Start WP to the capture spot'),
 -- 2) High Inquisitor Qormaladon (101269) stood at his spawn through his whole dialogue and never came for the player
 -- (spawn MovementType 2 without any waypoint path). Now he talks and walks towards Vereesa when she arrives, and attacks
 -- the closest player once he is attackable (data 1 1).
 (101269,   0, 13, 0,  61, 1,   0,    0,    0,    0,     49, 0,        0, 21, 100,    0, 0, 0, 'Link - Attack closest player'),
 (101269,   0, 14, 15, 38, 1,   2,    2,    0,    0,     5,  1,        0, 1,  0,      0, 0, 0, 'Data Set 2 2 - Emote talk'),
 (101269,   0, 15, 0,  61, 1,   0,    0,    0,    0,     69, 1,        0, 8,  0,      187.494, 1295.63, -59.0451, 'Link - Walk towards Vereesa');
+-- dev-check: explicit 100 yd for the closest-Inquisitor search (target 19 param2 = distance)
+UPDATE world.smart_scripts SET target_param2 = 100 WHERE entryorguid = 100397 AND source_type = 0 AND id = 64;
 UPDATE world.smart_scripts SET link = 13 WHERE entryorguid = 101269 AND source_type = 0 AND id = 1 AND link = 0;
 UPDATE world.creature SET MovementType = 0 WHERE guid = 370739 AND id = 101269;
 
