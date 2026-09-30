@@ -4,6 +4,7 @@ Format: `date — who — what — status — undo`. Core code changes are also 
 
 ## 2026-10-01 (Oslo)
 
+- Claude (desktop team dev-owner, subagent, dev-check review) — restart 23:43 UTC 2026-09-30 (owner OK, 60 s timer), worldserver 9ffaf5a (ready 23:44:57 UTC, no crash log): #136 Thas'dorah stages 6-8 (Vereesa fights, Inquisitor walks up and attacks, bow model + English name) — live, changelog 1555002722225492010, gabrielf03d told — undo: ~/undo_thasdorah_scenario_136b.sql.
 - Claude (desktop team dev-owner, subagents, dev-check reviews) — restart 22:11 UTC 2026-09-30 (owner OK, 60 s timer), worldserver 9ffaf5a (ready 22:12:44 UTC, no crash log): #79 Broken Shore Alliance (boarded on the sailing ship; WaypointMovementGenerator zero-delay action points no longer pause 180 s; Genn's end-of-path handler once), #137 Shadow Priest custom changes off in BG/arenas, #132 priest hall intro (server-wide: 311 eventobject conditions SourceId 10 -> 13), #131 GM Island Crucible, #136 Thas'dorah stage 3, #130 Stellagosa speed, #133 Dreamway circle + Dreamgrove portal, #134 Ursoc's Lair fixes — live, changelog 1554979507608223885, 10 reporter replies — undo: `git revert` of 9ffaf5a a32c05b 75b139a + rebuild; ~/undo_priest_hall_intro_crucible.sql, ~/undo_mm_scenario_still_alive_shadow_mania.sql, ~/undo_druid_dreamgrove_guardian.sql.
 
 ## 2026-09-30 (Oslo)
