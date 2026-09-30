@@ -222,9 +222,12 @@ struct boss_dargrul_the_underking : public BossAI
 //101476
 struct npc_dargrul_molten_charskin : public ScriptedAI
 {
-    npc_dargrul_molten_charskin(Creature* creature) : ScriptedAI(creature) 
+    npc_dargrul_molten_charskin(Creature* creature) : ScriptedAI(creature)
     {
         me->SetReactState(REACT_PASSIVE);
+        // a taunt would override the fixate (Creature::SelectVictim) and bring back the zigzag (#13)
+        me->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_MOD_TAUNT, true);
+        me->ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_ATTACK_ME, true);
     }
 
     EventMap events;
@@ -403,7 +406,12 @@ struct npc_dargrul_lava_geyser : public ScriptedAI
 //102253
 struct npc_nl_understone_demolisher : public ScriptedAI
 {
-    npc_nl_understone_demolisher(Creature* creature) : ScriptedAI(creature) {}
+    npc_nl_understone_demolisher(Creature* creature) : ScriptedAI(creature)
+    {
+        // a taunt would override the fixate (Creature::SelectVictim) and bring back the zigzag (#13)
+        me->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_MOD_TAUNT, true);
+        me->ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_ATTACK_ME, true);
+    }
 
     ObjectGuid playerGuid;
     EventMap events;
