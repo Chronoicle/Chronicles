@@ -456,9 +456,14 @@ class spell_pri_voidform : public AuraScript
         }
     }
 
-    // Owner request 2026-09-27: Shadow damage dealt +5% on top of the client data (20% -> 25%)
+    // Owner request 2026-09-27: Shadow damage dealt +5% on top of the client data (20% -> 25%); not in battlegrounds and
+    // arenas, where the retail value applies (#137)
     void CalculateAmount0(AuraEffect const* /*aurEff*/, float & amount, bool & /*canBeRecalculated*/)
     {
+        Unit* caster = GetCaster();
+        if (caster && caster->GetMap()->IsBattlegroundOrArena())
+            return;
+
         amount += 5.0f;
     }
 
@@ -1898,7 +1903,8 @@ class spell_pri_mass_dispel : public SpellScript
 };
 
 // Shadow Crash (impact) - 205386
-// custom (server suggestion): also applies Vampiric Touch to up to 6 enemies hit, like later expansions
+// custom (server suggestion): also applies Vampiric Touch to up to 6 enemies hit, like later expansions; not in
+// battlegrounds and arenas, where the retail behaviour applies (#137)
 class spell_pri_shadow_crash : public SpellScript
 {
     PrepareSpellScript(spell_pri_shadow_crash);
@@ -1909,7 +1915,7 @@ class spell_pri_shadow_crash : public SpellScript
     {
         Unit* caster = GetCaster();
         Unit* target = GetHitUnit();
-        if (!caster || !target || _dotted >= 6)
+        if (!caster || !target || _dotted >= 6 || caster->GetMap()->IsBattlegroundOrArena())
             return;
 
         ++_dotted;
