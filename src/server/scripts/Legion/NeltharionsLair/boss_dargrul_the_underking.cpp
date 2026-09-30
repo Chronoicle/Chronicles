@@ -249,6 +249,14 @@ struct npc_dargrul_molten_charskin : public ScriptedAI
         me->RemoveAurasDueToSpell(SPELL_MAGMA_BREAKER_AURA);
     }
 
+    // Burning Hatred: only the fixated player, whatever the threat. The 50 M threat did not hold for the 30 s: a tank's
+    // x10 threat (Blood DK Veteran of the Third War +900 %) passed it, UpdateVictim switched to the tank and the 2 s
+    // check switched back, so the add zigzagged between them (#13)
+    bool AllowSelectNextVictim(Unit* target) override
+    {
+        return playerGuid.IsEmpty() || target->GetGUID() == playerGuid;
+    }
+
     void SpellHitTarget(Unit* target, const SpellInfo* spell) override
     {
         if (spell->Id == SPELL_FIXATE_PLR)
@@ -420,6 +428,12 @@ struct npc_nl_understone_demolisher : public ScriptedAI
             me->CastSpell(me, 188587);
             events.RescheduleEvent(EVENT_1, 2500);
         }
+    }
+
+    // Fixate: only the fixated player, whatever the threat (see npc_dargrul_molten_charskin, #13)
+    bool AllowSelectNextVictim(Unit* target) override
+    {
+        return playerGuid.IsEmpty() || target->GetGUID() == playerGuid;
     }
 
     void SpellHitTarget(Unit* target, const SpellInfo* spell) override
