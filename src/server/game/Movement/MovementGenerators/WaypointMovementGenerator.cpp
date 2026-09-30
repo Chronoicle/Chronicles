@@ -99,6 +99,11 @@ void WaypointMovementGenerator<Creature>::OnArrived(Creature& creature)
     {
         TC_LOG_DEBUG("maps.scripts", "Creature movement start script %u at point %u for %s.", waypoint.event_id, _currentNode, creature.GetGUID().ToString().c_str());
         creature.ClearUnitState(UNIT_STATE_ROAMING_MOVE);
+        // #79: with no delay on this point DoUpdate then saw a stopped creature right after OnArrived and took it
+        // for "stopped for a player": a 3 minute pause (Creature.MovingStopTimeForPlayer) at every action point
+        // (Genn at "Bottom of Cliff" on the Broken Shore). Go on with the next update instead, like a 1 ms delay.
+        if (_nextMoveTime.Passed())
+            _nextMoveTime.Reset(1);
         creature.GetMap()->ScriptsStart(sWaypointScripts, waypoint.event_id, &creature, nullptr);
     }
 

@@ -1477,6 +1477,11 @@ public:
                 case 439136:
                     if (pointId == 13)
                     {
+                        // #79: at the end of a MovePath the waypoint generator reports the last point on every update,
+                        // so this ran each tick until the 22 s event below: players ported and the Stage 2 scene
+                        // cast over and over, and dozens of MovePath(439137) restarts queued. Once.
+                        currentWP = 0;
+
                         Map::PlayerList const &PlList = me->GetMap()->GetPlayers();
                         for (Map::PlayerList::const_iterator i = PlList.begin(); i != PlList.end(); ++i)
                             if (Player* player = i->getSource())

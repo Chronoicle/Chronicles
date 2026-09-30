@@ -99,7 +99,10 @@ public:
             auto transportGameObject = GetGameObjectByEntry(player->GetTeam() == ALLIANCE ? TRANSPORT_ALLIANCE : TRANSPORT_HORDE);
             ObjectGuid transportGuid = transportGameObject ? transportGameObject->GetGUID() : ObjectGuid::Empty;
 
-            if (Transport* transport = player->GetMap()->GetTransport(transportGuid))
+            // #77/#79: only for the arrival (step 0). Someone who relogs or joins later must not be put back on the
+            // ship: the intro that ports to the beach plays once per player and only in step 0.
+            Transport* transport = getScenarionStep() == 0 ? player->GetMap()->GetTransport(transportGuid) : nullptr;
+            if (transport)
             {
                 instance->LoadGrid(521.7239f, 1862.63f);
                 instance->LoadGrid(461.8785f, 2032.679f);
@@ -124,11 +127,10 @@ public:
 
                 init.Launch();
 
-                    // TODO: for all transports?
-//                    transport->AddDelayedEvent(5000, [transport]() -> void
-//                    {
-//                        transport->EnableMovement(true);
-//                    });
+                // The ship is created stopped (InitStopped) in area 8288. It has to sail into 8290 / 8455, where the
+                // Intro Scene (movie + Stage 1 Port to the beach) is cast. (Its own delayed events never run:
+                // Transport::Update does not update them, so no 5 s delay here.)
+                transport->EnableMovement(true);
             }
         }
         
@@ -637,6 +639,11 @@ public:
         }
         void OnGameObjectCreate(GameObject* go) override
         {
+            // #77/#79: registers every object for GetGameObjectByEntry. Without it OnPlayerEnter never found the
+            // battleship (251513 / 254124) and players stayed at the LFG entrance, which is the ship's deck offset
+            // used as a world position: in the sea about 2000 yd from the island.
+            InstanceScript::OnGameObjectCreate(go);
+
             switch (go->GetEntry())
             {
                 case GO_ALLIANCE_SHIP:
