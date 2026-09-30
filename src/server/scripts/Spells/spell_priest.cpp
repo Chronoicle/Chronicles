@@ -461,7 +461,7 @@ class spell_pri_voidform : public AuraScript
     void CalculateAmount0(AuraEffect const* /*aurEff*/, float & amount, bool & /*canBeRecalculated*/)
     {
         Unit* caster = GetCaster();
-        if (caster && caster->GetMap()->IsBattlegroundOrArena())
+        if (caster && caster->GetMap() && caster->GetMap()->IsBattlegroundOrArena())
             return;
 
         amount += 5.0f;
@@ -1915,7 +1915,7 @@ class spell_pri_shadow_crash : public SpellScript
     {
         Unit* caster = GetCaster();
         Unit* target = GetHitUnit();
-        if (!caster || !target || _dotted >= 6 || caster->GetMap()->IsBattlegroundOrArena())
+        if (!caster || !target || _dotted >= 6 || (caster->GetMap() && caster->GetMap()->IsBattlegroundOrArena()))
             return;
 
         ++_dotted;
