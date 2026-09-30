@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-10-01 (Oslo)
+
+- Claude (desktop team dev-owner, subagents, dev-check reviews) — restart 22:11 UTC 2026-09-30 (owner OK, 60 s timer), worldserver 9ffaf5a (ready 22:12:44 UTC, no crash log): #79 Broken Shore Alliance (boarded on the sailing ship; WaypointMovementGenerator zero-delay action points no longer pause 180 s; Genn's end-of-path handler once), #137 Shadow Priest custom changes off in BG/arenas, #132 priest hall intro (server-wide: 311 eventobject conditions SourceId 10 -> 13), #131 GM Island Crucible, #136 Thas'dorah stage 3, #130 Stellagosa speed, #133 Dreamway circle + Dreamgrove portal, #134 Ursoc's Lair fixes — live, changelog 1554979507608223885, 10 reporter replies — undo: `git revert` of 9ffaf5a a32c05b 75b139a + rebuild; ~/undo_priest_hall_intro_crucible.sql, ~/undo_mm_scenario_still_alive_shadow_mania.sql, ~/undo_druid_dreamgrove_guardian.sql.
+
 ## 2026-09-30 (Oslo)
 
 - Claude (desktop team dev-owner, subagents, dev-check + help-helper reviews) — restart 14:09 UTC (owner OK, 60 s timer), worldserver 9c839c8 (ready 14:10:08 UTC, no crash log): #13 Neltharion's Lair (boss + Hulk CC immunity, no turning during Piercing Shards/Landslide, Ularogg reset + totem ring, drummers wander + walk to their drum, Naraxas hidden until the RP + Spiked Tongue, Rokmora RP run-off, barrel ride, Dargrul fixate adds) — live, changelog 1554857981726826568, James told — undo: `git revert` of 1364b21 d76fd22 66f2094 9c839c8 + rebuild; ~/undo_neltharions_lair_13_4_bosses_drummers.sql. #4 crawler SQL not applied (owner).
