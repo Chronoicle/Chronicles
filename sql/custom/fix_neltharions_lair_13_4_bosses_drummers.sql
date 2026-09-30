@@ -15,3 +15,6 @@ CREATE TABLE world.bak_nl_13_4_drummers AS SELECT guid, position_x, position_y, 
 UPDATE world.creature_template SET mechanic_immune_mask = mechanic_immune_mask | 617299839 WHERE entry IN (91000, 91003, 91004, 91005, 91007);
 UPDATE world.creature SET position_x = 2553.12, position_y = 1500.03, position_z = -54.2467, orientation = 4.35817 WHERE guid = 11566198 AND id = 92610;
 UPDATE world.creature SET position_x = 2646.54, position_y = 1592.12, position_z = -54.3942, orientation = 4.11995 WHERE guid = 11566199 AND id = 92610;
+-- James (2026-09-27): the drummers should walk around, not stand; no retail path exists anywhere (dump, TC, DestinyCore): wander 5 yd
+-- around their own spot out of combat; in combat the script sends them to their drum.
+UPDATE world.creature SET MovementType = 1, spawndist = 5 WHERE guid IN (11566198, 11566199) AND id = 92610 AND MovementType = 0;
