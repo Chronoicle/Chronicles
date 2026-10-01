@@ -476,6 +476,10 @@ void ObjectAccessor::UnloadAll()
         corpse->RemoveFromWorld();
         if (corpse->IsInGrid())
             corpse->RemoveFromGrid();
+        // the maps still exist here (MapManager::UnloadAll runs after this at shutdown): ~WorldObject asserts on a corpse
+        // that still has its map (crashes at shutdown 2026-09-27 20:24 and 2026-10-01 07:43 UTC: a corpse of a
+        // character that logged out dead)
+        corpse->ResetMap();
 
         delete corpse;
     }

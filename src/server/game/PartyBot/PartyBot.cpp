@@ -463,6 +463,13 @@ void PartyBotSession::Dismiss()
             bot->SetAI(nullptr);
             delete ai;
         }
+        // dead (a wipe, a quest-test death): up first, or the logout leaves a corpse where it logs out (4 dungeon bots'
+        // corpses lay at Northshire Abbey, 2026-10-01)
+        if (bot->IsInWorld() && !bot->IsAlive())
+        {
+            bot->ResurrectPlayer(1.0f);
+            bot->SpawnCorpseBones();
+        }
         if (Group* group = bot->GetGroup())
             group->RemoveMember(bot->GetGUID());
     }
