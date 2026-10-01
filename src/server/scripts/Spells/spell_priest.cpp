@@ -1902,23 +1902,20 @@ class spell_pri_mass_dispel : public SpellScript
     }
 };
 
-// Shadow Crash (impact) - 205386
-// custom (server suggestion): also applies Vampiric Touch to up to 6 enemies hit, like later expansions; not in
-// battlegrounds and arenas, where the retail behaviour applies (#137)
+// Shadow Crash (impact) - 205386 (cast 205385)
+// custom (server suggestion): also applies Vampiric Touch to every enemy hit (owner 2026-10-01: all targets, was up to
+// 6), like later expansions; not in battlegrounds and arenas, where the retail behaviour applies (#137)
 class spell_pri_shadow_crash : public SpellScript
 {
     PrepareSpellScript(spell_pri_shadow_crash);
-
-    uint8 _dotted = 0;
 
     void HandleOnHit(SpellEffIndex /*effIndex*/)
     {
         Unit* caster = GetCaster();
         Unit* target = GetHitUnit();
-        if (!caster || !target || _dotted >= 6 || (caster->GetMap() && caster->GetMap()->IsBattlegroundOrArena()))
+        if (!caster || !target || (caster->GetMap() && caster->GetMap()->IsBattlegroundOrArena()))
             return;
 
-        ++_dotted;
         caster->CastSpell(target, 34914, true); // Vampiric Touch
     }
 
