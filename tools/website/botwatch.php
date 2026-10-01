@@ -132,11 +132,11 @@ if (isset($_GET['json'])) {
                 ['entry' => 11519, 'name' => 'Bazzalan', 'x' => -340.0, 'y' => 192.0, 'z' => -32.8, 'status' => 'alive', 'hp' => 100],
             ],
             'bots' => [
-                ['name' => 'Tankbot', 'class' => 'Warrior', 'spec' => 'Protection', 'role' => 'tank', 'level' => 15, 'hp' => 1234, 'maxhp' => 1500, 'power' => 80, 'powerType' => 'rage', 'alive' => true, 'x' => -179.0, 'y' => 108.0, 'z' => -25.0, 'o' => 2.3, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62],
-                ['name' => 'Healbot', 'class' => 'Priest', 'spec' => 'Holy', 'role' => 'healer', 'level' => 15, 'hp' => 820, 'maxhp' => 880, 'power' => 45, 'powerType' => 'mana', 'alive' => true, 'x' => -160.0, 'y' => 92.0, 'z' => -24.0, 'o' => 2.5, 'target' => 'Tankbot', 'targetHp' => 82],
-                ['name' => 'Frostbot', 'class' => 'Mage', 'spec' => 'Frost', 'role' => 'dps', 'level' => 15, 'hp' => 610, 'maxhp' => 790, 'power' => 30, 'powerType' => 'mana', 'alive' => true, 'x' => -165.0, 'y' => 118.0, 'z' => -24.5, 'o' => 2.0, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62],
-                ['name' => 'Stabbot', 'class' => 'Rogue', 'spec' => 'Outlaw', 'role' => 'dps', 'level' => 15, 'hp' => 0, 'maxhp' => 1010, 'power' => 0, 'powerType' => 'energy', 'alive' => false, 'x' => -186.0, 'y' => 104.0, 'z' => -25.2, 'o' => 0.4, 'target' => '', 'targetHp' => 0],
-                ['name' => 'Shootbot', 'class' => 'Hunter', 'spec' => 'Marksmanship', 'role' => 'dps', 'level' => 15, 'hp' => 940, 'maxhp' => 1050, 'power' => 70, 'powerType' => 'focus', 'alive' => true, 'x' => -152.0, 'y' => 125.0, 'z' => -24.0, 'o' => 2.2, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62],
+                ['name' => 'Tankbot', 'class' => 'Warrior', 'spec' => 'Protection', 'role' => 'tank', 'level' => 15, 'hp' => 1234, 'maxhp' => 1500, 'power' => 80, 'powerType' => 'rage', 'alive' => true, 'x' => -179.0, 'y' => 108.0, 'z' => -25.0, 'o' => 2.3, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62, 'quests' => [['id' => 5723, 'name' => 'Testing an Enemy\'s Strength', 'done' => true, 'progress' => '1/1'], ['id' => 5728, 'name' => 'Hidden Enemies', 'done' => false, 'progress' => '2/7'], ['id' => 5761, 'name' => 'Slaying the Beast', 'done' => false, 'progress' => '0/1']]],
+                ['name' => 'Healbot', 'class' => 'Priest', 'spec' => 'Holy', 'role' => 'healer', 'level' => 15, 'hp' => 820, 'maxhp' => 880, 'power' => 45, 'powerType' => 'mana', 'alive' => true, 'x' => -160.0, 'y' => 92.0, 'z' => -24.0, 'o' => 2.5, 'target' => 'Tankbot', 'targetHp' => 82, 'quests' => [['id' => 5723, 'name' => 'Testing an Enemy\'s Strength', 'done' => true, 'progress' => '1/1'], ['id' => 30969, 'name' => 'Plans of the Shadow Council', 'done' => false, 'progress' => '1/3']]],
+                ['name' => 'Frostbot', 'class' => 'Mage', 'spec' => 'Frost', 'role' => 'dps', 'level' => 15, 'hp' => 610, 'maxhp' => 790, 'power' => 30, 'powerType' => 'mana', 'alive' => true, 'x' => -165.0, 'y' => 118.0, 'z' => -24.5, 'o' => 2.0, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62, 'quests' => [['id' => 5725, 'name' => 'The Power to Destroy...', 'done' => true, 'progress' => '2/2'], ['id' => 5728, 'name' => 'Hidden Enemies', 'done' => false, 'progress' => '3/7'], ['id' => 30969, 'name' => 'Plans of the Shadow Council', 'done' => false, 'progress' => '0/3']]],
+                ['name' => 'Stabbot', 'class' => 'Rogue', 'spec' => 'Outlaw', 'role' => 'dps', 'level' => 15, 'hp' => 0, 'maxhp' => 1010, 'power' => 0, 'powerType' => 'energy', 'alive' => false, 'x' => -186.0, 'y' => 104.0, 'z' => -25.2, 'o' => 0.4, 'target' => '', 'targetHp' => 0, 'quests' => [['id' => 5722, 'name' => 'Searching for the Lost Satchel', 'done' => true, 'progress' => '1/1'], ['id' => 5761, 'name' => 'Slaying the Beast', 'done' => false, 'progress' => '0/1']]],
+                ['name' => 'Shootbot', 'class' => 'Hunter', 'spec' => 'Marksmanship', 'role' => 'dps', 'level' => 15, 'hp' => 940, 'maxhp' => 1050, 'power' => 70, 'powerType' => 'focus', 'alive' => true, 'x' => -152.0, 'y' => 125.0, 'z' => -24.0, 'o' => 2.2, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62, 'quests' => [['id' => 5723, 'name' => 'Testing an Enemy\'s Strength', 'done' => false, 'progress' => '0/1'], ['id' => 5725, 'name' => 'The Power to Destroy...', 'done' => true, 'progress' => '2/2']]],
             ],
             'trail' => $trail,
             'route' => [[-179.0, 108.0], [-196.0, 116.0], [-214.0, 125.0], [-232.0, 134.0], [-249.0, 142.0], [-262.0, 148.0]],
@@ -451,7 +451,7 @@ tr.dead td { color:#6b7280; }
 
     var right = el('div');
     var tbl = el('table'), hr = el('tr');
-    ['Bot', 'Class / spec', 'Role', 'Lvl', 'HP', 'Power', 'Target'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
+    ['Bot', 'Class / spec', 'Role', 'Lvl', 'HP', 'Power', 'Target', 'Quests'].forEach(function (h) { hr.appendChild(el('th', null, h)); });
     tbl.appendChild(hr);
     arr(run.bots).forEach(function (b) {
       var alive = b.alive !== false, tr = el('tr', alive ? '' : 'dead');
@@ -468,6 +468,10 @@ tr.dead td { color:#6b7280; }
       td.appendChild(bar(pw, 100, pw, (Object.prototype.hasOwnProperty.call(POWER, pt) ? POWER[pt] : '#a855f7'), (pt || 'power') + ' ' + pw + '%'));
       tr.appendChild(td);
       tr.appendChild(el('td', null, str(b.target) ? str(b.target) + ' (' + Math.round(num(b.targetHp)) + '%)' : '-'));
+      var qs = arr(b.quests), qd = qs.filter(function (q) { return q && q.done; }).length;
+      td = el('td', 'meta', qs.length ? 'quests ' + qd + '/' + qs.length : '-');
+      td.title = qs.map(function (q) { q = q || {}; return num(q.id) + ' ' + str(q.name) + ': ' + (q.done ? 'done' : str(q.progress)); }).join('\n');
+      tr.appendChild(td);
       tbl.appendChild(tr);
     });
     right.appendChild(tbl);
