@@ -789,6 +789,9 @@ public:
             QUEST = 38759,
         };
 
+        // #148: see go_q40077 (a goober click only reaches GossipUse)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
@@ -950,6 +953,9 @@ public:
             CREDIT = 100722,
         };
 
+        // #148: see go_q40077 (a goober click only reaches GossipUse)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
@@ -1101,6 +1107,9 @@ public:
             SPELL = 190851,
             CREDIT = 94407,
         };
+
+        // #148: see go_q40077 (a goober click only reaches GossipUse)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {
@@ -1416,6 +1425,9 @@ public:
             QUEST = 38727,
             CREDIT = 94407,
         };
+
+        // #148: see go_q40077 (a goober click only reaches GossipUse)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {
@@ -2088,6 +2100,9 @@ public:
             QUEST = 38729,
             CREDIT = 100651,
         };
+
+        // #148: see go_q40077 (a goober click only reaches GossipUse)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {
