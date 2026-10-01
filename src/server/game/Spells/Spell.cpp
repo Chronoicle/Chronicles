@@ -1545,7 +1545,10 @@ void Spell::SelectImplicitDestDestTargets(SpellEffIndex effIndex, SpellImplicitT
 
     Position pos = static_cast<Position>(*m_targets.GetDstPos());
 
-    if (canHitTargetInLOS && m_caster->IsCreature() && dist < 200.0f)
+    // Not Worm Call 183554 (Neltharion's Lair): this shortcut keeps the player's Z, so next to the cave walls the
+    // Tarspitter Grub spawned inside the rock, turned into a Rotdrool Grabber there, and its Barbed Tongue pulled players
+    // under the map (#143). MovePosition keeps the point on the ground and steps back from walls.
+    if (canHitTargetInLOS && m_caster->IsCreature() && dist < 200.0f && m_spellInfo->Id != 183554)
     {
         Position tempPos;
         pos.SimplePosXYRelocationByAngle(tempPos, dist, angle);
