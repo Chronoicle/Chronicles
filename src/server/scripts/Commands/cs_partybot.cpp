@@ -3,7 +3,7 @@
  * .partybot add <name|tank|healer|dps|spec|class>   a bot joins your group
  * .partybot remove [character]  dismiss one bot, or all of yours
  * .partybot list                your bots
- * .partybot questtest <class> [race] [max level] | stop   a fresh level-1 bot plays its starting zone's quests and logs
+ * .partybot questtest <class> [race] [max level] | random [race] [count] [max level] | stop   a fresh level-1 bot plays its starting zone's quests and logs
  *                               each quest's result (QUESTBOT lines in Server.log, game/PartyBot/QuestBot.cpp)
  * Staff only while the bots are being built (#65).
  */
@@ -13,7 +13,10 @@
 #include "Player.h"
 #include "DB2Stores.h"
 #include "DatabaseEnv.h"
+#include "ObjectMgr.h"
+#include "Containers.h"
 #include <boost/algorithm/string/predicate.hpp>
+#include <sstream>
 
 class partybot_commandscript : public CommandScript
 {
@@ -117,6 +120,67 @@ public:
         return true;
     }
 
+    // .partybot questtest random [race] [count=1] [max level=5] (owner 2026-10-01): count runs of the level-1 classes of
+    // that race (no race: each class's race of your faction), in random order, every class once before any repeats.
+    // Stops at the first run that can't start (cap, no free account).
+    static bool HandleQuestTestRandom(ChatHandler* handler, std::string const& text)
+    {
+        std::istringstream in(text);
+        std::vector<std::string> words;     // "random", the race (may have a space), [count] [max level]
+        for (std::string word; in >> word;)
+            words.push_back(word);
+        std::vector<uint32> numbers;
+        while (words.size() > 1 && numbers.size() < 2 && isdigit(uint8(words.back()[0])))
+        {
+            numbers.insert(numbers.begin(), uint32(atoi(words.back().c_str())));
+            words.pop_back();
+        }
+        uint32 count = numbers.empty() ? 1 : numbers[0];
+        std::string maxLevel = numbers.size() > 1 ? " " + std::to_string(numbers[1]) : "";
+
+        std::string raceName;
+        for (size_t i = 1; i < words.size(); ++i)
+            raceName += (raceName.empty() ? "" : " ") + words[i];
+        uint8 race = 0;
+        if (!raceName.empty())
+        {
+            for (ChrRacesEntry const* entry : sChrRacesStore)
+                if (boost::iequals(std::string(entry->Name->Str[DEFAULT_LOCALE]), raceName))
+                    race = entry->ID;
+            if (!race)
+            {
+                handler->PSendSysMessage("Unknown race '%s'.", raceName.c_str());
+                return true;
+            }
+        }
+
+        // death knights and demon hunters don't start at level 1 in the race's zone
+        std::vector<std::string> classes;
+        for (uint8 cls = CLASS_WARRIOR; cls < MAX_CLASSES; ++cls)
+            if (cls != CLASS_DEATH_KNIGHT && cls != CLASS_DEMON_HUNTER && (!race || sObjectMgr->GetPlayerInfo(race, cls)))
+                if (ChrClassesEntry const* entry = sChrClassesStore.LookupEntry(cls))
+                    classes.push_back(entry->Name->Str[DEFAULT_LOCALE]);
+        if (classes.empty())
+        {
+            handler->PSendSysMessage("No level-1 class for race '%s'.", raceName.c_str());
+            return true;
+        }
+        Trinity::Containers::RandomShuffle(classes);
+
+        uint32 started = 0;
+        std::string error;
+        while (started < count)
+        {
+            error = sPartyBotMgr->StartQuestTest(handler->GetSession()->GetPlayer(), classes[started % classes.size()] + (race ? " " + raceName : "") + maxLevel);
+            if (!error.empty())
+                break;
+            ++started;
+        }
+        handler->PSendSysMessage("Started %u of %u quest-test bots. Results: QUESTBOT lines in Server.log; .partybot questtest stop ends them.%s%s",
+            started, count, error.empty() ? "" : " Stopped: ", error.c_str());
+        return true;
+    }
+
     static bool HandleQuestTestCommand(ChatHandler* handler, char const* args)
     {
         std::string text = args ? args : "";
@@ -125,6 +189,8 @@ public:
             handler->SendSysMessage(sPartyBotMgr->StopQuestTests() ? "Quest test stopped." : "No quest test is running.");
             return true;
         }
+        if (boost::istarts_with(text, "random") && (text.size() == 6 || text[6] == ' '))
+            return HandleQuestTestRandom(handler, text);
 
         std::string error = sPartyBotMgr->StartQuestTest(handler->GetSession()->GetPlayer(), text);
         handler->SendSysMessage(error.empty() ? "Quest test bot is logging in. Results: QUESTBOT lines in Server.log (run=end is the summary); "

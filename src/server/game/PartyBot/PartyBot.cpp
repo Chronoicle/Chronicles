@@ -936,7 +936,7 @@ static std::string BotName(std::string const& raw)
     return "";
 }
 
-// the bot accounts partybot1@bot..partybot90@bot (1-50 made by the owner, 51-90 fix_partybot_accounts_51_90.sql), matched exactly
+// the bot accounts partybot1@bot..partybot94@bot (1-50 made by the owner, 51-94 fix_partybot_accounts_51_94.sql), matched exactly
 static char const* const BotAccountPattern = "^PARTYBOT[0-9]+@BOT$";
 
 uint32 PartyBotMgr::FreeBotAccount()
@@ -1060,11 +1060,23 @@ uint32 PartyBotMgr::StopQuestTests()
 
 // .partybot questtest <class> [race] [max level] (owner 2026-10-01, #65): a fresh level-1 character of that race and
 // class (default: the GM's faction, like .partybot create) plays its starting zone's quests alone (QuestBot.cpp). Up to
-// MaxQuestTests runs at a time, one per race/class. Each run starts from level 1: the new character is made first, then the previous quest-test character
-// of that race and class is deleted. Only a character named Qt... (case-sensitive) on a partybot account
-// (partybotN@bot exactly) that is no party bot (no partybot_characters row) is ever deleted.
+// MaxQuestTests runs at a time, several of one race/class allowed (owner 2026-10-01: .partybot questtest random). Each run starts from level 1: the new
+// character is made first, then an idle previous quest-test character of that race and class is deleted. Only a character named Qt... (case-sensitive) on
+// a partybot account (partybotN@bot exactly) that is no party bot (no partybot_characters row) is ever deleted.
 std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
 {
+    // an account one of our bot sessions uses: sWorld->FindSession misses a session added this tick (AddSession queues
+    // it), e.g. the runs .partybot questtest random starts in one go
+    auto accountBusy = [this](uint32 account)
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        for (auto const& bot : _bots)
+            if (std::shared_ptr<PartyBotSession> session = bot.lock())
+                if (session->GetAccountId() == account)
+                    return true;
+        return false;
+    };
+
     {
         std::lock_guard<std::mutex> guard(_lock);
         if (QuestTestCount() >= MaxQuestTests)
@@ -1092,7 +1104,8 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
             }
         }
     if (!classEntry || !maxLevel)
-        return "Usage: .partybot questtest <class> [race] [max level, default 5]   e.g. .partybot questtest warrior human";
+        return "Usage: .partybot questtest <class> [race] [max level, default 5]   e.g. .partybot questtest warrior human\n"
+            "       .partybot questtest random [race] [count] [max level]   e.g. .partybot questtest random human 50";
 
     uint8 cls = classEntry->ID;
     uint8 race = BotRace(cls, gm->GetTeam() == ALLIANCE);
@@ -1107,25 +1120,24 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
     }
     std::string raceName = sChrRacesStore.AssertEntry(race)->Name->Str[DEFAULT_LOCALE];
 
-    // the previous quest-test character of this race and class (a player's Qt... character is skipped)
+    // an idle previous quest-test character of this race and class (a player's Qt... character, a running one is skipped)
     uint32 accountId = 0;
     ObjectGuid oldGuid;
     if (QueryResult result = CharacterDatabase.PQuery("SELECT c.guid, c.account, c.name FROM characters c LEFT JOIN partybot_characters p ON p.guid = c.guid "
         "WHERE p.guid IS NULL AND c.name LIKE 'Qt%%' AND c.race = %u AND c.class = %u", race, cls))
         do
         {
+            ObjectGuid candidate = ObjectGuid::Create<HighGuid::Player>((*result)[0].GetUInt64());
             uint32 account = (*result)[1].GetUInt32();
-            if ((*result)[2].GetString().compare(0, 2, "Qt") == 0
+            if ((*result)[2].GetString().compare(0, 2, "Qt") == 0 && !ObjectAccessor::FindPlayer(candidate) && !sWorld->FindSession(account) && !accountBusy(account)
                 && LoginDatabase.PQuery("SELECT 1 FROM account WHERE id = %u AND username REGEXP '%s'", account, BotAccountPattern))
             {
-                oldGuid = ObjectGuid::Create<HighGuid::Player>((*result)[0].GetUInt64());
+                oldGuid = candidate;
                 accountId = account;
                 break;
             }
         } while (result->NextRow());
 
-    if (!oldGuid.IsEmpty() && (ObjectAccessor::FindPlayer(oldGuid) || sWorld->FindSession(accountId)))
-        return "A quest test of this race and class is running, or its account is in use (.partybot questtest stop).";
     bool reserved = false;
     if (!accountId)
         reserved = (accountId = ReserveBotAccount()) != 0;
@@ -1138,7 +1150,7 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
             {
                 ObjectGuid candidate = ObjectGuid::Create<HighGuid::Player>((*result)[0].GetUInt64());
                 uint32 account = (*result)[1].GetUInt32();
-                if ((*result)[2].GetString().compare(0, 2, "Qt") == 0 && !ObjectAccessor::FindPlayer(candidate) && !sWorld->FindSession(account)
+                if ((*result)[2].GetString().compare(0, 2, "Qt") == 0 && !ObjectAccessor::FindPlayer(candidate) && !sWorld->FindSession(account) && !accountBusy(account)
                     && LoginDatabase.PQuery("SELECT 1 FROM account WHERE id = %u AND username REGEXP '%s'", account, BotAccountPattern))
                 {
                     oldGuid = candidate;
