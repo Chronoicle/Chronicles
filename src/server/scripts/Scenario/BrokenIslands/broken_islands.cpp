@@ -1373,6 +1373,7 @@ public:
         std::list<ObjectGuid> targetList;
 
         bool check1{}, check2{}, tempcheck{}, firstcheck{};
+        bool gualdanCalled{};           // #79: Varian's arrival in the last step calls Gul'dan once
 
         void Reset() override
         {
@@ -1457,8 +1458,12 @@ public:
                         return;
 
                     Creature* gualdan = m->GetCreature(script->GetGuidData(NPC_GULDAN));
-                    if (!gualdan)
+                    if (!gualdan || gualdanCalled)
                         return;
+                    // #79: at the end of a MovePath the waypoint generator reports the last point on every update and the
+                    // step stays 9 after the scenario completed: Gul'dan was teleported every tick until the instance
+                    // unloaded (lag for the whole server)
+                    gualdanCalled = true;
 
                     gualdan->NearTeleportTo(1660.127f, 1655.793f, 79.36142f, 2.33f);
                     //sCreatureTextMgr->SendChat(me, TEXT_GENERIC_5);
@@ -3089,6 +3094,7 @@ public:
         uint32 timer;
         uint32 timerforevent = 1000;
         uint32 currentWp = 0;
+        bool battleOver = false;        // #79: no more waves on the hill after the end
 
         void Reset() override
         {
@@ -3391,6 +3397,7 @@ public:
                             DoCast(225242);
                             me->AddDelayedEvent(10000, [this]() -> void
                             {
+                                battleOver = true;
                                 if (InstanceScript *script = me->GetInstanceScript())
                                     script->SetData(SCENARION_STEP_END, 0);
                             });
@@ -3452,18 +3459,18 @@ public:
         {
             if (me->GetEntry() == 90709)
             {
-                if (me->GetPositionZ() >= 135.23f)
+                if (!battleOver && me->GetPositionZ() >= 135.23f)
                 {
                     if (timerforevent <= diff)
                     {
                         uint8 const counter = urand(1, 5);
                         for (uint8 i = 0; i < counter; ++i)
                         {
-                            if (Creature* targ = me->SummonCreature(92801, 1703.13f, 1449.93f, 104.0f, 2.62f))
+                            if (Creature* targ = me->SummonCreature(92801, 1703.13f, 1449.93f, 104.0f, 2.62f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000))
                                 targ->GetMotionMaster()->MovePath(439155, false, irand(-5, 5), irand(-4, 4)); // 8
 
                             if (urand(1, 3) == 2)
-                                if (Creature* targ = me->SummonCreature(urand(1, 2) == 1 ? 90677 : 105199, 1542.98f + irand(-5, 5), 1400.00f + irand(-5, 5), 105.53f, 1.8f))
+                                if (Creature* targ = me->SummonCreature(urand(1, 2) == 1 ? 90677 : 105199, 1542.98f + irand(-5, 5), 1400.00f + irand(-5, 5), 105.53f, 1.8f, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 60000))
                                     targ->GetMotionMaster()->MovePoint(0, 1537.02f + irand(-3, 3), 1473.59f + irand(-3, 3), 125.87f);
                         }
                         DoCast(me, 225218);
