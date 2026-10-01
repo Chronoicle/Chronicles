@@ -12,6 +12,7 @@
 #include "WorldSession.h"
 #include <atomic>
 #include "UnitAI.h"
+#include "MoveSplineInitArgs.h"
 
 struct ChrSpecializationEntry;
 
@@ -102,6 +103,7 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     uint32 _checkTimer = 0;
     ObjectGuid _approachGuid;           // who the bot is walking to (positioning)
     uint8 _approachTicks = 0;           // AI ticks spent walking to an unseen target
+    Movement::PointsArray _walkRoute;   // WalkTo: the corridor corners of the last walk (the dungeon watch export shows the tank's)
     SpellCastResult _castResult = SPELL_FAILED_DONT_REPORT;    // the last TryCast's CastSpell result (DONT_REPORT: not tried)
 };
 

@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <deque>
 #include <fstream>
@@ -338,6 +339,10 @@ void DungeonLeaderAI::WriteWatch(bool ended)
             first = false;
         }
     }
+    json << "],\"route\":[";             // the tank's planned walk (corridor corners), only while it walks
+    if (!ended && !strcmp(_state, "walk"))
+        for (size_t i = 0; i < _walkRoute.size(); ++i)
+            json << (i ? "," : "") << "[" << _walkRoute[i].x << "," << _walkRoute[i].y << "]";
     json << "],\"trail\":[";
     for (size_t i = 0; i < _trail.size(); ++i)
         json << (i ? "," : "") << "[" << _trail[i].GetPositionX() << "," << _trail[i].GetPositionY() << "]";

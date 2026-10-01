@@ -818,7 +818,11 @@ bool PartyBotAI::WalkTo(Position const& pos)
     path.CalculatePath(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
     Movement::PointsArray const& corners = path.GetPath();
     if ((path.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORT)) || corners.empty())
+    {
+        _walkRoute.clear();
         return false;
+    }
+    _walkRoute = corners;
 
     // the farthest corner within the leg length along the path (the corridor's end when it is shorter); a first corner
     // beyond it: the point at that length on the straight segment to it
