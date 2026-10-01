@@ -936,7 +936,7 @@ static std::string BotName(std::string const& raw)
     return "";
 }
 
-// the bot accounts partybot1@bot..partybot50@bot (made by the owner), matched exactly
+// the bot accounts partybot1@bot..partybot90@bot (1-50 made by the owner, 51-90 fix_partybot_accounts_51_90.sql), matched exactly
 static char const* const BotAccountPattern = "^PARTYBOT[0-9]+@BOT$";
 
 uint32 PartyBotMgr::FreeBotAccount()
@@ -1032,7 +1032,7 @@ std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& 
 
 // quest-test runs at the same time: one per race/class, at most MaxQuestTests (owner 2026-10-01: several starting zones
 // at once; each run scans its zone's spawns once at start on its map thread); _lock held
-static constexpr uint32 MaxQuestTests = 4;
+static constexpr uint32 MaxQuestTests = 50;  // owner 2026-10-01; all runs share the one map-update thread (MapUpdate.Threads = 1)
 uint32 PartyBotMgr::QuestTestCount()
 {
     Cleanup();
