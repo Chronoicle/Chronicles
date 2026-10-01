@@ -27,7 +27,7 @@
 #include "ScriptedCreature.h"
 #include "GridNotifiers.h"
 //#include "AreaTriggerAI.h"
-//#include "AreaTrigger.h"
+#include "AreaTrigger.h"
 
 enum MageSpells
 {
@@ -2118,6 +2118,47 @@ class spell_mage_phoenixs_flames : public SpellScript
     }
 };
 
+// 190357 - Blizzard (one damage pulse, cast by the mage from Blizzard's area trigger every tick)
+// custom (owner 2026-10-01): each pulse has a 20% chance to send a Frozen Orb from one of the enemies it hit, rolling on
+// away from the mage. The orb is Frozen Orb's own area trigger (as 84714 creates it), spawned directly so it neither
+// uses Frozen Orb's cooldown nor needs the mage to know it; its damage (84721) is cast by the mage. Not in battlegrounds
+// and arenas.
+class spell_mage_blizzard_frozen_orb : public SpellScript
+{
+    PrepareSpellScript(spell_mage_blizzard_frozen_orb);
+
+    // runs once per pulse with all the enemies of that pulse, so this is one roll per tick
+    void HandleTargets(std::list<WorldObject*>& targets)
+    {
+        Unit* caster = GetCaster();
+        if (targets.empty() || !caster || !caster->IsPlayer() || caster->GetMap()->IsBattlegroundOrArena() || !roll_chance_i(20))
+            return;
+
+        SpellInfo const* orbInfo = sSpellMgr->GetSpellInfo(SPELL_MAGE_FROZEN_ORB);
+        if (!orbInfo)
+            return;
+
+        WorldObject* target = Trinity::Containers::SelectRandomContainerElement(targets);
+        Position pos = target->GetPosition();
+        float angle = caster->GetAngle(target);
+        pos.SetOrientation(angle);
+        // the orb flies to its move target, not along its facing (with the start as the target it took a fixed compass
+        // direction, dev-check): a point its normal travel distance away from the enemy, away from the mage
+        Position dest;
+        pos.SimplePosXYRelocationByAngle(dest, 42.29f, angle);  // areatrigger_template 8661 Distance
+        dest.m_positionZ = pos.GetPositionZ();
+
+        auto orb = new AreaTrigger;
+        if (!orb->CreateAreaTrigger(sObjectMgr->GetGenerator<HighGuid::AreaTrigger>()->Generate(), 8661, caster, orbInfo, pos, dest)) // 8661 = Frozen Orb's area trigger
+            delete orb;
+    }
+
+    void Register() override
+    {
+        OnObjectAreaTargetSelect += SpellObjectAreaTargetSelectFn(spell_mage_blizzard_frozen_orb::HandleTargets, EFFECT_0, TARGET_UNIT_DEST_AREA_ENEMY);
+    }
+};
+
 // 84714 - Frozen orb
 /*class areatrigger_at_mage_frozen_orb : public AreaTriggerScript
 {
@@ -2192,5 +2233,6 @@ void AddSC_mage_spell_scripts()
     RegisterAuraScript(spell_mage_immolation);
     RegisterAuraScript(spell_mage_highblades_will);
     RegisterSpellScript(spell_mage_phoenixs_flames);
+    RegisterSpellScript(spell_mage_blizzard_frozen_orb);
 	//new areatrigger_at_mage_frozen_orb();
 }
