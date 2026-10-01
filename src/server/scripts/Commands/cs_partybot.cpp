@@ -5,6 +5,8 @@
  * .partybot list                your bots
  * .partybot questtest <class> [race] [max level] | random [race] [count] [max level] | stop   a fresh level-1 bot plays its starting zone's quests and logs
  *                               each quest's result (QUESTBOT lines in Server.log, game/PartyBot/QuestBot.cpp)
+ * .partybot dungeontest <dungeon id | name | random> [level] | stop   five bots (tank, healer, 3 DPS) queue through the
+ *                               Dungeon Finder and clear dungeons, then the next random one (DUNGEONBOT lines, #140)
  * Staff only while the bots are being built (#65).
  */
 #include "ScriptMgr.h"
@@ -32,6 +34,7 @@ public:
             { "remove", SEC_GAMEMASTER, false, &HandleRemoveCommand, "" },
             { "list",   SEC_GAMEMASTER, false, &HandleListCommand,   "" },
             { "questtest", SEC_GAMEMASTER, false, &HandleQuestTestCommand, "" },
+            { "dungeontest", SEC_GAMEMASTER, false, &HandleDungeonTestCommand, "" },
         };
         static std::vector<ChatCommand> commandTable =
         {
@@ -195,6 +198,23 @@ public:
         std::string error = sPartyBotMgr->StartQuestTest(handler->GetSession()->GetPlayer(), text);
         handler->SendSysMessage(error.empty() ? "Quest test bot is logging in. Results: QUESTBOT lines in Server.log (run=end is the summary); "
             ".partybot questtest stop ends it." : error.c_str());
+        return true;
+    }
+
+    // .partybot dungeontest <dungeon id | name | random> [level] | stop (#140, game/PartyBot/DungeonRun.cpp)
+    static bool HandleDungeonTestCommand(ChatHandler* handler, char const* args)
+    {
+        std::string text = args ? args : "";
+        if (boost::iequals(text, "stop"))
+        {
+            if (uint32 stopped = sPartyBotMgr->StopDungeonTests())
+                handler->PSendSysMessage("%u dungeon test run(s) stopped, their bots log out.", stopped);
+            else
+                handler->SendSysMessage("No dungeon test is running.");
+            return true;
+        }
+
+        handler->SendSysMessage(sPartyBotMgr->StartDungeonTest(handler->GetSession()->GetPlayer(), text).c_str());
         return true;
     }
 

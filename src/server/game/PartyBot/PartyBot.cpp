@@ -31,10 +31,10 @@
 
 // ---------------------------------------------------------------- session
 
-PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, ObjectGuid botGuid, ObjectGuid leaderGuid, uint8 questMaxLevel) :
+PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, ObjectGuid botGuid, ObjectGuid leaderGuid, uint8 questMaxLevel, uint8 dungeonRole) :
     WorldSession(accountId, std::move(accountName), nullptr, SEC_PLAYER, CURRENT_EXPANSION, 0, "Win", LOCALE_enUS, 0, false,
         AT_AUTH_FLAG_NONE, std::unordered_map<uint8, int64>()),
-    _botGuid(botGuid), _leaderGuid(leaderGuid), _questMaxLevel(questMaxLevel)
+    _botGuid(botGuid), _leaderGuid(leaderGuid), _questMaxLevel(questMaxLevel), _dungeonRole(dungeonRole)
 {
 }
 
@@ -117,6 +117,14 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
         return result;
     }
 
+    // dungeon run (DungeonRun.cpp): the run's steps; the tank's AI handles its own death (DungeonLeaderDeadUpdate there)
+    if (IsDungeonBot() && !_dismissed)
+    {
+        DungeonUpdate(bot, diff);
+        if (_botGuid == _leaderGuid)
+            return result;
+    }
+
     // dead: come back when the leader is alive and the group out of combat (here, as Player::Update only runs the
     // AI while the bot is alive): go to the leader, then resurrect there
     if (_setupDone && !_dismissed && bot->isDead(false) && !bot->IsBeingTeleported())
@@ -131,6 +139,9 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
                     bot->SpawnCorpseBones();
                 }
             }
+
+    if (IsDungeonBot())                 // the run forms and leaves the group and dismisses its bots
+        return result;
 
     // the leader logged out: wait a moment (reconnects, loading screens), then go too
     if (!_dismissed)
@@ -378,6 +389,12 @@ void PartyBotSession::Setup(Player* bot)
     // setup 0: a .partybot create bot, 2: a level bot (CreateLevelBot); 1 and 3: done
     if (QueryResult result = CharacterDatabase.PQuery("SELECT spec, setup FROM partybot_characters WHERE guid = %u AND setup IN (0, 2)", bot->GetGUIDLow()))
         FirstLoginSetup(bot, (*result)[0].GetUInt32(), (*result)[1].GetUInt8() == 2);
+
+    if (IsDungeonBot())                 // no group to join: the run forms it once all five are in
+    {
+        DungeonSetup(bot);
+        return;
+    }
 
     Player* leader = ObjectAccessor::FindPlayer(_leaderGuid);
     if (!leader)

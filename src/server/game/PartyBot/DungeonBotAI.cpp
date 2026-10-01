@@ -345,7 +345,13 @@ void DungeonLeaderAI::Start()
     _entrance = me->GetPosition();
     Map* map = me->GetMap();
     _dungeonName = map->GetMapName();
-    if (lfg::LFGDungeonData const* dungeon = sLFGMgr->GetLFGDungeon(_mapId, map->GetDifficultyID(), me->GetTeam()))
+    // the run's queued dungeon (DungeonRun.cpp); the map's entry only when unknown (it ignores the difficulty)
+    lfg::LFGDungeonData const* dungeon = nullptr;
+    if (uint32 queued = DungeonRunDungeonId(_runId))
+        dungeon = sLFGMgr->GetLFGDungeon(queued);
+    if (!dungeon)
+        dungeon = sLFGMgr->GetLFGDungeon(_mapId, map->GetDifficultyID(), me->GetTeam());
+    if (dungeon)
     {
         _dungeonId = dungeon->id;
         _dungeonName = dungeon->name;
