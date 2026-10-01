@@ -42,6 +42,18 @@ PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, Ob
 {
 }
 
+static bool IsTankSpec(Player* player)
+{
+    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(player->GetSpecializationId());
+    return spec && spec->Role == 0;
+}
+
+static bool IsHealerSpec(Player* player)
+{
+    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(player->GetSpecializationId());
+    return spec && spec->Role == 1;
+}
+
 static bool GroupInCombat(Player* bot)
 {
     if (Group* group = bot->GetGroup())
@@ -534,6 +546,14 @@ void PartyBotAI::UpdateAI(uint32 diff)
     // fight what the leader fights (tanks also pick up what attacks the group)
     if (Unit* target = PickTarget(leader))
     {
+        if (WaitForThreat(leader, target, diff))
+        {
+            if (me->getVictim())
+                me->AttackStop();
+            FollowLeader(leader);
+            return;
+        }
+
         bool newTarget = me->getVictim() != target;
         if (newTarget)
             me->Attack(target, !IsRanged());
@@ -893,8 +913,49 @@ std::vector<uint32> PartyBotAI::LootQuestItems(Player* looter, ObjectGuid guid, 
     return items;
 }
 
+// owner 2026-10-01: "they all run in headless" before the tank. Damage dealers attack the tank's target once it has hit
+// the tank for ThreatLeadMs (the mob still walking up or not yet aggroed: wait behind the tank); a mob on anyone else
+// is loose and helped at once. Only when the leader is a tank (a bot of a dungeon run, or a player in a tank spec)
+bool PartyBotAI::WaitForThreat(Player* leader, Unit* target, uint32 diff)
+{
+    static uint32 const ThreatLeadMs = 2500;
+    if (leader == me || !IsTankSpec(leader) || IsTankSpec(me) || IsHealerSpec(me) || leader->getVictim() != target)
+        return false;
+    Unit* victim = target->getVictim();
+    if (victim && victim != leader)
+        return false;
+    if (_leadGuid != target->GetGUID())
+    {
+        _leadGuid = target->GetGUID();
+        _leadMs = 0;
+    }
+    if (!victim && !target->isInCombat())   // the tank still walking up to it
+    {
+        _leadMs = 0;
+        return true;
+    }
+    // in combat without a victim (a turret, a boss between phases): a longer wait, not forever
+    _leadMs += diff;
+    return _leadMs < (victim ? ThreatLeadMs : 3 * ThreatLeadMs);
+}
+
+// owner 2026-10-01: tanks lost aggro. Each tank spec's +900% threat spell is a passive (Defensive Stance 71, Righteous
+// Fury 25780, 115069 Brewmaster, 48263 Blood, 189926 Vengeance): applied again if it is missing; a Guardian fights in
+// Bear Form (it has no threat passive of its own in this data)
+void PartyBotAI::TankStance()
+{
+    static uint32 const ThreatPassives[] = { 71, 25780, 115069, 48263, 189926 };
+    for (uint32 spell : ThreatPassives)
+        if (me->HasSpell(spell) && !me->HasAura(spell))
+            me->CastSpell(me, spell, true);
+    if (me->GetSpecializationId() == 104 && me->HasSpell(5487) && !me->HasAura(5487) && !me->IsNonMeleeSpellCast(false))
+        me->CastSpell(me, 5487, false);
+}
+
 bool PartyBotAI::CastRotation(Unit* target)
 {
+    if (target && IsTankSpec(me))
+        TankStance();
     std::vector<PartyBotSpell> const* spells = sPartyBotMgr->GetSpells(me->GetSpecializationId());
     if (!spells)
         return false;

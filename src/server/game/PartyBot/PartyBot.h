@@ -99,6 +99,8 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     uint32 GroupMembersBelow(int32 pct) const;
     Unit* TauntTarget() const;
     bool IsRanged() const;
+    bool WaitForThreat(Player* leader, Unit* target, uint32 diff);   // DPS: the tank's threat lead
+    void TankStance();                                    // tanks: threat passive, Bear Form
     // quest bot and dungeon run (QuestBotAI::UseObject's / TakeQuestLoot's pattern, for any bot as user / looter)
     static bool UseGameObject(Player* user, GameObject* go);
     static std::vector<uint32> LootQuestItems(Player* looter, ObjectGuid guid, Loot* loot, std::function<bool(uint32)> const& wanted);
@@ -108,6 +110,8 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     uint32 _checkTimer = 0;
     ObjectGuid _approachGuid;           // who the bot is walking to (positioning)
     uint8 _approachTicks = 0;           // AI ticks spent walking to an unseen target
+    ObjectGuid _leadGuid;               // the target the tank is building threat on (WaitForThreat)
+    uint32 _leadMs = 0;
     Movement::PointsArray _walkRoute;   // WalkTo: the corridor corners of the last walk (the dungeon watch export shows the tank's)
     SpellCastResult _castResult = SPELL_FAILED_DONT_REPORT;    // the last TryCast's CastSpell result (DONT_REPORT: not tried)
 };
