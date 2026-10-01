@@ -19,6 +19,7 @@ void AddSC_custom_events();
 void AddSC_scene_scripts();
 
 void AddSC_chat_log();
+void AddSC_instance_encounter_memory();
 
 void AddSC_petbattle_abilities();
 void AddSC_PetBattlePlayerScript();
@@ -47,6 +48,7 @@ void AddWorldScripts()
     AddSC_scene_scripts();
 
     AddSC_chat_log();
+    AddSC_instance_encounter_memory();
 
     AddSC_petbattle_abilities();
     AddSC_PetBattlePlayerScript();
