@@ -1055,17 +1055,7 @@ void QuestBotAI::UseObject(GameObject* go)
         return;
 
     uint32 entry = go->GetEntry();
-    WorldPacket data(CMSG_GAME_OBJ_USE);
-    WorldPackets::GameObject::GameObjectUse packet(std::move(data));
-    packet.Guid = go->GetGUID();
-    me->GetSession()->HandleGameObjectUse(packet);      // goobers, buttons, quest objects: scripts and credit
-
-    // chests and gathering nodes: the client opens them with the lock's opening spell (Spell::SendLoot).
-    // ponytail: looted directly instead, so a chest's triggered event and linked trap do not fire; cast the lock's
-    // open spell here if a quest turns out to depend on them
-    if (me->GetLootGUID() != go->GetGUID() && go->GetGOInfo()->GetLootId())
-        me->SendLoot(go->GetGUID(), LOOT_CORPSE);
-    if (me->GetLootGUID() == go->GetGUID())
+    if (UseGameObject(me, go))
         TakeQuestLoot(go->GetGUID(), &go->loot);
     TC_LOG_INFO("server.questbot", "QUESTBOT event=use bot=%s quest=%u object=%u", _name.c_str(), QuestId(), entry);
 }
@@ -1122,19 +1112,9 @@ bool QuestBotAI::UseItem(WorldObject* target)
 // take the quest items (and the items the quest asks for) and release the loot, as a player looting
 void QuestBotAI::TakeQuestLoot(ObjectGuid guid, Loot* loot)
 {
-    WorldPacket data(CMSG_LOOT_ITEM);
-    WorldPackets::Loot::AutoStoreLootItem packet(std::move(data));
-    for (uint32 slot = 0; slot < loot->GetMaxSlotInLootFor(me) && slot < 255; ++slot)
-        if (LootItem* item = loot->LootItemInSlot(slot, me))
-            if (slot >= loot->items.size() || item->needs_quest || IsObjectiveItem(item->item.ItemID))
-                packet.Loot.push_back({ guid, uint8(slot + 1) });
-
-    if (!packet.Loot.empty())
-    {
-        me->GetSession()->HandleAutostoreLootItemOpcode(packet);
-        TC_LOG_INFO("server.questbot", "QUESTBOT event=loot bot=%s quest=%u from=%u items=%u", _name.c_str(), QuestId(), guid.GetEntry(), uint32(packet.Loot.size()));
-    }
-    me->GetSession()->DoLootRelease(guid);
+    std::vector<uint32> items = LootQuestItems(me, guid, loot, [this](uint32 itemId) { return IsObjectiveItem(itemId); });
+    if (!items.empty())
+        TC_LOG_INFO("server.questbot", "QUESTBOT event=loot bot=%s quest=%u from=%u items=%u", _name.c_str(), QuestId(), guid.GetEntry(), uint32(items.size()));
 }
 
 bool QuestBotAI::IsObjectiveItem(uint32 itemId) const

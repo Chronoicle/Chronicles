@@ -26,6 +26,10 @@
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "PathGenerator.h"
+#include "GameObject.h"
+#include "GameObjectPackets.h"
+#include "LootMgr.h"
+#include "LootPackets.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <sstream>
 
@@ -849,6 +853,44 @@ bool PartyBotAI::WalkTo(Position const& pos)
     }
     me->GetMotionMaster()->MovePoint(0, leg.x, leg.y, leg.z, true);
     return true;
+}
+
+// user uses the object as a client does (CMSG_GAME_OBJ_USE: goobers, buttons, quest objects: scripts and credit).
+// True: its loot is open for user (LootQuestItems takes it)
+bool PartyBotAI::UseGameObject(Player* user, GameObject* go)
+{
+    WorldPacket data(CMSG_GAME_OBJ_USE);
+    WorldPackets::GameObject::GameObjectUse packet(std::move(data));
+    packet.Guid = go->GetGUID();
+    user->GetSession()->HandleGameObjectUse(packet);
+
+    // chests and gathering nodes: the client opens them with the lock's opening spell (Spell::SendLoot).
+    // ponytail: looted directly instead, so a chest's triggered event and linked trap do not fire; cast the lock's
+    // open spell here if a quest turns out to depend on them
+    if (user->GetLootGUID() != go->GetGUID() && go->GetGOInfo()->GetLootId())
+        user->SendLoot(go->GetGUID(), LOOT_CORPSE);
+    return user->GetLootGUID() == go->GetGUID();
+}
+
+// looter takes the quest items (and the items wanted() asks for) and releases the loot, as a player looting.
+// Returns the item ids taken
+std::vector<uint32> PartyBotAI::LootQuestItems(Player* looter, ObjectGuid guid, Loot* loot, std::function<bool(uint32)> const& wanted)
+{
+    std::vector<uint32> items;
+    WorldPacket data(CMSG_LOOT_ITEM);
+    WorldPackets::Loot::AutoStoreLootItem packet(std::move(data));
+    for (uint32 slot = 0; slot < loot->GetMaxSlotInLootFor(looter) && slot < 255; ++slot)
+        if (LootItem* item = loot->LootItemInSlot(slot, looter))
+            if (slot >= loot->items.size() || item->needs_quest || wanted(item->item.ItemID))
+            {
+                packet.Loot.push_back({ guid, uint8(slot + 1) });
+                items.push_back(item->item.ItemID);
+            }
+
+    if (!packet.Loot.empty())
+        looter->GetSession()->HandleAutostoreLootItemOpcode(packet);
+    looter->GetSession()->DoLootRelease(guid);
+    return items;
 }
 
 bool PartyBotAI::CastRotation(Unit* target)

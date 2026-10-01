@@ -17,22 +17,35 @@
  * Watch export (owner: a website to watch the runs, tools/website/botwatch.php): with PartyBot.WatchDir set, every 2 s
  * the run's state goes to <dir>/run_<id>.json (written to .tmp, then renamed): bosses, bots, the tank's trail, the last
  * 25 DUNGEONBOT lines.
+ *
+ * Dungeon quests (owner: the bots also do the dungeon's quests): at the start every member gets the quests of the
+ * dungeon's zone that fit it (like a GM .quest add, no prerequisite chain) and have a target in the map; after each
+ * fight the members take their quest items from the corpses near the tank, and the tank walks a member to its quest
+ * objects. At the end a complete quest is rewarded (XP), an incomplete one is logged and abandoned:
+ *
+ *   DUNGEONBOT event=quests run=<id> dungeon=<id> bot=<member> added=<id,id,...|-> skipped=<n>
+ *   DUNGEONBOT quest=<id> "<title>" result=DONE|INCOMPLETE run=<id> dungeon=<id> bot=<member> level=<n> [targets=in_map|not_in_map detail=<obj index>:<type>:<object id>:<have>/<need>,...]
  */
 #include "PartyBot.h"
 #include "CellImpl.h"
 #include "Config.h"
 #include "DB2Stores.h"
+#include "DisableMgr.h"
+#include "GameObject.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "Group.h"
 #include "InstanceScript.h"
 #include "LFGMgr.h"
+#include "LootMgr.h"
 #include "Log.h"
 #include "MotionMaster.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "PathGenerator.h"
 #include "Player.h"
+#include "QuestData.h"
+#include "QuestDef.h"
 #include <algorithm>
 #include <cstdarg>
 #include <cstdio>
@@ -62,6 +75,9 @@ namespace
     uint32 const WatchMs        = 2 * IN_MILLISECONDS;              // watch export interval
     size_t const WatchEvents    = 25;
     size_t const WatchTrail     = 120;
+    float const LootRange       = 30.0f;                            // corpses around the tank after a fight
+    float const ObjectRange     = 40.0f;                            // quest objects the tank walks a member to
+    uint32 const ObjectMaxMs    = MINUTE * IN_MILLISECONDS;         // one such detour at most
 
     enum Result { RESULT_KILLED, RESULT_WIPE, RESULT_EVADE, RESULT_STUCK, RESULT_NO_PATH, RESULT_NOT_FOUND, MAX_RESULT };
     char const* const ResultNames[MAX_RESULT] = { "KILLED", "WIPE", "EVADE", "STUCK", "NO_PATH", "NOT_FOUND" };
@@ -78,6 +94,39 @@ namespace
         char const* Status;             // watch export: killed / alive / current, kept for the export after the run
         float Hp;
     };
+
+    // a dungeon quest one member got at the start; its state as of the last look (the destructor has no players)
+    struct BotQuest
+    {
+        ObjectGuid Bot;
+        std::string BotName;
+        Quest const* Info;
+        bool InMap;                     // every creature / object target has a spawn in the map
+        bool Done;
+        std::string Progress;           // the counters summed: "2/6"
+        std::string Detail;             // the open objectives: <index>:<type>:<id>:<have>/<need>,...
+    };
+
+    char const* ObjectiveType(uint8 type)
+    {
+        return type == QUEST_OBJECTIVE_MONSTER ? "MONSTER" : type == QUEST_OBJECTIVE_ITEM ? "ITEM" : type == QUEST_OBJECTIVE_GAMEOBJECT ? "GAMEOBJECT" : "OTHER";
+    }
+
+    // the quests of a zone (QuestSortID > 0), built once
+    std::vector<Quest const*> const& ZoneQuests(uint32 zoneId)
+    {
+        static std::unordered_map<uint32, std::vector<Quest const*>> const zones = []
+        {
+            std::unordered_map<uint32, std::vector<Quest const*>> index;
+            for (auto const& itr : sQuestDataStore->GetQuestTemplates())
+                if (itr.second->QuestSortID > 0)
+                    index[uint32(itr.second->QuestSortID)].push_back(itr.second);
+            return index;
+        }();
+        static std::vector<Quest const*> const none;
+        auto itr = zones.find(zoneId);
+        return itr != zones.end() ? itr->second : none;
+    }
 
     // PartyBot.WatchDir (worldserver.conf), read once: "" = no watch export
     std::string const& WatchDir()
@@ -123,22 +172,23 @@ namespace
         }
     }
 
-    // creature in range that the tank sees and the predicate accepts, the nearest (the searcher keeps the last match)
+    // creature / object in range that the tank sees and the predicate accepts, the nearest (the searcher keeps the last match)
+    template<class T>
     struct NearestCheck
     {
-        NearestCheck(Player* bot, float range, std::function<bool(Creature*)> const& pred) : Bot(bot), Range(range), Pred(pred) { }
+        NearestCheck(Player* bot, float range, std::function<bool(T*)> const& pred) : Bot(bot), Range(range), Pred(pred) { }
 
-        bool operator()(Creature* creature)
+        bool operator()(T* object)
         {
-            if (!Bot->IsWithinDistInMap(creature, Range) || !Pred(creature) || !Bot->canSeeOrDetect(creature))
+            if (!Bot->IsWithinDistInMap(object, Range) || !Pred(object) || !Bot->canSeeOrDetect(object))
                 return false;
-            Range = Bot->GetDistance(creature);
+            Range = Bot->GetDistance(object);
             return true;
         }
 
         Player* Bot;
         float Range;
-        std::function<bool(Creature*)> const& Pred;
+        std::function<bool(T*)> const& Pred;
     };
 }
 
@@ -168,6 +218,11 @@ private:
     void Finish(std::string const& reason);
     Move MoveTo(Position const& pos, float dist);
     Creature* NearestCreature(std::function<bool(Creature*)> const& pred, float range) const;
+    void AddQuests(std::set<uint32> const& spawns);
+    void QuestLoot();
+    bool QuestObject();
+    void UpdateQuest(BotQuest& quest, Player* bot);
+    void QuestResults(bool reward);
     bool Ignored(ObjectGuid guid) const { auto itr = _ignore.find(guid); return itr != _ignore.end() && itr->second > _runMs; }
     void Ignore(ObjectGuid guid) { _ignore[guid] = _runMs + IgnoreMs; }
     DungeonBoss* CurrentBoss() { return _bossIndex < _bosses.size() ? &_bosses[_bossIndex] : nullptr; }
@@ -207,6 +262,16 @@ private:
     std::map<ObjectGuid, uint32> _ignore;   // guid -> until (_runMs)
     std::set<uint32> _oddMobs;              // hostile creatures far above the group's level, logged once each
 
+    // dungeon quests
+    std::vector<BotQuest> _quests;
+    std::set<ObjectGuid> _corpses;          // corpses seen after a fight (counted, looted)
+    std::map<uint32, uint32> _kills;        // creature entry (and its kill credit entries) -> corpses seen
+    std::set<uint32> _dropped;              // quest items a member took
+    std::set<ObjectGuid> _usedObjects;      // quest objects walked to (once each)
+    ObjectGuid _objectGuid;                 // the current quest object detour: the object, the member, the time
+    ObjectGuid _objectUser;
+    uint32 _objectMs = 0;
+
     Position _moveDest;
     float _moveBest = 0.0f;
     uint32 _moveMs = 0;
@@ -238,6 +303,7 @@ DungeonLeaderAI::~DungeonLeaderAI()
     {
         Log("run=end run=%u dungeon=%u cleared=0 bosses=%u/%u wipes=%u time=%u reason=stopped",
             _runId, _dungeonId, _killed, uint32(_bosses.size()), _wipes, _runMs / IN_MILLISECONDS);
+        QuestResults(false);
         WriteWatch(true);
     }
 }
@@ -336,7 +402,17 @@ void DungeonLeaderAI::WriteWatch(bool ended)
                 << ",\"powerType\":\"" << PowerName(bot->GetPowerType()) << "\",\"alive\":" << (bot->IsAlive() ? "true" : "false")
                 << ",\"x\":" << bot->GetPositionX() << ",\"y\":" << bot->GetPositionY() << ",\"z\":" << bot->GetPositionZ()
                 << ",\"o\":" << bot->GetOrientation() << ",\"target\":" << JsonString(target ? target->GetName() : "")
-                << ",\"targetHp\":" << (target ? target->GetHealthPct() : 0.0f) << "}";
+                << ",\"targetHp\":" << (target ? target->GetHealthPct() : 0.0f) << ",\"quests\":[";
+            bool firstQuest = true;
+            for (BotQuest& quest : _quests)
+                if (quest.Bot == bot->GetGUID())
+                {
+                    UpdateQuest(quest, bot);
+                    json << (firstQuest ? "" : ",") << "{\"id\":" << quest.Info->GetQuestId() << ",\"name\":" << JsonString(quest.Info->LogTitle)
+                        << ",\"done\":" << (quest.Done ? "true" : "false") << ",\"progress\":\"" << quest.Progress << "\"}";
+                    firstQuest = false;
+                }
+            json << "]}";
             first = false;
         }
     }
@@ -493,6 +569,9 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
         return;
     }
 
+    if (QuestObject())
+        return;
+
     // walk to the boss; at its spot, wait a minute for a boss an event spawns
     Creature* creature = BossCreature(*boss);
     if (!boss->HasPos && creature)
@@ -564,16 +643,27 @@ void DungeonLeaderAI::Start()
             }
     std::stable_sort(_bosses.begin(), _bosses.end(), [](DungeonBoss const& a, DungeonBoss const& b) { return a.Order < b.Order; });
 
+    std::set<uint32> spawns;            // creature (and kill credit) and object entries spawned in the map: quest targets
     if (CellObjectGuidsMap const* cells = sObjectMgr->GetMapObjectGuids(_mapId, map->GetSpawnMode()))
         for (auto const& cell : *cells)
+        {
             for (ObjectGuid::LowType spawnId : cell.second.creatures)
                 if (CreatureData const* data = sObjectMgr->GetCreatureData(spawnId))
+                {
+                    spawns.insert(data->id);
+                    if (CreatureTemplate const* info = sObjectMgr->GetCreatureTemplate(data->id))
+                        spawns.insert(std::begin(info->KillCredit), std::end(info->KillCredit));
                     for (DungeonBoss& boss : _bosses)
                         if (!boss.HasPos && boss.Entry == data->id)
                         {
                             boss.Pos.Relocate(data->posX, data->posY, data->posZ);
                             boss.HasPos = true;
                         }
+                }
+            for (ObjectGuid::LowType spawnId : cell.second.gameobjects)
+                if (GameObjectData const* data = sObjectMgr->GetGOData(spawnId))
+                    spawns.insert(data->id);
+        }
 
     std::ostringstream route;
     for (DungeonBoss const& boss : _bosses)
@@ -581,6 +671,7 @@ void DungeonLeaderAI::Start()
     Log("event=start run=%u dungeon=%u map=%u bot=%s \"%s\" difficulty=%u level=%u members=%u bosses=%u route=%s",
         _runId, _dungeonId, _mapId, _name.c_str(), _dungeonName.c_str(), uint32(map->GetDifficultyID()), me->getLevel(),
         uint32(Members(true).size()), uint32(_bosses.size()), route.str().c_str());
+    AddQuests(spawns);
 
     // bosses already dead (a reused instance) don't count as kills of this run
     while (_bossIndex < _bosses.size() && BossDone(_bosses[_bossIndex]))
@@ -642,6 +733,7 @@ void DungeonLeaderAI::AfterFight()
     _fighting = false;
     if (me->getVictim())
         me->AttackStop();
+    QuestLoot();
     DungeonBoss* boss = CurrentBoss();
     if (_bossEngaged && boss)
     {
@@ -778,6 +870,7 @@ void DungeonLeaderAI::Finish(std::string const& reason)
         _runId, _dungeonId, uint32(cleared), _killed, uint32(_bosses.size()), _wipes, _runMs / IN_MILLISECONDS, reason.c_str());
     me->AttackStop();
     StandStill();
+    QuestResults(true);
     WriteWatch(true);
     DungeonRunEnded(_runId, cleared, reason);
 }
@@ -822,8 +915,226 @@ DungeonLeaderAI::Move DungeonLeaderAI::MoveTo(Position const& pos, float dist)
 Creature* DungeonLeaderAI::NearestCreature(std::function<bool(Creature*)> const& pred, float range) const
 {
     Creature* found = nullptr;
-    NearestCheck check(me, range, pred);
-    Trinity::CreatureLastSearcher<NearestCheck> searcher(me, found, check);
+    NearestCheck<Creature> check(me, range, pred);
+    Trinity::CreatureLastSearcher<NearestCheck<Creature>> searcher(me, found, check);
     me->VisitNearbyObject(range, searcher);
     return found;
+}
+
+// the dungeon's quests for each member (Start): the zone's quests that fit the member (class, race, level; no
+// prerequisite chain, like a GM .quest add), not repeatable / daily / weekly / raid / seasonal / disabled, with a
+// creature or object target spawned in the map or an item to collect. A dungeon quest still in the log (a stopped
+// run) counts as added
+void DungeonLeaderAI::AddQuests(std::set<uint32> const& spawns)
+{
+    std::vector<Quest const*> const& quests = ZoneQuests(me->GetZoneId());
+    for (Player* member : Members(false))
+    {
+        std::ostringstream added;
+        uint32 skipped = 0;
+        for (Quest const* quest : quests)
+        {
+            uint32 id = quest->GetQuestId();
+            QuestStatus status = member->GetQuestStatus(id);
+            bool inLog = status == QUEST_STATUS_INCOMPLETE || status == QUEST_STATUS_COMPLETE;
+            bool target = false, inMap = true;
+            for (QuestObjective const& obj : quest->GetObjectives())
+            {
+                bool spawned = spawns.count(uint32(obj.ObjectID)) != 0;
+                if (obj.Type == QUEST_OBJECTIVE_ITEM || ((obj.Type == QUEST_OBJECTIVE_MONSTER || obj.Type == QUEST_OBJECTIVE_GAMEOBJECT) && spawned))
+                    target = true;
+                if ((obj.Type == QUEST_OBJECTIVE_MONSTER || obj.Type == QUEST_OBJECTIVE_GAMEOBJECT) && !spawned)
+                    inMap = false;
+            }
+            if (!inLog && (!target || status != QUEST_STATUS_NONE || member->GetQuestRewardStatus(id)
+                || !member->SatisfyQuestClass(quest, false) || !member->SatisfyQuestRace(quest, false) || !member->SatisfyQuestLevel(quest, false)
+                || quest->IsRepeatable() || quest->IsDailyOrWeekly() || quest->IsSeasonal() || quest->IsRaidQuest(me->GetMap()->GetDifficultyID())
+                || DisableMgr::IsDisabledFor(DISABLE_TYPE_QUEST, id, member) || !member->CanAddQuest(quest, false)))
+            {
+                ++skipped;
+                continue;
+            }
+            if (!inLog)
+                member->AddQuestAndCheckCompletion(quest, nullptr);
+            _quests.push_back({ member->GetGUID(), member->GetName(), quest, inMap, false, "", "" });
+            added << (added.tellp() ? "," : "") << id;
+        }
+        Log("event=quests run=%u dungeon=%u bot=%s added=%s skipped=%u", _runId, _dungeonId, member->GetName(),
+            added.tellp() ? added.str().c_str() : "-", skipped);
+    }
+}
+
+// after a fight: count the corpses around the tank (kills without credit in the result), and each member takes its
+// quest items from them (as QuestBotAI does from its own kills)
+void DungeonLeaderAI::QuestLoot()
+{
+    std::list<Creature*> corpses;
+    Trinity::AllDeadCreaturesInRange check(me, LootRange, ObjectGuid::Empty);
+    Trinity::CreatureListSearcher<Trinity::AllDeadCreaturesInRange> searcher(me, corpses, check);
+    me->VisitNearbyObject(LootRange, searcher);
+
+    for (Creature* corpse : corpses)
+    {
+        if (_corpses.insert(corpse->GetGUID()).second)
+        {
+            ++_kills[corpse->GetEntry()];
+            for (uint32 credit : corpse->GetCreatureTemplate()->KillCredit)
+                if (credit)
+                    ++_kills[credit];
+        }
+        for (Player* member : Members(true))
+        {
+            if (!member->IsWithinDistInMap(corpse, LOOT_DISTANCE) || !corpse->loot.hasItemFor(member))
+                continue;
+            member->SendLoot(corpse->GetGUID(), LOOT_CORPSE);
+            std::vector<uint32> items = LootQuestItems(member, corpse->GetGUID(), &corpse->loot, [this, member](uint32 itemId)
+                {
+                    for (BotQuest const& quest : _quests)
+                        if (quest.Bot == member->GetGUID())
+                            for (QuestObjective const& obj : quest.Info->GetObjectives())
+                                if (obj.Type == QUEST_OBJECTIVE_ITEM && uint32(obj.ObjectID) == itemId)
+                                    return true;
+                    return false;
+                });
+            _dropped.insert(items.begin(), items.end());
+        }
+    }
+}
+
+// out of combat: a member's open GAMEOBJECT objective within 40 yd of the tank: the tank walks there (the member
+// follows) and the member uses it. Each object once, a minute at most. True while on the detour
+bool DungeonLeaderAI::QuestObject()
+{
+    if (_objectGuid.IsEmpty())
+    {
+        Player* user = nullptr;
+        uint32 questId = 0;
+        // the searcher keeps the last match, the nearest: user / questId are set by that last accepted call
+        std::function<bool(GameObject*)> pred = [&](GameObject* go)
+        {
+            if (!go->isSpawned() || _usedObjects.count(go->GetGUID()))
+                return false;
+            for (BotQuest const& quest : _quests)
+                if (Player* member = ObjectAccessor::GetPlayer(*me, quest.Bot))
+                    if (member->IsAlive() && member->GetQuestStatus(quest.Info->GetQuestId()) == QUEST_STATUS_INCOMPLETE)
+                        for (QuestObjective const& obj : quest.Info->GetObjectives())
+                            if (obj.Type == QUEST_OBJECTIVE_GAMEOBJECT && uint32(obj.ObjectID) == go->GetEntry() && !member->HasQuestObjectiveComplete(quest.Info, obj))
+                            {
+                                user = member;
+                                questId = quest.Info->GetQuestId();
+                                return true;
+                            }
+            return false;
+        };
+        GameObject* found = nullptr;
+        NearestCheck<GameObject> check(me, ObjectRange, pred);
+        Trinity::GameObjectLastSearcher<NearestCheck<GameObject>> searcher(me, found, check);
+        me->VisitNearbyObject(ObjectRange, searcher);
+        if (!found)
+            return false;
+        _objectGuid = found->GetGUID();
+        _objectUser = user->GetGUID();
+        _objectMs = 0;
+        _usedObjects.insert(_objectGuid);
+        Log("event=useobject run=%u dungeon=%u bot=%s object=%u \"%s\" quest=%u", _runId, _dungeonId, user->GetName(), found->GetEntry(),
+            found->GetName(), questId);
+    }
+
+    GameObject* go = me->GetMap()->GetGameObject(_objectGuid);
+    Player* user = ObjectAccessor::GetPlayer(*me, _objectUser);
+    if (!go || !user || !user->IsAlive() || (_objectMs += _tick) > ObjectMaxMs)
+    {
+        _objectGuid.Clear();
+        return false;
+    }
+    _state = "walk";
+    Move move = MoveTo(go->GetPosition(), 2.0f);
+    if (move == Move::Failed)
+    {
+        _objectGuid.Clear();
+        return false;
+    }
+    if (move == Move::Moving || !user->IsWithinDistInMap(go, INTERACTION_DISTANCE))    // wait for the member to follow
+        return true;
+    if (UseGameObject(user, go))
+    {
+        std::vector<uint32> items = LootQuestItems(user, go->GetGUID(), &go->loot, [](uint32) { return false; });
+        _dropped.insert(items.begin(), items.end());
+    }
+    _objectGuid.Clear();
+    return true;
+}
+
+// the quest's state for bot: done, the summed counters, the open objectives (with "killed N, credit M" when the group
+// killed more of a target than the quest counted, "never dropped" for an item no member took in a cleared run)
+void DungeonLeaderAI::UpdateQuest(BotQuest& quest, Player* bot)
+{
+    QuestStatus status = bot->GetQuestStatus(quest.Info->GetQuestId());
+    quest.Done = status == QUEST_STATUS_COMPLETE || bot->GetQuestRewardStatus(quest.Info->GetQuestId());
+    if (quest.Done || status != QUEST_STATUS_INCOMPLETE)
+    {
+        quest.Progress = quest.Done ? "done" : "-";
+        quest.Detail = quest.Done ? "" : "quest status " + std::to_string(int(status)) + " (failed, or removed by a script)";
+        return;
+    }
+    // ponytail: "never dropped" only when every boss died (an item of a boss the run never reached is no bug); a
+    // per-item source check needs the loot templates' item lists
+    bool cleared = !_bosses.empty() && _killed == _bosses.size();
+    int32 have = 0, need = 0;
+    std::ostringstream detail;
+    QuestObjectives const& objectives = quest.Info->GetObjectives();
+    for (size_t i = 0; i < objectives.size(); ++i)
+    {
+        QuestObjective const& obj = objectives[i];
+        if (obj.StorageIndex < 0 || (obj.Flags & QUEST_OBJECTIVE_FLAG_OPTIONAL))
+            continue;
+        int32 count = bot->GetQuestObjectiveData(quest.Info, obj.StorageIndex);
+        have += std::min(count, obj.Amount);
+        need += obj.Amount;
+        if (bot->HasQuestObjectiveComplete(quest.Info, obj))
+            continue;
+        detail << (detail.tellp() ? "," : "") << i << ':' << ObjectiveType(obj.Type) << ':' << obj.ObjectID << ':' << count << '/' << obj.Amount;
+        auto kills = _kills.find(uint32(obj.ObjectID));
+        if (obj.Type == QUEST_OBJECTIVE_MONSTER && kills != _kills.end() && int32(kills->second) > count)
+            detail << " (killed " << kills->second << ", credit " << count << ')';
+        if (obj.Type == QUEST_OBJECTIVE_ITEM && cleared && !_dropped.count(uint32(obj.ObjectID)))
+            detail << " (never dropped)";
+    }
+    quest.Progress = std::to_string(have) + '/' + std::to_string(need);
+    quest.Detail = detail.str();
+}
+
+// the run's end: each added quest's result. reward (Finish): a complete quest is turned in (XP, money, items; reward
+// choice 0) and an incomplete one abandoned, so the next run starts clean. Without (the destructor; the bots may be
+// gone): the last known state, only logged
+void DungeonLeaderAI::QuestResults(bool reward)
+{
+    for (BotQuest& quest : _quests)
+    {
+        Player* bot = reward ? ObjectAccessor::GetPlayer(*me, quest.Bot) : nullptr;
+        if (bot)
+            UpdateQuest(quest, bot);
+        uint32 id = quest.Info->GetQuestId();
+        if (bot && bot->GetQuestStatus(id) == QUEST_STATUS_COMPLETE && bot->CanRewardQuest(quest.Info, false))
+            bot->RewardQuest(quest.Info, 0, bot);
+        else if (bot && bot->GetQuestStatus(id) != QUEST_STATUS_NONE)
+        {
+            // abandoned as .quest remove does, without forgetting a reward (a complete quest whose reward the bags
+            // can't hold included)
+            for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+                if (bot->GetQuestSlotQuestId(slot) == id)
+                {
+                    bot->SetQuestSlot(slot, 0);
+                    bot->TakeQuestSourceItem(id, false);
+                }
+            bot->RemoveActiveQuest(id);
+        }
+        if (quest.Done)
+            Log("quest=%u \"%s\" result=DONE run=%u dungeon=%u bot=%s level=%u", id, quest.Info->LogTitle.c_str(), _runId, _dungeonId,
+                quest.BotName.c_str(), bot ? uint32(bot->getLevel()) : 0);
+        else
+            Log("quest=%u \"%s\" result=INCOMPLETE run=%u dungeon=%u bot=%s level=%u targets=%s detail=%s", id, quest.Info->LogTitle.c_str(),
+                _runId, _dungeonId, quest.BotName.c_str(), bot ? uint32(bot->getLevel()) : 0, quest.InMap ? "in_map" : "not_in_map",
+                quest.Detail.empty() ? "-" : quest.Detail.c_str());
+    }
 }

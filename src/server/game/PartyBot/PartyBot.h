@@ -11,10 +11,12 @@
 
 #include "WorldSession.h"
 #include <atomic>
+#include <functional>
 #include "UnitAI.h"
 #include "MoveSplineInitArgs.h"
 
 struct ChrSpecializationEntry;
+struct Loot;
 
 class PartyBotSession : public WorldSession
 {
@@ -97,6 +99,9 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     uint32 GroupMembersBelow(int32 pct) const;
     Unit* TauntTarget() const;
     bool IsRanged() const;
+    // quest bot and dungeon run (QuestBotAI::UseObject's / TakeQuestLoot's pattern, for any bot as user / looter)
+    static bool UseGameObject(Player* user, GameObject* go);
+    static std::vector<uint32> LootQuestItems(Player* looter, ObjectGuid guid, Loot* loot, std::function<bool(uint32)> const& wanted);
 
     ObjectGuid _leaderGuid;
     uint8 _slot;                        // position around the leader
