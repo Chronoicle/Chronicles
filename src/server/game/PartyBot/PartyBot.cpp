@@ -26,7 +26,6 @@
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "PathGenerator.h"
-#include "MoveSpline.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <sstream>
 
@@ -805,19 +804,39 @@ void PartyBotAI::PetAttack(Unit* target)
     pet->AI()->AttackStart(target);
 }
 
-// walk to pos along the corners of the navmesh corridor (as far as it reaches; call again once the walk ended). The
-// default smooth path (MovePoint) gives up past ~300 yd (74 points of 4 yd) and read as "no path" for a quest NPC or a
-// spawn point further away (quest bots, 2026-10-01: Kurtok 300 yd from Northshire Abbey, Goldshire's innkeeper)
+// walk toward pos in legs of up to WalkLegLength along the navmesh corridor (call again once a leg ended). MovePoint's
+// smooth path gives up past ~300 yd (74 points of 4 yd) and read as "no path" for a quest NPC or a spawn point further
+// away (quest bots 2026-10-01: Kurtok 300 yd from Northshire Abbey, Goldshire's innkeeper). The corridor's corners
+// (straight path) only pick the leg's end; the leg itself is the normal point movement (dev-check: a spline through
+// sparse corners cuts wall corners). False: no path at all
 bool PartyBotAI::WalkTo(Position const& pos)
 {
+    static float const WalkLegLength = 250.0f;
     me->GetMap()->LoadGrid(pos.GetPositionX(), pos.GetPositionY());     // the path needs the destination's navmesh tile
     PathGenerator path(me);
     path.SetUseStraightPath(true);
     path.CalculatePath(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
-    Movement::PointsArray const& points = path.GetPath();
-    if ((path.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORT)) || points.size() < 2)
+    Movement::PointsArray const& corners = path.GetPath();
+    if ((path.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORT)) || corners.empty())
         return false;
-    me->GetMotionMaster()->MoveSmoothPath(0, points.data(), points.size(), false);
+
+    // the farthest corner within the leg length along the path (the corridor's end when it is shorter); a first corner
+    // beyond it: the point at that length on the straight segment to it
+    G3D::Vector3 leg = corners.back();
+    G3D::Vector3 last(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ());
+    float length = 0.0f;
+    for (G3D::Vector3 const& corner : corners)
+    {
+        float step = (corner - last).length();
+        if (length + step > WalkLegLength)
+        {
+            leg = length > 1.0f ? last : last + (corner - last) * ((WalkLegLength - length) / step);    // corner 0 = the start
+            break;
+        }
+        length += step;
+        last = corner;
+    }
+    me->GetMotionMaster()->MovePoint(0, leg.x, leg.y, leg.z, true);
     return true;
 }
 

@@ -32,7 +32,6 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "PathGenerator.h"
-#include "MoveSpline.h"
 #include "Player.h"
 #include <algorithm>
 #include <cstdarg>
@@ -771,7 +770,7 @@ DungeonLeaderAI::Move DungeonLeaderAI::MoveTo(Position const& pos, float dist)
     float distance = me->GetExactDist(pos);
     if (distance <= dist)
     {
-        if (!me->movespline->Finalized())
+        if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
             StandStill();
         return Move::Arrived;
     }
@@ -790,7 +789,7 @@ DungeonLeaderAI::Move DungeonLeaderAI::MoveTo(Position const& pos, float dist)
         return Move::Failed;
     }
 
-    if (newDest || me->movespline->Finalized())
+    if (newDest || me->GetMotionMaster()->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
     {
         if (!WalkTo(pos))
         {
