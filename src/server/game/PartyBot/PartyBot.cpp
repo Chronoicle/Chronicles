@@ -88,6 +88,15 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
     if (!_setupDone && !_dismissed)
         Setup(bot);
 
+    // #140 A: a bot that leveled (dungeon run, quest test) learns the talent row that opened once it is out of combat
+    // (talents are refused in combat or dead). Player::GiveLevel already taught the new class and spec spells.
+    if (_setupDone && !_dismissed && bot->getLevel() != _talentLevel && bot->IsAlive() && !bot->isInCombat())
+    {
+        if (_talentLevel)               // the first time just notes the level (the first login set the talents)
+            PartyBotMgr::OnBotLevelUp(bot);
+        _talentLevel = bot->getLevel();
+    }
+
     // quest test: no leader, no group. Dead: up again where it fell after 10 s (the AI only runs while alive)
     if (IsQuestTest())
     {
@@ -156,8 +165,98 @@ void PartyBotSession::AckTeleports(Player* bot)
     }
 }
 
-// .partybot create made this character: level 110, its spec and its gear set (world.gear_npc_items) at the first login
-void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId)
+// the spec's talent build (world.partybot_talents, generated with the rotations): the picks of the rows the bot's level
+// has unlocked (Player::CalculateTalentsPoints: 15, 30, 45, 60, 75, 90, 100; Death Knights 56.., Demon Hunters 99..)
+// that it doesn't have yet. LearnTalent refuses the locked rows anyway; skipping them spares the refusal packets.
+static void LearnBotTalents(Player* bot, uint32 specId)
+{
+    QueryResult result = WorldDatabase.PQuery("SELECT talent FROM partybot_talents WHERE spec = %u", specId);
+    if (!result)
+        return;
+
+    bot->SetFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHANGING_TALENTS);    // replaces an earlier pick in the row
+    do
+    {
+        uint32 talentId = (*result)[0].GetUInt32();
+        TalentEntry const* talent = sTalentStore.LookupEntry(talentId);
+        if (talent && talent->TierID < bot->GetUInt32Value(PLAYER_FIELD_MAX_TALENT_TIERS) && !bot->HasTalent(talentId, bot->GetActiveTalentGroup()))
+            bot->LearnTalent(talentId);
+    } while (result->NextRow());
+    bot->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHANGING_TALENTS);
+}
+
+void PartyBotMgr::OnBotLevelUp(Player* bot)
+{
+    LearnBotTalents(bot, bot->GetSpecializationId());
+}
+
+// level-scaling gear for a level bot (#140): heirlooms. Their item level follows the owner's level through their
+// ScalingStatDistribution (Item::GetItemLevel; Player::GiveLevel re-applies the stats at each level), by themselves up
+// to level 60, with the level-110 upgrade (bonus list 3592: ScalingStatDistribution 1059, same curve 956) up to 110:
+// item level 20 at 15, 45 at 40, ~85 at 60, 605 at 100, 800 at 110. No heirloom gloves, wrists, belt or boots:
+// the starting gear stays there.
+static void EquipHeirlooms(Player* bot, ChrSpecializationEntry const* spec)
+{
+    // head, shoulders, chest, legs per armor type (strength or agility / intellect: the spec's primary stat counts)
+    static uint32 const armor[4][4] =
+    {
+        { 122245, 122355, 122381, 122251 },     // plate: Polished ... of Valor
+        { 122246, 122356, 122379, 122252 },     // mail
+        { 122248, 122358, 122383, 122254 },     // leather: Stained Shadowcraft
+        { 122250, 122360, 122384, 122256 },     // cloth: Tattered Dreadmist
+    };
+    // back, neck, ring, trinket, trinket per primary stat
+    static uint32 const stat[3][5] =
+    {
+        { 122260, 122667, 128172, 122361, 122530 },     // strength
+        { 122261, 122668, 128173, 122361, 122530 },     // agility
+        { 122262, 122664, 128169, 122362, 122361 },     // intellect
+    };
+
+    // the best armor the class wears; ChrSpecialization.PrimaryStatPriority: 5 strength, 2-3 agility, 0-1 intellect
+    uint8 armorType = bot->HasSkill(SKILL_PLATE_MAIL) ? 0 : bot->HasSkill(SKILL_MAIL) ? 1 : bot->HasSkill(SKILL_LEATHER) ? 2 : 3;
+    uint8 statType = spec->PrimaryStatPriority >= 4 ? 0 : spec->PrimaryStatPriority >= 2 ? 1 : 2;
+
+    // main hand, off hand (0: none). The off hand needs Dual Wield / Titan's Grip; without it the core refuses it
+    std::pair<uint32, uint32> weapons;
+    switch (spec->ID)
+    {
+        case 73: case 66:               weapons = { 122389, 122391 }; break;   // tanks: one-hand sword and shield
+        case 65: case 262: case 264:    weapons = { 122354, 122392 }; break;   // intellect mace and shield
+        case 72:                        weapons = { 122349, 122365 }; break;   // Fury: two two-handers
+        case 253: case 254:             weapons = { 122352, 0 }; break;        // bow
+        case 255:                       weapons = { 140773, 0 }; break;        // Survival: polearm
+        case 259: case 260: case 261:   weapons = { 122350, 122364 }; break;   // daggers
+        case 263: case 269:             weapons = { 122385, 122396 }; break;   // agility mace and fist weapon
+        case 577: case 581:             weapons = { 122351, 122396 }; break;   // no heirloom warglaives: sword and fist weapon
+        case 268: case 103: case 104:   weapons = { 122363, 0 }; break;        // agility staff
+        case 71: case 70: case 250: case 251: case 252: weapons = { 122349, 0 }; break;   // strength two-hander
+        default:                        weapons = { 122353, 0 }; break;        // intellect staff
+    }
+
+    for (uint8 slot : { EQUIPMENT_SLOT_HEAD, EQUIPMENT_SLOT_NECK, EQUIPMENT_SLOT_SHOULDERS, EQUIPMENT_SLOT_CHEST, EQUIPMENT_SLOT_LEGS,
+        EQUIPMENT_SLOT_BACK, EQUIPMENT_SLOT_FINGER1, EQUIPMENT_SLOT_FINGER2, EQUIPMENT_SLOT_TRINKET1, EQUIPMENT_SLOT_TRINKET2,
+        EQUIPMENT_SLOT_MAINHAND, EQUIPMENT_SLOT_OFFHAND })
+        if (bot->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+            bot->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+
+    std::vector<uint32> const upgrade110 = { 3592 };
+    std::vector<uint32> items(std::begin(armor[armorType]), std::end(armor[armorType]));
+    items.insert(items.end(), std::begin(stat[statType]), std::end(stat[statType]));
+    items.push_back(122529);            // Dread Pirate Ring (no primary stat) in the second ring slot
+    items.push_back(weapons.first);
+    items.push_back(weapons.second);
+    for (uint32 itemId : items)
+    {
+        uint16 dest;
+        if (itemId && bot->CanEquipNewItem(NULL_SLOT, dest, itemId, false) == EQUIP_ERR_OK)
+            bot->EquipNewItem(dest, itemId, true, 0, upgrade110);
+    }
+}
+
+// .partybot create made this character: level 110, its spec and its gear set (world.gear_npc_items) at the first login.
+// A level bot (CreateLevelBot, setup 2) keeps the level it was made with and gets heirlooms instead.
+void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId, bool levelBot)
 {
     ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(specId);
     if (!spec || spec->ClassID != bot->getClass())
@@ -171,19 +270,21 @@ void PartyBotSession::FirstLoginSetup(Player* bot, uint32 specId)
         bot->SpawnCorpseBones();
     }
 
-    if (bot->getLevel() < 110)
+    if (!levelBot && bot->getLevel() < 110)
         bot->GiveLevel(110);
     if (bot->GetSpecializationId() != specId)
-        bot->ActivateTalentGroup(spec);
+        bot->ActivateTalentGroup(spec);     // also teaches the spec's spells of the bot's level
 
-    // the spec's talent build (world.partybot_talents, generated with the rotations)
-    if (QueryResult result = WorldDatabase.PQuery("SELECT talent FROM partybot_talents WHERE spec = %u", specId))
+    LearnBotTalents(bot, specId);
+
+    // a level bot: heirlooms instead of the level-110 set, no class hall or artifact
+    if (levelBot)
     {
-        bot->SetFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHANGING_TALENTS);    // replaces an earlier pick in the row
-        do
-            bot->LearnTalent((*result)[0].GetUInt32());
-        while (result->NextRow());
-        bot->RemoveFlag(UNIT_FIELD_FLAGS_2, UNIT_FLAG2_ALLOW_CHANGING_TALENTS);
+        EquipHeirlooms(bot, spec);
+        bot->SetFullHealth();
+        CharacterDatabase.PExecute("UPDATE partybot_characters SET setup = 3 WHERE guid = %u", bot->GetGUIDLow());
+        bot->SaveToDB();
+        return;
     }
 
     // the class hall talent for a second legendary first, or the set's second legendary is refused (empty slot)
@@ -274,8 +375,9 @@ void PartyBotSession::Setup(Player* bot)
         return;
     }
 
-    if (QueryResult result = CharacterDatabase.PQuery("SELECT spec FROM partybot_characters WHERE guid = %u AND setup = 0", bot->GetGUIDLow()))
-        FirstLoginSetup(bot, (*result)[0].GetUInt32());
+    // setup 0: a .partybot create bot, 2: a level bot (CreateLevelBot); 1 and 3: done
+    if (QueryResult result = CharacterDatabase.PQuery("SELECT spec, setup FROM partybot_characters WHERE guid = %u AND setup IN (0, 2)", bot->GetGUIDLow()))
+        FirstLoginSetup(bot, (*result)[0].GetUInt32(), (*result)[1].GetUInt8() == 2);
 
     Player* leader = ObjectAccessor::FindPlayer(_leaderGuid);
     if (!leader)
@@ -992,8 +1094,10 @@ void PartyBotMgr::ReleaseBotAccount(uint32 accountId)
     _usedAccounts.erase(accountId);
 }
 
-// a level-1 character on a bot account, as the character screen makes it (without a client); empty guid on failure
-static ObjectGuid NewCharacter(uint32 accountId, uint8 race, uint8 cls, std::string const& name)
+// a level-1 character on a bot account, as the character screen makes it (without a client); empty guid on failure.
+// level: a level bot's level, set before the first save like .character level does for an offline character (the
+// login then teaches the class and spec spells of that level, Player::LoadFromDB)
+static ObjectGuid NewCharacter(uint32 accountId, uint8 race, uint8 cls, std::string const& name, uint8 level = 0)
 {
     std::string accountName;
     AccountMgr::GetName(accountId, accountName);
@@ -1014,6 +1118,8 @@ static ObjectGuid NewCharacter(uint32 accountId, uint8 race, uint8 cls, std::str
         return ObjectGuid::Empty;
     }
 
+    if (level > newChar.getLevel())
+        newChar.SetUInt32Value(UNIT_FIELD_LEVEL, level);
     newChar.setCinematic(1);
     newChar.SaveToDB(true);
     sWorld->AddCharacterInfo(newChar.GetGUID(), accountId, name, newChar.getGender(), newChar.getRace(), newChar.getClass(), newChar.getLevel());
@@ -1050,6 +1156,44 @@ std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& 
     CharacterDatabase.PExecute("REPLACE INTO partybot_characters (guid, account, spec, setup) VALUES (%u, %u, %u, 0)", guid.GetCounter(), accountId, specId);
 
     TC_LOG_INFO("server.partybot", "Party bot character %s (spec %u, account %u) created by %s", name.c_str(), specId, accountId, creator->GetName());
+    return "";
+}
+
+// #140 A: like CreateBot, at a level (setup 2: FirstLoginSetup keeps the level and gives heirlooms)
+std::string PartyBotMgr::CreateLevelBot(uint32 specId, uint8 level, bool alliance, std::string& name, ObjectGuid& guid)
+{
+    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(specId);
+    if (!spec || !spec->ClassID || spec->ClassID >= MAX_CLASSES)
+        return "Unknown specialization.";
+
+    // a spec from 10; Death Knights start at 55, Demon Hunters at 98
+    ChrClassesEntry const* classEntry = sChrClassesStore.AssertEntry(spec->ClassID);
+    uint32 minLevel = std::max<int32>(10, classEntry->StartingLevel);
+    if (level < minLevel || level > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+        return std::string(classEntry->Name->Str[DEFAULT_LOCALE]) + " bots need a level from " + std::to_string(minLevel) + " to "
+            + std::to_string(sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)) + ".";
+
+    uint32 accountId = ReserveBotAccount();
+    if (!accountId)
+        return "No free partybot account left (partybotN@bot).";
+
+    name = BotName(std::string(spec->Name->Str[DEFAULT_LOCALE]) + classEntry->Name->Str[DEFAULT_LOCALE]);
+    if (name.empty())
+    {
+        ReleaseBotAccount(accountId);
+        return "Could not find a free name.";
+    }
+
+    guid = NewCharacter(accountId, BotRace(spec->ClassID, alliance), spec->ClassID, name, level);
+    if (guid.IsEmpty())
+    {
+        ReleaseBotAccount(accountId);
+        return "The character could not be created.";
+    }
+
+    CharacterDatabase.PExecute("REPLACE INTO partybot_characters (guid, account, spec, setup) VALUES (%u, %u, %u, 2)", guid.GetCounter(), accountId, specId);
+
+    TC_LOG_INFO("server.partybot", "Level bot character %s (spec %u, level %u, account %u) created", name.c_str(), specId, level, accountId);
     return "";
 }
 
@@ -1241,7 +1385,8 @@ std::string PartyBotMgr::AddBotByRole(Player* leader, std::string const& what)
     else if (boost::iequals(what, "dps") || boost::iequals(what, "damage"))
         role = 2;
 
-    QueryResult result = CharacterDatabase.Query("SELECT p.guid, p.spec, c.name, c.race FROM partybot_characters p JOIN characters c ON c.guid = p.guid ORDER BY p.guid");
+    // level bots (setup 2, 3: dungeon bots, #140) aren't picked by role
+    QueryResult result = CharacterDatabase.Query("SELECT p.guid, p.spec, c.name, c.race FROM partybot_characters p JOIN characters c ON c.guid = p.guid WHERE p.setup < 2 ORDER BY p.guid");
     if (!result)
         return "There are no bot characters yet (.partybot create <class> <spec>).";
 

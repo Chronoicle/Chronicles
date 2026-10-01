@@ -82,7 +82,7 @@ public:
                     if (ChrSpecializationEntry const* spec = sDB2Manager.GetChrSpecializationByIndex(cls, i))
                     {
                         bool have = false;
-                        if (QueryResult result = CharacterDatabase.PQuery("SELECT c.race FROM partybot_characters p JOIN characters c ON c.guid = p.guid WHERE p.spec = %u", spec->ID))
+                        if (QueryResult result = CharacterDatabase.PQuery("SELECT c.race FROM partybot_characters p JOIN characters c ON c.guid = p.guid WHERE p.spec = %u AND p.setup < 2", spec->ID))
                             do
                                 if ((Player::TeamForRace((*result)[0].GetUInt8()) == ALLIANCE) == alliance)
                                     have = true;
