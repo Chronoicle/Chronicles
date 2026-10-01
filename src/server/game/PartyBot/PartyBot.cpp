@@ -1009,15 +1009,18 @@ std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& 
     return "";
 }
 
-// a quest-test bot is running (one at a time, dev-check); _lock held
-bool PartyBotMgr::QuestTestRunning()
+// quest-test runs at the same time: one per race/class, at most MaxQuestTests (owner 2026-10-01: several starting zones
+// at once; each run scans its zone's spawns once at start on its map thread); _lock held
+static constexpr uint32 MaxQuestTests = 4;
+uint32 PartyBotMgr::QuestTestCount()
 {
     Cleanup();
+    uint32 count = 0;
     for (auto const& bot : _bots)
         if (std::shared_ptr<PartyBotSession> session = bot.lock())
             if (session->IsQuestTest())
-                return true;
-    return false;
+                ++count;
+    return count;
 }
 
 uint32 PartyBotMgr::StopQuestTests()
@@ -1035,16 +1038,16 @@ uint32 PartyBotMgr::StopQuestTests()
 }
 
 // .partybot questtest <class> [race] [max level] (owner 2026-10-01, #65): a fresh level-1 character of that race and
-// class (default: the GM's faction, like .partybot create) plays its starting zone's quests alone (QuestBot.cpp). One
-// run at a time. Each run starts from level 1: the new character is made first, then the previous quest-test character
+// class (default: the GM's faction, like .partybot create) plays its starting zone's quests alone (QuestBot.cpp). Up to
+// MaxQuestTests runs at a time, one per race/class. Each run starts from level 1: the new character is made first, then the previous quest-test character
 // of that race and class is deleted. Only a character named Qt... (case-sensitive) on a partybot account
 // (partybotN@bot exactly) that is no party bot (no partybot_characters row) is ever deleted.
 std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
 {
     {
         std::lock_guard<std::mutex> guard(_lock);
-        if (QuestTestRunning())
-            return "A quest test is already running (one at a time; .partybot questtest stop).";
+        if (QuestTestCount() >= MaxQuestTests)
+            return "Already " + std::to_string(MaxQuestTests) + " quest tests running (.partybot questtest stop ends them).";
     }
 
     uint8 maxLevel = 5;
@@ -1126,8 +1129,8 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
     std::shared_ptr<PartyBotSession> session = std::make_shared<PartyBotSession>(accountId, std::move(accountName), guid, gm->GetGUID(), maxLevel);
     {
         std::lock_guard<std::mutex> guard(_lock);
-        if (QuestTestRunning())         // another GM started one meanwhile; the new character is replaced at the next run
-            return "A quest test is already running (one at a time; .partybot questtest stop).";
+        if (QuestTestCount() >= MaxQuestTests)  // other GMs started some meanwhile; the new character is replaced at the next run
+            return "Already " + std::to_string(MaxQuestTests) + " quest tests running (.partybot questtest stop ends them).";
         _bots.push_back(session);
     }
     sWorld->AddSession(session);
