@@ -11981,7 +11981,9 @@ void Player::SendLoot(ObjectGuid guid, LootType loot_type, bool AoeLoot, uint8 p
             // set group rights only for loot_type != LOOT_SKINNING
             else
             {
-                if(creature->IsPersonal() || creature->HasInLootList(GetGUID()))
+                // Quest-only loot holds no normal items, so owner rights only show this player's own quest items: he may
+                // not be on the loot list when his personal loot rolled nothing (see isAllowedToLoot, #122).
+                if(creature->IsPersonal() || creature->HasInLootList(GetGUID()) || (loot->isOnlyQuest && loot->hasItemFor(this)))
                     permission = OWNER_PERMISSION;
                 else if (Group* group = GetGroup())
                 {
@@ -22632,6 +22634,13 @@ bool Player::isAllowedToLoot(const Creature* creature)
 
     if (HasPendingBind())
         return false;
+
+    // Quest items never go into personal loot, only into the shared quest-only corpse loot (Loot::AddItem), and only a
+    // player whose personal loot got gold or an item is put on the loot list. When that roll came out empty, his quest
+    // item could not be looted: Overseer Lykill's key (no gold) about one kill in four (#122). Checked before the
+    // personal loot, which can be an empty entry (SendLoot creates it with personalLoot[guid]).
+    if (creature->loot.isOnlyQuest && creature->loot.hasItemFor(this))
+        return true;
 
     if(Loot* lootPesonal = GetPersonalLoot(creature->GetGUID()))
     {
