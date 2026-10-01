@@ -546,7 +546,7 @@ void PartyBotAI::UpdateAI(uint32 diff)
     // fight what the leader fights (tanks also pick up what attacks the group)
     if (Unit* target = PickTarget(leader))
     {
-        if (WaitForThreat(leader, target, diff))
+        if (WaitForThreat(leader, target))
         {
             if (me->getVictim())
                 me->AttackStop();
@@ -916,27 +916,32 @@ std::vector<uint32> PartyBotAI::LootQuestItems(Player* looter, ObjectGuid guid, 
 // owner 2026-10-01: "they all run in headless" before the tank. Damage dealers attack the tank's target once it has hit
 // the tank for ThreatLeadMs (the mob still walking up or not yet aggroed: wait behind the tank); a mob on anyone else
 // is loose and helped at once. Only when the leader is a tank (a bot of a dungeon run, or a player in a tank spec)
-bool PartyBotAI::WaitForThreat(Player* leader, Unit* target, uint32 diff)
+bool PartyBotAI::WaitForThreat(Player* leader, Unit* target)
 {
     static uint32 const ThreatLeadMs = 2500;
+    static uint32 const WalkUpMaxMs = 20 * IN_MILLISECONDS;
     if (leader == me || !IsTankSpec(leader) || IsTankSpec(me) || IsHealerSpec(me) || leader->getVictim() != target)
         return false;
     Unit* victim = target->getVictim();
     if (victim && victim != leader)
         return false;
+    // times from getMSTime: UpdateAI's body runs every 500 ms but diff is only the last frame's (dev-check)
+    uint32 now = getMSTime();
     if (_leadGuid != target->GetGUID())
     {
         _leadGuid = target->GetGUID();
-        _leadMs = 0;
+        _leadStartMs = 0;
+        _walkUpStartMs = now;
     }
-    if (!victim && !target->isInCombat())   // the tank still walking up to it
+    if (!victim && !target->isInCombat())   // the tank still walking up to it (an unreachable one: not forever)
     {
-        _leadMs = 0;
-        return true;
+        _leadStartMs = 0;
+        return getMSTimeDiff(_walkUpStartMs, now) < WalkUpMaxMs;
     }
+    if (!_leadStartMs)
+        _leadStartMs = now ? now : 1;
     // in combat without a victim (a turret, a boss between phases): a longer wait, not forever
-    _leadMs += diff;
-    return _leadMs < (victim ? ThreatLeadMs : 3 * ThreatLeadMs);
+    return getMSTimeDiff(_leadStartMs, now) < (victim ? ThreatLeadMs : 3 * ThreatLeadMs);
 }
 
 // owner 2026-10-01: tanks lost aggro. Each tank spec's +900% threat spell is a passive (Defensive Stance 71, Righteous
@@ -945,16 +950,38 @@ bool PartyBotAI::WaitForThreat(Player* leader, Unit* target, uint32 diff)
 void PartyBotAI::TankStance()
 {
     static uint32 const ThreatPassives[] = { 71, 25780, 115069, 48263, 189926 };
+    // at most every 10 s per spell; still missing 10 s after a cast: logged once (a passive that works through another
+    // spell id or a script would else be cast every tick, dev-check)
+    uint32 now = getMSTime();
+    auto apply = [&](uint32 spell, bool triggered)
+    {
+        auto itr = _stanceTry.find(spell);
+        if (me->HasAura(spell))
+        {
+            if (itr != _stanceTry.end())
+                _stanceTry.erase(itr);
+            return;
+        }
+        if (itr != _stanceTry.end())
+        {
+            if (getMSTimeDiff(itr->second, now) < 10 * IN_MILLISECONDS)
+                return;
+            if (_stanceFailLogged.insert(spell).second)
+                TC_LOG_INFO("server.questbot", "BOT event=stancefail bot=%s spell=%u spec=%u", me->GetName(), spell, me->GetSpecializationId());
+        }
+        _stanceTry[spell] = now;
+        me->CastSpell(me, spell, triggered);
+    };
     for (uint32 spell : ThreatPassives)
-        if (me->HasSpell(spell) && !me->HasAura(spell))
-            me->CastSpell(me, spell, true);
-    if (me->GetSpecializationId() == 104 && me->HasSpell(5487) && !me->HasAura(5487) && !me->IsNonMeleeSpellCast(false))
-        me->CastSpell(me, 5487, false);
+        if (me->HasSpell(spell))
+            apply(spell, true);
+    if (me->GetSpecializationId() == 104 && me->HasSpell(5487) && !me->IsNonMeleeSpellCast(false))
+        apply(5487, false);
 }
 
 bool PartyBotAI::CastRotation(Unit* target)
 {
-    if (target && IsTankSpec(me))
+    if (IsTankSpec(me))                 // also out of combat: the stance is there before the first hit
         TankStance();
     std::vector<PartyBotSpell> const* spells = sPartyBotMgr->GetSpells(me->GetSpecializationId());
     if (!spells)
