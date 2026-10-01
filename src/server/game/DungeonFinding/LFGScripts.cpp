@@ -97,6 +97,12 @@ void LFGPlayerScript::OnMapChanged(Player* player)
     {
         player->EnterInTimeWalk(nullptr);
         player->RemoveAurasDueToSpell(LFG_SPELL_LUCK_OF_THE_DRAW);
+
+        // #79: leaving a finished solo Dungeon Finder instance (the Broken Shore scenario) ends its one-player group,
+        // else the Dungeon Finder eye stays and offers the way back in
+        if (group && group->isLFGGroup() && group->GetMembersCount() == 1
+            && sLFGMgr->GetState(group->GetGUID(), sLFGMgr->GetQueueId(group->GetGUID())) == LFG_STATE_FINISHED_DUNGEON)
+            player->RemoveFromGroup();
     }
 }
 
