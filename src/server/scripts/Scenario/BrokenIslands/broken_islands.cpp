@@ -659,6 +659,14 @@ public:
 
                         plr->CastSpell(plr, plr->GetTeam() == ALLIANCE ? 199358 : 225152, false);
                     }
+
+                // #79: everybody is off the ship and on the beach now. The battleship (sailing since 9ffaf5a) runs on along
+                // its path and beaches at the landing, on top of the ported players ("under the boat"); retail phases it
+                // out here and shows the beached ship (GO_*_SHIP above). A transport is map-wide (no grid visibility):
+                // take it off the map
+                if (GameObject* shipGo = script->GetGameObjectByEntry(player->GetTeam() == ALLIANCE ? TRANSPORT_ALLIANCE : TRANSPORT_HORDE))
+                    if (Transport* ship = m->GetTransport(shipGo->GetGUID()))
+                        ship->AddObjectToRemoveList();
             }
         }
 
