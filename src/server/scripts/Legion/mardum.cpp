@@ -49,6 +49,10 @@ public:
             SCENE = 191677,
         };
 
+        // #148: a click on a GOOBER (GAME_OBJ_USE, or its open-lock cast) reaches GameObject::Use -> GossipUse, never
+        // GossipHello(isUse = true): the banner did nothing
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
@@ -246,12 +250,21 @@ public:
 
         enum data
         {
-            SCENE = 189261,
+            SCENE  = 189261,
+            QUEST  = 40378,
+            CREDIT = 88872,
         };
+
+        // #148: see go_q40077 (the gateway did nothing)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
+                return true;
+
+            // once per quest, like the Coilskar twin go_q40379 (the summons repeated on every click)
+            if (player->GetQuestStatus(QUEST) != QUEST_STATUS_INCOMPLETE || player->GetReqKillOrCastCurrentCount(QUEST, CREDIT))
                 return true;
 
             /*
@@ -259,7 +272,7 @@ public:
             GameObjectGUID: Full: 0x2C2090B920EEB5C00000100001364D15; HighType: GameObject; Low: 20335893; Map: 1481; Entry: 244439;
             */
             player->Dismount();
-            player->KilledMonsterCredit(88872);
+            player->KilledMonsterCredit(CREDIT);
             player->CastSpell(player, SCENE, true);
             
             player->SummonCreature(99916, 1023.25f, 2849.71f, 5.42f, 1.75f, TEMPSUMMON_MANUAL_DESPAWN, 0, player->GetGUID(), NULL);
