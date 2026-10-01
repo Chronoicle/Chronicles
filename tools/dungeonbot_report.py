@@ -8,6 +8,7 @@
 Markdown: one row per run, the result counts per boss, and the likely dungeon bugs (a boss that resets, a boss dead
 without its encounter DONE, a boss never found, no path / stuck on the way, targets that take no damage) grouped by
 dungeon and boss with a count and the first detail. Wipes alone are not listed as bugs (bots can be weak).
+Quests: DONE / INCOMPLETE counts per dungeon quest; a kill without credit or an item that never dropped is a likely bug.
 """
 import collections, re, sys
 
@@ -43,6 +44,7 @@ def report(lines):
     runs, current = [], {}                      # current: run id -> its record (ids repeat after a restart)
     boss_counts = collections.OrderedDict()     # (dungeon, boss entry) -> Counter of results
     boss_names = {}
+    quests = collections.OrderedDict()          # (dungeon, quest id) -> [title, DONE, INCOMPLETE, first INCOMPLETE detail]
     bugs = collections.OrderedDict()            # (dungeon, kind, entry) -> [count, name, first detail]
 
     def run_of(fields):
@@ -78,7 +80,19 @@ def report(lines):
             continue
         r = run_of(f)
         dungeon = r["name"] or names.get("dungeon") or "dungeon %s" % r["dungeon"]
-        if event == "evade":
+        if event is None and "quest" in f:    # quest results also carry result=: keep them out of the boss table
+            qid, title, detail = f["quest"], names.get("quest", ""), f.get("detail", "")
+            q = quests.setdefault((dungeon, qid), [title, 0, 0, ""])
+            if f.get("result") == "DONE":
+                q[1] += 1
+            else:
+                q[2] += 1
+                q[3] = q[3] or detail
+                if "credit 0" in detail:
+                    bug(dungeon, "QUEST no kill credit", qid, title, detail)
+                if "never dropped" in detail:
+                    bug(dungeon, "QUEST item never dropped", qid, title, detail)
+        elif event == "evade":
             bug(dungeon, "EVADE (reset)", f.get("boss", "?"), boss_names.get(f.get("boss")), f.get("detail", ""))
         elif event == "oddmob":
             bug(dungeon, "HOSTILE FAR ABOVE LEVEL", f.get("target", "?"), names.get("target"), f.get("detail", ""))
@@ -104,6 +118,13 @@ def report(lines):
     out += ["", "## Bosses", "", "| dungeon | boss | " + " | ".join(RESULTS) + " |", "|---|---|" + "---|" * len(RESULTS)]
     for (dungeon, entry), counts in boss_counts.items():
         out.append("| %s | %s %s | %s |" % (dungeon, entry, boss_names.get(entry, ""), " | ".join(str(counts[x]) for x in RESULTS)))
+    out += ["", "## Quests", ""]
+    if quests:
+        out += ["| dungeon | quest | DONE | INCOMPLETE | first INCOMPLETE detail |", "|---|---|---|---|---|"]
+        for (dungeon, qid), (title, done, incomplete, detail) in quests.items():
+            out.append("| %s | %s %s | %d | %d | %s |" % (dungeon, qid, title, done, incomplete, detail.replace("|", "/")))
+    else:
+        out.append("None.")
     out += ["", "## Likely bugs (%d)" % len(bugs), ""]
     if bugs:
         out += ["| dungeon | kind | entry | name | count | first detail |", "|---|---|---|---|---|---|"]
@@ -120,6 +141,11 @@ SAMPLE = r'''2026-10-01 10:00:00 DUNGEONBOT event=start run=1 dungeon=18 map=389
 2026-10-01 10:03:00 DUNGEONBOT run=1 dungeon=18 "Ragefire Chasm" boss=61408 "Adarogg" result=KILLED time=120 level=15 wipes=0 detail=-
 2026-10-01 10:04:00 DUNGEONBOT event=evade run=1 dungeon=18 map=389 bot=Tankbot boss=61412 detail=boss reset at 40% with 5/5 alive (evades every pull?)
 2026-10-01 10:05:00 DUNGEONBOT run=1 dungeon=18 "Ragefire Chasm" boss=61412 "Dark Shaman Koranthal" result=NO_PATH time=60 level=15 wipes=1 detail=no path from 1,2,3 to 4,5,6 (a closed door or a missing bridge?)
+2026-10-01 10:00:01 DUNGEONBOT event=quests run=1 dungeon=18 bot=Healbot added=5723,5728 skipped=4
+2026-10-01 10:02:30 DUNGEONBOT event=useobject run=1 dungeon=18 bot=Healbot object=175085 "Chest" quest=5723
+2026-10-01 10:05:00 DUNGEONBOT quest=5723 "Testing an Enemy's Strength" result=DONE run=1 dungeon=18 bot=Healbot level=16
+2026-10-01 10:05:00 DUNGEONBOT quest=5728 "Hidden Enemies" result=INCOMPLETE run=1 dungeon=18 bot=Healbot level=16 targets=in_map detail=0:MONSTER:11518:2/6 (killed 3, credit 0),1:ITEM:14544:0/1 (never dropped)
+2026-10-01 10:05:00 DUNGEONBOT quest=5761 "Slaying the Beast" result=INCOMPLETE run=1 dungeon=18 bot=Tankbot level=16 targets=not_in_map detail=0:MONSTER:11520:0/1
 2026-10-01 10:05:01 DUNGEONBOT run=end run=1 dungeon=18 cleared=0 bosses=1/2 wipes=0 time=301 reason=no boss left on the route
 '''
 
@@ -130,7 +156,13 @@ def selftest():
     assert "| Ragefire Chasm | 61408 Adarogg | 1 | 0 | 0 | 0 | 0 | 0 |" in text, text
     assert "| Ragefire Chasm | NO_PATH | 61412 | Dark Shaman Koranthal | 1 | no path from 1,2,3 to 4,5,6 (a closed door or a missing bridge?) |" in text, text
     assert "| Ragefire Chasm | NO DAMAGE (giveup) | 11319 | Ragefire Shaman | 1 | health 100% |" in text, text
-    assert "EVADE (reset) | 61412 | Dark Shaman Koranthal | 1 |" in text and "## Likely bugs (3)" in text, text
+    assert "EVADE (reset) | 61412 | Dark Shaman Koranthal | 1 |" in text and "## Likely bugs (5)" in text, text
+    assert "| Ragefire Chasm | 5723 Testing an Enemy's Strength | 1 | 0 |  |" in text, text
+    assert "| Ragefire Chasm | 5728 Hidden Enemies | 0 | 1 | 0:MONSTER:11518:2/6 (killed 3, credit 0),1:ITEM:14544:0/1 (never dropped) |" in text, text
+    assert "| Ragefire Chasm | 5761 Slaying the Beast | 0 | 1 | 0:MONSTER:11520:0/1 |" in text, text
+    assert "| Ragefire Chasm | QUEST no kill credit | 5728 | Hidden Enemies | 1 |" in text, text
+    assert "| Ragefire Chasm | QUEST item never dropped | 5728 | Hidden Enemies | 1 |" in text, text
+    assert "57" not in text.split("## Quests")[0], text   # no quest in the boss table
     print("selftest ok")
 
 
