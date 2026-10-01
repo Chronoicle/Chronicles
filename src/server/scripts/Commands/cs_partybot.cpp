@@ -3,6 +3,8 @@
  * .partybot add <name|tank|healer|dps|spec|class>   a bot joins your group
  * .partybot remove [character]  dismiss one bot, or all of yours
  * .partybot list                your bots
+ * .partybot questtest <class> [race] [max level] | stop   a fresh level-1 bot plays its starting zone's quests and logs
+ *                               each quest's result (QUESTBOT lines in Server.log, game/PartyBot/QuestBot.cpp)
  * Staff only while the bots are being built (#65).
  */
 #include "ScriptMgr.h"
@@ -26,6 +28,7 @@ public:
             { "create", SEC_GAMEMASTER, false, &HandleCreateCommand, "" },
             { "remove", SEC_GAMEMASTER, false, &HandleRemoveCommand, "" },
             { "list",   SEC_GAMEMASTER, false, &HandleListCommand,   "" },
+            { "questtest", SEC_GAMEMASTER, false, &HandleQuestTestCommand, "" },
         };
         static std::vector<ChatCommand> commandTable =
         {
@@ -111,6 +114,28 @@ public:
     {
         std::string error = sPartyBotMgr->RemoveBot(handler->GetSession()->GetPlayer(), args ? args : "");
         handler->SendSysMessage(error.empty() ? "Party bot dismissed." : error.c_str());
+        return true;
+    }
+
+    static bool HandleQuestTestCommand(ChatHandler* handler, char const* args)
+    {
+        std::string text = args ? args : "";
+        Player* gm = handler->GetSession()->GetPlayer();
+        if (boost::iequals(text, "stop"))
+        {
+            uint32 stopped = 0;
+            for (auto const& session : sPartyBotMgr->GetBots(gm->GetGUID()))
+                if (session->IsQuestTest())
+                {
+                    session->RequestDismiss();
+                    ++stopped;
+                }
+            handler->SendSysMessage(stopped ? "Quest test stopped." : "You have no quest test running.");
+            return true;
+        }
+
+        std::string error = sPartyBotMgr->StartQuestTest(gm, text);
+        handler->SendSysMessage(error.empty() ? "Quest test bot is logging in: QUESTBOT lines in Server.log, .partybot questtest stop to end it." : error.c_str());
         return true;
     }
 

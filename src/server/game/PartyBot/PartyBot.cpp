@@ -29,10 +29,10 @@
 
 // ---------------------------------------------------------------- session
 
-PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, ObjectGuid botGuid, ObjectGuid leaderGuid) :
+PartyBotSession::PartyBotSession(uint32 accountId, std::string&& accountName, ObjectGuid botGuid, ObjectGuid leaderGuid, uint8 questMaxLevel) :
     WorldSession(accountId, std::move(accountName), nullptr, SEC_PLAYER, CURRENT_EXPANSION, 0, "Win", LOCALE_enUS, 0, false,
         AT_AUTH_FLAG_NONE, std::unordered_map<uint8, int64>()),
-    _botGuid(botGuid), _leaderGuid(leaderGuid)
+    _botGuid(botGuid), _leaderGuid(leaderGuid), _questMaxLevel(questMaxLevel)
 {
 }
 
@@ -85,6 +85,26 @@ bool PartyBotSession::Update(uint32 diff, Map* map)
 
     if (!_setupDone && !_dismissed)
         Setup(bot);
+
+    // quest test: no leader, no group. Dead: up again where it fell after 10 s (the AI only runs while alive)
+    if (IsQuestTest())
+    {
+        if (_dismissed || !bot->isDead(false))
+            _deadTimer = 0;
+        else
+        {
+            if (!_deadTimer)
+                TC_LOG_INFO("server.questbot", "QUESTBOT event=died bot=%s level=%u pos=%u:%.1f,%.1f,%.1f", bot->GetName(), bot->getLevel(),
+                    bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ());
+            if ((_deadTimer += std::max<uint32>(diff, 1)) > 10 * IN_MILLISECONDS)
+            {
+                _deadTimer = 0;
+                bot->ResurrectPlayer(1.0f);
+                bot->SpawnCorpseBones();
+            }
+        }
+        return result;
+    }
 
     // dead: come back when the leader is alive and the group out of combat (here, as Player::Update only runs the
     // AI while the bot is alive): go to the leader, then resurrect there
@@ -244,6 +264,13 @@ void PartyBotSession::FillArtifacts(Player* bot)
 void PartyBotSession::Setup(Player* bot)
 {
     _setupDone = true;
+
+    if (IsQuestTest())                  // a fresh level-1 character: no party bot setup, no group
+    {
+        bot->SetAI(NewQuestBotAI(bot, _leaderGuid, _questMaxLevel));
+        bot->IsAIEnabled = true;
+        return;
+    }
 
     if (QueryResult result = CharacterDatabase.PQuery("SELECT spec FROM partybot_characters WHERE guid = %u AND setup = 0", bot->GetGUIDLow()))
         FirstLoginSetup(bot, (*result)[0].GetUInt32());
@@ -889,11 +916,10 @@ static uint8 BotRace(uint8 cls, bool alliance)
     }
 }
 
-static std::string BotName(ChrSpecializationEntry const* spec)
+static std::string BotName(std::string const& raw)
 {
-    // letters of spec + class, e.g. Holypaladin; letters a..z at the end when the name is taken
+    // letters of raw (spec + class, e.g. Holypaladin); letters a..z at the end when the name is taken
     std::string base;
-    std::string raw = std::string(spec->Name->Str[DEFAULT_LOCALE]) + sChrClassesStore.AssertEntry(spec->ClassID)->Name->Str[DEFAULT_LOCALE];
     for (char c : raw)
         if (isalpha(c))
             base += char(base.empty() ? toupper(c) : tolower(c));
@@ -910,40 +936,30 @@ static std::string BotName(ChrSpecializationEntry const* spec)
     return "";
 }
 
-std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& name)
+uint32 PartyBotMgr::FreeBotAccount()
 {
-    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(specId);
-    if (!spec || !spec->ClassID || spec->ClassID >= MAX_CLASSES)
-        return "Unknown specialization.";
-
-    // a partybot account without characters
-    uint32 accountId = 0;
     if (QueryResult accounts = LoginDatabase.Query("SELECT id FROM account WHERE username LIKE 'PARTYBOT%@BOT' ORDER BY id"))
     {
         do
         {
             uint32 id = (*accounts)[0].GetUInt32();
             if (!_usedAccounts.count(id) && !CharacterDatabase.PQuery("SELECT 1 FROM characters WHERE account = %u LIMIT 1", id))
-            {
-                accountId = id;
-                break;
-            }
+                return id;
         } while (accounts->NextRow());
     }
-    if (!accountId)
-        return "No free partybot account left (partybotN@bot).";
+    return 0;
+}
 
-    name = BotName(spec);
-    if (name.empty())
-        return "Could not find a free name.";
-
+// a level-1 character on a bot account, as the character screen makes it (without a client); empty guid on failure
+static ObjectGuid NewCharacter(uint32 accountId, uint8 race, uint8 cls, std::string const& name)
+{
     std::string accountName;
     AccountMgr::GetName(accountId, accountName);
     PartyBotSession session(accountId, std::move(accountName), ObjectGuid::Empty, ObjectGuid::Empty);
 
     WorldPackets::Character::CharacterCreateInfo info;
-    info.Race = BotRace(spec->ClassID, creator->GetTeam() == ALLIANCE);
-    info.Class = spec->ClassID;
+    info.Race = race;
+    info.Class = cls;
     info.Sex = urand(0, 1) ? GENDER_MALE : GENDER_FEMALE;
     info.Name = name;
     info.CustomDisplay.fill(0);
@@ -953,19 +969,130 @@ std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& 
     if (!newChar.Create(sObjectMgr->GetGenerator<HighGuid::Player>()->Generate(), &info))
     {
         newChar.CleanupsBeforeDelete();
-        return "The character could not be created.";
+        return ObjectGuid::Empty;
     }
 
-    _usedAccounts.insert(accountId);
     newChar.setCinematic(1);
     newChar.SaveToDB(true);
     sWorld->AddCharacterInfo(newChar.GetGUID(), accountId, name, newChar.getGender(), newChar.getRace(), newChar.getClass(), newChar.getLevel());
     sWorld->UpdateCharacterAccount(newChar.GetGUID(), accountId);
-    CharacterDatabase.PExecute("REPLACE INTO partybot_characters (guid, account, spec, setup) VALUES (%u, %u, %u, 0)", newChar.GetGUIDLow(), accountId, specId);
     newChar.GetAchievementMgr()->ClearMap();
     newChar.CleanupsBeforeDelete();
+    return newChar.GetGUID();
+}
+
+std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& name)
+{
+    ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(specId);
+    if (!spec || !spec->ClassID || spec->ClassID >= MAX_CLASSES)
+        return "Unknown specialization.";
+
+    uint32 accountId = FreeBotAccount();
+    if (!accountId)
+        return "No free partybot account left (partybotN@bot).";
+
+    name = BotName(std::string(spec->Name->Str[DEFAULT_LOCALE]) + sChrClassesStore.AssertEntry(spec->ClassID)->Name->Str[DEFAULT_LOCALE]);
+    if (name.empty())
+        return "Could not find a free name.";
+
+    ObjectGuid guid = NewCharacter(accountId, BotRace(spec->ClassID, creator->GetTeam() == ALLIANCE), spec->ClassID, name);
+    if (guid.IsEmpty())
+        return "The character could not be created.";
+
+    _usedAccounts.insert(accountId);
+    CharacterDatabase.PExecute("REPLACE INTO partybot_characters (guid, account, spec, setup) VALUES (%u, %u, %u, 0)", guid.GetCounter(), accountId, specId);
 
     TC_LOG_INFO("server.partybot", "Party bot character %s (spec %u, account %u) created by %s", name.c_str(), specId, accountId, creator->GetName());
+    return "";
+}
+
+// .partybot questtest <class> [race] [max level] (owner 2026-10-01, #65): a fresh level-1 character of that race and
+// class (default: the GM's faction, like .partybot create) plays its starting zone's quests alone (QuestBot.cpp). Each
+// run starts from level 1: the previous quest-test character of that race and class is deleted first. Only characters
+// named Qt... on a partybot account that are no party bot (no partybot_characters row) are ever deleted.
+std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
+{
+    uint8 maxLevel = 5;
+    size_t space = text.find_last_of(' ');
+    if (space != std::string::npos && isdigit(uint8(text[space + 1])))
+    {
+        maxLevel = uint8(std::min(atoi(text.c_str() + space + 1), int(MAX_LEVEL)));
+        text.resize(space);
+    }
+
+    // the class name starts the text (death knight, demon hunter have a space), the race is the rest
+    ChrClassesEntry const* classEntry = nullptr;
+    for (uint32 cls = 1; cls < MAX_CLASSES && !classEntry; ++cls)
+        if (ChrClassesEntry const* entry = sChrClassesStore.LookupEntry(cls))
+        {
+            std::string className = entry->Name->Str[DEFAULT_LOCALE];
+            if (boost::istarts_with(text, className) && (text.size() == className.size() || text[className.size()] == ' '))
+            {
+                classEntry = entry;
+                text = text.size() > className.size() ? text.substr(className.size() + 1) : "";
+            }
+        }
+    if (!classEntry || !maxLevel)
+        return "Usage: .partybot questtest <class> [race] [max level, default 5]   e.g. .partybot questtest warrior human";
+
+    uint8 cls = classEntry->ID;
+    uint8 race = BotRace(cls, gm->GetTeam() == ALLIANCE);
+    if (!text.empty())
+    {
+        race = 0;
+        for (ChrRacesEntry const* entry : sChrRacesStore)
+            if (boost::iequals(std::string(entry->Name->Str[DEFAULT_LOCALE]), text))
+                race = entry->ID;
+        if (!race)
+            return "Unknown race '" + text + "'.";
+    }
+    std::string raceName = sChrRacesStore.AssertEntry(race)->Name->Str[DEFAULT_LOCALE];
+
+    // the previous quest-test character of this race and class (a player's Qt... character is skipped)
+    uint32 accountId = 0;
+    ObjectGuid oldGuid;
+    if (QueryResult result = CharacterDatabase.PQuery("SELECT c.guid, c.account FROM characters c LEFT JOIN partybot_characters p ON p.guid = c.guid "
+        "WHERE p.guid IS NULL AND c.name LIKE 'Qt%%' AND c.race = %u AND c.class = %u", race, cls))
+        do
+        {
+            uint32 account = (*result)[1].GetUInt32();
+            if (LoginDatabase.PQuery("SELECT 1 FROM account WHERE id = %u AND username LIKE 'PARTYBOT%%@BOT'", account))
+            {
+                oldGuid = ObjectGuid::Create<HighGuid::Player>((*result)[0].GetUInt64());
+                accountId = account;
+                break;
+            }
+        } while (result->NextRow());
+
+    if (!oldGuid.IsEmpty() && (ObjectAccessor::FindPlayer(oldGuid) || sWorld->FindSession(accountId)))
+        return "A quest test of this race and class is running, or its account is in use (.partybot questtest stop).";
+    if (!accountId && !(accountId = FreeBotAccount()))
+        return "No free partybot account left (partybotN@bot).";
+
+    std::string name = BotName("Qt" + raceName + classEntry->Name->Str[DEFAULT_LOCALE]);   // the old name is still taken
+    if (name.empty())
+        return "Could not find a free name.";
+
+    if (!oldGuid.IsEmpty())
+    {
+        sWorld->DeleteCharacterNameData(oldGuid);
+        Player::DeleteFromDB(oldGuid, accountId, true, true);
+    }
+
+    ObjectGuid guid = NewCharacter(accountId, race, cls, name);
+    if (guid.IsEmpty())
+        return "The character could not be created (" + raceName + " " + classEntry->Name->Str[DEFAULT_LOCALE] + " allowed?).";
+    _usedAccounts.insert(accountId);
+
+    std::string accountName;
+    AccountMgr::GetName(accountId, accountName);
+    std::shared_ptr<PartyBotSession> session = std::make_shared<PartyBotSession>(accountId, std::move(accountName), guid, gm->GetGUID(), maxLevel);
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        _bots.push_back(session);
+    }
+    sWorld->AddSession(session);
+    TC_LOG_INFO("server.questbot", "QUESTBOT event=create bot=%s race=%u class=%u maxlevel=%u account=%u by=%s", name.c_str(), race, cls, maxLevel, accountId, gm->GetName());
     return "";
 }
 
