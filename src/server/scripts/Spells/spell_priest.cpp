@@ -1928,6 +1928,26 @@ class spell_pri_shadow_crash : public SpellScript
     }
 };
 
+// 124430 - Shadowy Insight (the buff of the talent 162452, a 10% proc on Shadow Word: Pain ticks): "resets the remaining
+// cooldown on Mind Blast and your next Mind Blast is instant". The buff only carried the instant cast (-100% cast time on
+// Mind Blast), nothing reset the cooldown, so a proc did nothing until Mind Blast came back by itself (owner 2026-10-01:
+// "doesn't feel like it's procing")
+class spell_pri_shadowy_insight : public AuraScript
+{
+    PrepareAuraScript(spell_pri_shadowy_insight);
+
+    void OnApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        if (Player* player = GetTarget()->ToPlayer())
+            player->RemoveSpellCooldown(8092, true);    // Mind Blast (also restores its charge)
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_pri_shadowy_insight::OnApply, EFFECT_0, SPELL_AURA_ADD_PCT_MODIFIER, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
 void AddSC_priest_spell_scripts()
 {
     new spell_pri_spirit_shell();
@@ -1971,4 +1991,5 @@ void AddSC_priest_spell_scripts()
     RegisterAuraScript(spell_pri_mind_flay);
     RegisterSpellScript(spell_pri_mass_dispel);
     RegisterSpellScript(spell_pri_shadow_crash);
+    RegisterAuraScript(spell_pri_shadowy_insight);
 }
