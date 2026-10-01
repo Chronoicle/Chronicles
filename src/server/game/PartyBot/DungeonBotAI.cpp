@@ -13,9 +13,14 @@
  * within 20 yd of the tank on the way, one pack at a time, rest between pulls. A boss is dead when its encounter bit is
  * in the instance's completed mask (or its creature is dead). Runs in Player::Update on the tank's map thread; while the
  * tank is dead Player::Update doesn't run the AI, so the run manager calls DungeonLeaderDeadUpdate from the session.
+ *
+ * Watch export (owner: a website to watch the runs, tools/website/botwatch.php): with PartyBot.WatchDir set, every 2 s
+ * the run's state goes to <dir>/run_<id>.json (written to .tmp, then renamed): bosses, bots, the tank's trail, the last
+ * 25 DUNGEONBOT lines.
  */
 #include "PartyBot.h"
 #include "CellImpl.h"
+#include "Config.h"
 #include "DB2Stores.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -29,6 +34,11 @@
 #include "PathGenerator.h"
 #include "Player.h"
 #include <algorithm>
+#include <cstdarg>
+#include <cstdio>
+#include <ctime>
+#include <deque>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 
@@ -48,6 +58,9 @@ namespace
     float const PullRange       = 20.0f;
     float const GroupRange      = 30.0f;                            // wait for members further away
     float const BossDist        = 8.0f;                             // close enough to the boss spot
+    uint32 const WatchMs        = 2 * IN_MILLISECONDS;              // watch export interval
+    size_t const WatchEvents    = 25;
+    size_t const WatchTrail     = 120;
 
     enum Result { RESULT_KILLED, RESULT_WIPE, RESULT_EVADE, RESULT_STUCK, RESULT_NO_PATH, RESULT_NOT_FOUND, MAX_RESULT };
     char const* const ResultNames[MAX_RESULT] = { "KILLED", "WIPE", "EVADE", "STUCK", "NO_PATH", "NOT_FOUND" };
@@ -61,7 +74,53 @@ namespace
         Position Pos;
         bool HasPos;
         uint8 Wipes;
+        char const* Status;             // watch export: killed / alive / current, kept for the export after the run
+        float Hp;
     };
+
+    // PartyBot.WatchDir (worldserver.conf), read once: "" = no watch export
+    std::string const& WatchDir()
+    {
+        static std::string const dir = sConfigMgr->GetStringDefault("PartyBot.WatchDir", "");
+        return dir;
+    }
+
+    std::string JsonString(std::string const& text)
+    {
+        std::string out = "\"";
+        for (unsigned char c : text)
+        {
+            if (c == '"' || c == '\\')
+                out += '\\', out += char(c);
+            else if (c < 0x20)
+            {
+                char buf[8];
+                snprintf(buf, sizeof(buf), "\\u%04x", c);
+                out += buf;
+            }
+            else
+                out += char(c);
+        }
+        return out + '"';
+    }
+
+    char const* PowerName(Powers power)
+    {
+        switch (power)
+        {
+            case POWER_MANA: return "mana";
+            case POWER_RAGE: return "rage";
+            case POWER_FOCUS: return "focus";
+            case POWER_ENERGY: return "energy";
+            case POWER_RUNIC_POWER: return "runic power";
+            case POWER_LUNAR_POWER: return "astral power";
+            case POWER_MAELSTROM: return "maelstrom";
+            case POWER_INSANITY: return "insanity";
+            case POWER_FURY: return "fury";
+            case POWER_PAIN: return "pain";
+            default: return "other";
+        }
+    }
 
     // creature in range that the tank sees and the predicate accepts, the nearest (the searcher keeps the last match)
     struct NearestCheck
@@ -95,6 +154,8 @@ private:
     enum class Move { Arrived, Moving, Failed };
 
     bool Tick(uint32 diff);
+    void Log(char const* format, ...);
+    void WriteWatch(bool ended);
     void Start();
     std::vector<Player*> Members(bool aliveOnly) const;
     bool GroupInCombat() const;
@@ -148,6 +209,12 @@ private:
     float _moveBest = 0.0f;
     uint32 _moveMs = 0;
     bool _noPath = false;
+
+    // watch export
+    char const* _state = "gather";      // gather / walk / pull / fight / rest / wipe / ended
+    uint32 _watchMs = 0;
+    std::deque<std::pair<std::string, std::string>> _events;  // UTC hh:mm:ss, line without "DUNGEONBOT "
+    std::deque<Position> _trail;        // the tank, one point per export
 };
 
 PlayerAI* NewDungeonLeaderAI(Player* tank, uint32 runId)
@@ -166,8 +233,11 @@ DungeonLeaderAI::~DungeonLeaderAI()
 {
     // stopped (.partybot dungeontest stop); no `me` here: only the AI's own fields
     if (_started && !_finished)
-        TC_LOG_INFO("server.questbot", "DUNGEONBOT run=end run=%u dungeon=%u cleared=0 bosses=%u/%u wipes=%u time=%u reason=stopped",
+    {
+        Log("run=end run=%u dungeon=%u cleared=0 bosses=%u/%u wipes=%u time=%u reason=stopped",
             _runId, _dungeonId, _killed, uint32(_bosses.size()), _wipes, _runMs / IN_MILLISECONDS);
+        WriteWatch(true);
+    }
 }
 
 bool DungeonLeaderAI::Tick(uint32 diff)
@@ -178,7 +248,112 @@ bool DungeonLeaderAI::Tick(uint32 diff)
     _tick = _elapsed;
     _elapsed = 0;
     _runMs += _tick;
+    if ((_watchMs += _tick) >= WatchMs)
+    {
+        _watchMs = 0;
+        WriteWatch(false);
+    }
     return true;
+}
+
+// a DUNGEONBOT log line, also kept for the watch export (the last 25)
+void DungeonLeaderAI::Log(char const* format, ...)
+{
+    char text[1024];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(text, sizeof(text), format, args);
+    va_end(args);
+    TC_LOG_INFO("server.questbot", "DUNGEONBOT %s", text);
+
+    if (WatchDir().empty())
+        return;
+    uint32 secs = uint32(time(nullptr) % DAY);
+    char clock[16];
+    snprintf(clock, sizeof(clock), "%02u:%02u:%02u", secs / HOUR, secs % HOUR / MINUTE, secs % MINUTE);
+    _events.emplace_back(clock, text);
+    if (_events.size() > WatchEvents)
+        _events.pop_front();
+}
+
+// <dir>/run_<id>.json for tools/website/botwatch.php. ended: the last write (Finish, or the destructor: no `me` there,
+// the bosses keep their last status and there are no bots)
+void DungeonLeaderAI::WriteWatch(bool ended)
+{
+    std::string const& dir = WatchDir();
+    if (dir.empty())
+        return;
+
+    if (ended)
+        _state = "ended";
+    else if (!me->IsInWorld())          // between maps: next time
+        return;
+    else
+    {
+        _trail.push_back(me->GetPosition());
+        if (_trail.size() > WatchTrail)
+            _trail.pop_front();
+        InstanceScript* instance = me->GetInstanceScript();
+        for (size_t i = 0; i < _bosses.size(); ++i)
+        {
+            DungeonBoss& boss = _bosses[i];
+            Creature* creature = instance ? instance->GetCreatureByEntry(boss.Entry) : nullptr;
+            bool done = BossDone(boss) || (creature && !creature->IsAlive());
+            boss.Status = done ? "killed" : i == _bossIndex ? "current" : "alive";
+            boss.Hp = done ? 0.0f : creature ? creature->GetHealthPct() : 100.0f;
+        }
+    }
+
+    std::ostringstream json;
+    json << std::fixed << std::setprecision(1) << "{\"run\":" << _runId << ",\"dungeon\":" << _dungeonId << ",\"name\":" << JsonString(_dungeonName)
+        << ",\"map\":" << _mapId << ",\"instance\":" << (ended ? 0 : me->GetInstanceId()) << ",\"level\":" << (ended ? 0 : uint32(me->getLevel()))
+        << ",\"state\":\"" << _state << "\",\"updated\":" << uint64(time(nullptr)) << ",\"elapsed\":" << _runMs / IN_MILLISECONDS
+        << ",\"wipes\":" << _wipes << ",\"killed\":" << _killed << ",\"total\":" << _bosses.size() << ",\"bosses\":[";
+    for (size_t i = 0; i < _bosses.size(); ++i)
+    {
+        DungeonBoss const& boss = _bosses[i];
+        json << (i ? "," : "") << "{\"entry\":" << boss.Entry << ",\"name\":" << JsonString(boss.Name) << ",\"x\":" << boss.Pos.GetPositionX()
+            << ",\"y\":" << boss.Pos.GetPositionY() << ",\"z\":" << boss.Pos.GetPositionZ() << ",\"status\":\"" << boss.Status
+            << "\",\"hp\":" << boss.Hp << "}";
+    }
+    json << "],\"bots\":[";
+    if (!ended)
+    {
+        bool first = true;
+        for (Player* bot : Members(false))
+        {
+            ChrClassesEntry const* classEntry = sChrClassesStore.LookupEntry(bot->getClass());
+            ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(bot->GetSpecializationId());
+            char const* className = classEntry && classEntry->Name ? classEntry->Name->Str[DEFAULT_LOCALE] : nullptr;
+            char const* specName = spec && spec->Name ? spec->Name->Str[DEFAULT_LOCALE] : nullptr;
+            Unit* target = bot->getVictim();
+            json << (first ? "" : ",") << "{\"name\":" << JsonString(bot->GetName()) << ",\"class\":" << JsonString(className ? className : "")
+                << ",\"spec\":" << JsonString(specName ? specName : "") << ",\"role\":\""
+                << (!spec ? "dps" : spec->Role == 0 ? "tank" : spec->Role == 1 ? "healer" : "dps") << "\",\"level\":" << uint32(bot->getLevel())
+                << ",\"hp\":" << bot->GetHealth() << ",\"maxhp\":" << bot->GetMaxHealth() << ",\"power\":" << bot->GetPowerPct(bot->GetPowerType())
+                << ",\"powerType\":\"" << PowerName(bot->GetPowerType()) << "\",\"alive\":" << (bot->IsAlive() ? "true" : "false")
+                << ",\"x\":" << bot->GetPositionX() << ",\"y\":" << bot->GetPositionY() << ",\"z\":" << bot->GetPositionZ()
+                << ",\"o\":" << bot->GetOrientation() << ",\"target\":" << JsonString(target ? target->GetName() : "")
+                << ",\"targetHp\":" << (target ? target->GetHealthPct() : 0.0f) << "}";
+            first = false;
+        }
+    }
+    json << "],\"trail\":[";
+    for (size_t i = 0; i < _trail.size(); ++i)
+        json << (i ? "," : "") << "[" << _trail[i].GetPositionX() << "," << _trail[i].GetPositionY() << "]";
+    json << "],\"events\":[";
+    for (size_t i = 0; i < _events.size(); ++i)
+        json << (i ? "," : "") << "{\"t\":\"" << _events[i].first << "\",\"text\":" << JsonString(_events[i].second) << "}";
+    json << "]}\n";
+
+    std::string path = dir + "/run_" + std::to_string(_runId) + ".json";
+    {
+        std::ofstream out(path + ".tmp", std::ios::trunc);
+        if (!out)
+            return;
+        out << json.str();
+    }
+    std::rename((path + ".tmp").c_str(), path.c_str());
 }
 
 std::vector<Player*> DungeonLeaderAI::Members(bool aliveOnly) const
@@ -233,7 +408,7 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
     if (_wiped)                         // up again after a wipe: the members follow the session's resurrection
     {
         _wiped = false;
-        TC_LOG_INFO("server.questbot", "DUNGEONBOT event=resurrect run=%u dungeon=%u map=%u bot=%s at=entrance", _runId, _dungeonId, _mapId, _name.c_str());
+        Log("event=resurrect run=%u dungeon=%u map=%u bot=%s at=entrance", _runId, _dungeonId, _mapId, _name.c_str());
     }
 
     if (me->IsNonMeleeSpellCast(false))
@@ -278,6 +453,7 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
         _restMs = 0;
     else if ((_restMs += _tick) < RestMaxMs)
     {
+        _state = "rest";
         StandStill();
         CastRotation(nullptr);
         return;
@@ -291,10 +467,11 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
                 && !Ignored(creature->GetGUID()) && !creature->IsCritter();
         }, PullRange))
     {
-        TC_LOG_INFO("server.questbot", "DUNGEONBOT event=pull run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" at=%.1f,%.1f,%.1f boss=%u",
+        Log("event=pull run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" at=%.1f,%.1f,%.1f boss=%u",
             _runId, _dungeonId, _mapId, _name.c_str(), pull->GetEntry(), pull->GetName(), pull->GetPositionX(), pull->GetPositionY(),
             pull->GetPositionZ(), boss->Entry);
         Fight(pull);
+        _state = "pull";
         return;
     }
 
@@ -313,6 +490,7 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
     switch (MoveTo(creature && creature->IsAlive() ? creature->GetPosition() : boss->Pos, BossDist))
     {
         case Move::Moving:
+            _state = "walk";
             return;
         case Move::Failed:
         {
@@ -328,7 +506,7 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
     }
     if (creature && creature->IsAlive() && me->IsValidAttackTarget(creature))
     {
-        TC_LOG_INFO("server.questbot", "DUNGEONBOT event=pull run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" boss=%u",
+        Log("event=pull run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" boss=%u",
             _runId, _dungeonId, _mapId, _name.c_str(), creature->GetEntry(), creature->GetName(), boss->Entry);
         Fight(creature);
         return;
@@ -364,7 +542,7 @@ void DungeonLeaderAI::Start()
             {
                 char const* name = encounter->dbcEntry->Name ? encounter->dbcEntry->Name->Str[sObjectMgr->GetDBCLocaleIndex()] : nullptr;
                 _bosses.push_back({ encounter->creditEntry, encounter->dbcEntry->Bit, encounter->dbcEntry->OrderIndex,
-                    name ? name : "", Position(), false, 0 });
+                    name ? name : "", Position(), false, 0, "alive", 100.0f });
             }
     std::stable_sort(_bosses.begin(), _bosses.end(), [](DungeonBoss const& a, DungeonBoss const& b) { return a.Order < b.Order; });
 
@@ -382,7 +560,7 @@ void DungeonLeaderAI::Start()
     std::ostringstream route;
     for (DungeonBoss const& boss : _bosses)
         route << (route.tellp() ? "," : "") << boss.Entry << (boss.HasPos ? "" : "?") << (BossDone(boss) ? "(done)" : "");
-    TC_LOG_INFO("server.questbot", "DUNGEONBOT event=start run=%u dungeon=%u map=%u bot=%s \"%s\" difficulty=%u level=%u members=%u bosses=%u route=%s",
+    Log("event=start run=%u dungeon=%u map=%u bot=%s \"%s\" difficulty=%u level=%u members=%u bosses=%u route=%s",
         _runId, _dungeonId, _mapId, _name.c_str(), _dungeonName.c_str(), uint32(map->GetDifficultyID()), me->getLevel(),
         uint32(Members(true).size()), uint32(_bosses.size()), route.str().c_str());
 
@@ -395,6 +573,7 @@ void DungeonLeaderAI::Start()
 void DungeonLeaderAI::Fight(Unit* target)
 {
     _fighting = true;
+    _state = "fight";
     _moveDest = Position();             // the walk measure starts again after a fight
     _restMs = 0;
 
@@ -422,7 +601,7 @@ void DungeonLeaderAI::Fight(Unit* target)
     }
     else if ((_targetMs += _tick) > TargetGiveUpMs)
     {
-        TC_LOG_INFO("server.questbot", "DUNGEONBOT event=giveup run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" health=%.0f%% reason=no damage for 45 s",
+        Log("event=giveup run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" health=%.0f%% reason=no damage for 45 s",
             _runId, _dungeonId, _mapId, _name.c_str(), target->GetEntry(), target->GetName(), target->GetHealthPct());
         Ignore(target->GetGUID());
         me->AttackStop();
@@ -463,7 +642,7 @@ void DungeonLeaderAI::AfterFight()
                 if (++boss->Wipes >= MaxWipes)
                     BossResult(RESULT_EVADE, detail.str() + ", 3rd time: end");
                 else
-                    TC_LOG_INFO("server.questbot", "DUNGEONBOT event=evade run=%u dungeon=%u map=%u bot=%s boss=%u detail=%s",
+                    Log("event=evade run=%u dungeon=%u map=%u bot=%s boss=%u detail=%s",
                         _runId, _dungeonId, _mapId, _name.c_str(), boss->Entry, detail.str().c_str());
             }
             else if (!creature->IsAlive())
@@ -495,6 +674,7 @@ void DungeonLeaderAI::DeadUpdate(uint32 diff)
 
     // everyone dead: a wipe. Log it once, then the tank back to the entrance and up; the members' sessions take them to
     // the tank and resurrect them there (PartyBotSession: leader alive, group out of combat)
+    _state = "wipe";
     if (!_wiped)
     {
         _wiped = true;
@@ -507,7 +687,7 @@ void DungeonLeaderAI::DeadUpdate(uint32 diff)
         std::ostringstream detail;
         detail << (_bossEngaged ? "boss at " : "trash, boss not engaged; boss at ") << std::fixed << std::setprecision(0) << _bossPct
             << "%, first dead " << _firstDead;
-        TC_LOG_INFO("server.questbot", "DUNGEONBOT event=wipe run=%u dungeon=%u map=%u bot=%s boss=%u wipes=%u detail=%s",
+        Log("event=wipe run=%u dungeon=%u map=%u bot=%s boss=%u wipes=%u detail=%s",
             _runId, _dungeonId, _mapId, _name.c_str(), boss ? boss->Entry : 0, uint32(wipes), detail.str().c_str());
         _bossEngaged = false;
         _bossGuid.Clear();
@@ -556,7 +736,7 @@ void DungeonLeaderAI::BossResult(Result result, std::string const& detail)
         return;
     if (result == RESULT_KILLED)
         ++_killed;
-    TC_LOG_INFO("server.questbot", "DUNGEONBOT run=%u dungeon=%u \"%s\" boss=%u \"%s\" result=%s time=%u level=%u wipes=%u detail=%s",
+    Log("run=%u dungeon=%u \"%s\" boss=%u \"%s\" result=%s time=%u level=%u wipes=%u detail=%s",
         _runId, _dungeonId, _dungeonName.c_str(), boss->Entry, boss->Name.c_str(), ResultNames[result], _bossMs / IN_MILLISECONDS,
         me->getLevel(), uint32(boss->Wipes), detail.empty() ? "-" : detail.c_str());
 
@@ -576,10 +756,11 @@ void DungeonLeaderAI::Finish(std::string const& reason)
         return;
     _finished = true;
     bool cleared = !_bosses.empty() && _killed == _bosses.size();
-    TC_LOG_INFO("server.questbot", "DUNGEONBOT run=end run=%u dungeon=%u cleared=%u bosses=%u/%u wipes=%u time=%u reason=%s",
+    Log("run=end run=%u dungeon=%u cleared=%u bosses=%u/%u wipes=%u time=%u reason=%s",
         _runId, _dungeonId, uint32(cleared), _killed, uint32(_bosses.size()), _wipes, _runMs / IN_MILLISECONDS, reason.c_str());
     me->AttackStop();
     StandStill();
+    WriteWatch(true);
     DungeonRunEnded(_runId, cleared, reason);
 }
 
