@@ -102,7 +102,10 @@ MESH;
     }
     $f = $project_root . 'cache/botwatch/mesh_' . $map . '.json';
     if (!is_file($f)) { http_response_code(404); echo json_encode(['error' => 'no mesh']); exit; }
-    header('Cache-Control: max-age=3600');
+    // an open-world map's mesh would be too big for the tab (the converter is meant for dungeons) (dev-check)
+    if (filesize($f) > 20 * 1048576) { http_response_code(413); echo json_encode(['error' => 'mesh too big']); exit; }
+    header('Cache-Control: private, max-age=3600');     // an admin-only response: no shared proxy cache
+    ob_start('ob_gzhandler');                           // a few MB of numbers compress ~5x
     readfile($f);
     exit;
 }
