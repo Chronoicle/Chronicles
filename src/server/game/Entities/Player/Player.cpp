@@ -21592,7 +21592,7 @@ void Player::_LoadBGData(PreparedQueryResult result)
     m_bgData.TaxiPath[0]  = fields[7].GetUInt32();
     m_bgData.TaxiPath[1]  = fields[8].GetUInt32();
     m_bgData.MountSpellID   = fields[9].GetUInt32();
-    m_bgData.LastActiveSpecID = fields[10].GetUInt8();
+    m_bgData.LastActiveSpecID = fields[10].GetUInt16();  // SMALLINT, saved with setUInt16: GetUInt8 asserted on spec ids > 255 (crash loop 2026-10-01)
 }
 
 bool Player::LoadPositionFromDB(uint32& mapid, float& x, float& y, float& z, float& o, bool& in_flight, ObjectGuid guid)
