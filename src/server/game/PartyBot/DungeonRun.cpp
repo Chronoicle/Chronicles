@@ -119,6 +119,14 @@ namespace
     }
 
     // the specs of a role a character of this level can have, in random order
+    // below 30 several tank and healer specs lack their core spells (Ironfur / Ironskin Brew at 20, Holy Paladin no damage
+    // spell until 26, Lifebloom 20...): the first runs (2026-10-01) wiped with a Brewmaster and a Holy Paladin at 15.
+    // There: Protection Warrior tanks, Holy Priest / Restoration Shaman / Mistweaver heal
+    bool StrongAtLevel(uint32 specId, uint8 role, uint8 level)
+    {
+        return role == lfg::PLAYER_ROLE_DAMAGE || level >= 30 || specId == 73 || specId == 257 || specId == 264 || specId == 270;
+    }
+
     std::vector<uint32> SpecsFor(uint8 role, uint8 level)
     {
         std::vector<uint32> specs;
@@ -128,7 +136,7 @@ namespace
                 continue;                               // their characters start at 55 / 98
             for (uint32 i = 0; i < MAX_SPECIALIZATIONS; ++i)
                 if (ChrSpecializationEntry const* spec = sDB2Manager.GetChrSpecializationByIndex(cls, i))
-                    if (RoleOf(spec) == role)
+                    if (RoleOf(spec) == role && StrongAtLevel(spec->ID, role, level))
                         specs.push_back(spec->ID);
         }
         Trinity::Containers::RandomShuffle(specs);
@@ -533,7 +541,8 @@ std::string PartyBotMgr::PickDungeonBot(uint8 role, uint8 level, bool alliance, 
             ObjectGuid candidate = ObjectGuid::Create<HighGuid::Player>(fields[0].GetUInt64());
             ChrSpecializationEntry const* spec = sChrSpecializationStore.LookupEntry(fields[1].GetUInt32());
             uint32 account = fields[3].GetUInt32();
-            if (!spec || RoleOf(spec) != role || usedSpecs.count(spec->ID) || (Player::TeamForRace(fields[2].GetUInt8()) == ALLIANCE) != alliance
+            if (!spec || RoleOf(spec) != role || !StrongAtLevel(spec->ID, role, level) || usedSpecs.count(spec->ID)
+                || (Player::TeamForRace(fields[2].GetUInt8()) == ALLIANCE) != alliance
                 || ObjectAccessor::FindPlayer(candidate) || sWorld->FindSession(account) || InRun(candidate))
                 continue;
 

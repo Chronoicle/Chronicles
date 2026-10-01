@@ -205,6 +205,7 @@ private:
     uint64 _targetHealth = 0;
     uint32 _targetMs = 0;
     std::map<ObjectGuid, uint32> _ignore;   // guid -> until (_runMs)
+    std::set<uint32> _oddMobs;              // hostile creatures far above the group's level, logged once each
 
     Position _moveDest;
     float _moveBest = 0.0f;
@@ -468,8 +469,20 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
     // pull: the nearest hostile creature within 20 yd (the tank walks the path, so this is the path ahead), one at a time
     if (Creature* pull = NearestCreature([this](Creature* creature)
         {
-            return creature->IsAlive() && !creature->IsInEvadeMode() && me->IsValidAttackTarget(creature) && me->IsHostileTo(creature)
-                && !Ignored(creature->GetGUID()) && !creature->IsCritter();
+            if (!creature->IsAlive() || creature->IsInEvadeMode() || !me->IsValidAttackTarget(creature) || !me->IsHostileTo(creature)
+                || Ignored(creature->GetGUID()) || creature->IsCritter())
+                return false;
+            // a hostile creature far above the dungeon's level is no trash but wrong data (2026-10-01: Deadmines' level 85
+            // "Glubtok Firewall Platter Creature Level 1c" one-shot the level 15 group 6 times): logged once, not pulled
+            if (creature->getLevel() > me->getLevel() + 10)
+            {
+                if (_oddMobs.insert(creature->GetEntry()).second)
+                    Log("event=oddmob run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" level=%u at=%.1f,%.1f,%.1f detail=hostile, %u levels above the group: wrong data?",
+                        _runId, _dungeonId, _mapId, _name.c_str(), creature->GetEntry(), creature->GetName(), uint32(creature->getLevel()),
+                        creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), uint32(creature->getLevel() - me->getLevel()));
+                return false;
+            }
+            return true;
         }, PullRange))
     {
         Log("event=pull run=%u dungeon=%u map=%u bot=%s target=%u \"%s\" at=%.1f,%.1f,%.1f boss=%u",

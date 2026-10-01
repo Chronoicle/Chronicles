@@ -80,6 +80,8 @@ def report(lines):
         dungeon = r["name"] or names.get("dungeon") or "dungeon %s" % r["dungeon"]
         if event == "evade":
             bug(dungeon, "EVADE (reset)", f.get("boss", "?"), boss_names.get(f.get("boss")), f.get("detail", ""))
+        elif event == "oddmob":
+            bug(dungeon, "HOSTILE FAR ABOVE LEVEL", f.get("target", "?"), names.get("target"), f.get("detail", ""))
         elif event == "giveup":
             bug(dungeon, "NO DAMAGE (giveup)", f.get("target", "?"), names.get("target"), "health %s" % f.get("health", "?"))
         elif event is None and "result" in f:
