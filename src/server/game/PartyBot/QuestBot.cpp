@@ -32,6 +32,7 @@
 #include "MotionMaster.h"
 #include "ObjectMgr.h"
 #include "PathGenerator.h"
+#include "MoveSpline.h"
 #include "Player.h"
 #include "QuestData.h"
 #include "QuestDef.h"
@@ -882,7 +883,7 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
     float distance = me->GetExactDist(pos);
     if (distance <= dist)
     {
-        if (motion->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
+        if (!me->movespline->Finalized())
             StandStill();
         return Move::Arrived;
     }
@@ -903,18 +904,14 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
     }
 
     // a new destination, or the last walk ended (partial path, a fight): walk again
-    if (newDest || motion->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
+    if (newDest || me->movespline->Finalized())
     {
-        me->GetMap()->LoadGrid(pos.GetPositionX(), pos.GetPositionY());     // the path needs the destination's navmesh tile
-        PathGenerator path(me);
-        path.CalculatePath(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
-        if (path.GetPathType() & PATHFIND_NOPATH)
+        if (!WalkTo(pos))
         {
             _moveDest = Position();
             _noPath = true;
             return Move::Failed;
         }
-        motion->MovePoint(0, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), true);
     }
     return Move::Moving;
 }

@@ -32,6 +32,7 @@
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "PathGenerator.h"
+#include "MoveSpline.h"
 #include "Player.h"
 #include <algorithm>
 #include <cstdarg>
@@ -767,11 +768,10 @@ void DungeonLeaderAI::Finish(std::string const& reason)
 // walk (pathfinding) to within dist of pos. Failed: no path, or 60 s without getting closer (QuestBotAI::MoveTo)
 DungeonLeaderAI::Move DungeonLeaderAI::MoveTo(Position const& pos, float dist)
 {
-    MotionMaster* motion = me->GetMotionMaster();
     float distance = me->GetExactDist(pos);
     if (distance <= dist)
     {
-        if (motion->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE)
+        if (!me->movespline->Finalized())
             StandStill();
         return Move::Arrived;
     }
@@ -790,18 +790,14 @@ DungeonLeaderAI::Move DungeonLeaderAI::MoveTo(Position const& pos, float dist)
         return Move::Failed;
     }
 
-    if (newDest || motion->GetCurrentMovementGeneratorType() != POINT_MOTION_TYPE)
+    if (newDest || me->movespline->Finalized())
     {
-        me->GetMap()->LoadGrid(pos.GetPositionX(), pos.GetPositionY());     // the path needs the destination's navmesh tile
-        PathGenerator path(me);
-        path.CalculatePath(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
-        if (path.GetPathType() & PATHFIND_NOPATH)
+        if (!WalkTo(pos))
         {
             _moveDest = Position();
             _noPath = true;
             return Move::Failed;
         }
-        motion->MovePoint(0, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), true);
     }
     return Move::Moving;
 }

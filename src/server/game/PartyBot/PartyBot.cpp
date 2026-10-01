@@ -26,6 +26,7 @@
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "PathGenerator.h"
+#include "MoveSpline.h"
 #include <boost/algorithm/string/predicate.hpp>
 #include <sstream>
 
@@ -802,6 +803,22 @@ void PartyBotAI::PetAttack(Unit* target)
     charmInfo->SetIsFollowing(false);
     charmInfo->SetIsReturning(false);
     pet->AI()->AttackStart(target);
+}
+
+// walk to pos along the corners of the navmesh corridor (as far as it reaches; call again once the walk ended). The
+// default smooth path (MovePoint) gives up past ~300 yd (74 points of 4 yd) and read as "no path" for a quest NPC or a
+// spawn point further away (quest bots, 2026-10-01: Kurtok 300 yd from Northshire Abbey, Goldshire's innkeeper)
+bool PartyBotAI::WalkTo(Position const& pos)
+{
+    me->GetMap()->LoadGrid(pos.GetPositionX(), pos.GetPositionY());     // the path needs the destination's navmesh tile
+    PathGenerator path(me);
+    path.SetUseStraightPath(true);
+    path.CalculatePath(pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ());
+    Movement::PointsArray const& points = path.GetPath();
+    if ((path.GetPathType() & (PATHFIND_NOPATH | PATHFIND_SHORT)) || points.size() < 2)
+        return false;
+    me->GetMotionMaster()->MoveSmoothPath(0, points.data(), points.size(), false);
+    return true;
 }
 
 bool PartyBotAI::CastRotation(Unit* target)

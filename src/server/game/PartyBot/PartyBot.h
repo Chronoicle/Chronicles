@@ -90,6 +90,7 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     bool Approach(Unit* unit);                             // false: gave up (no path, or too long)
     void StandStill();
     void PetAttack(Unit* target);                         // the bot's pet attacks its target (pets start passive)
+    bool WalkTo(Position const& pos);                     // along the navmesh corridor's corners; false: no path
     void PositionRanged(Unit* target, Player* leader);
     void PositionHealer(Player* leader);
     uint32 GroupMembersBelow(int32 pct) const;
