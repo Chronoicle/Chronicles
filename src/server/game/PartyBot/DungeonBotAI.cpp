@@ -213,7 +213,13 @@ void DungeonLeaderAI::UpdateAI(uint32 diff)
         // wait at the entrance until the five are in the map and alive (after the Dungeon Finder teleport)
         std::vector<Player*> alive = Members(true);
         Group* group = me->GetGroup();
-        if (!group || (alive.size() < group->GetMembersCount() && _runMs < GatherMaxMs))
+        if (!group)
+        {
+            if (_runMs > GatherMaxMs)       // the group never formed (dev-check)
+                Finish("no group");
+            return;
+        }
+        if (alive.size() < group->GetMembersCount() && _runMs < GatherMaxMs)
             return;
         Start();
         return;
@@ -441,7 +447,9 @@ void DungeonLeaderAI::AfterFight()
             BossResult(RESULT_KILLED, "");
         else if (Creature* creature = BossCreature(*boss))
         {
-            if (creature->IsAlive())
+            // only a real reset counts (evading, or back at full health): a boss in an untargetable phase or out of
+            // reach is engaged again on the next walk (dev-check)
+            if (creature->IsAlive() && (creature->IsInEvadeMode() || creature->IsFullHealth()))
             {
                 std::ostringstream detail;
                 detail << "boss reset at " << std::fixed << std::setprecision(0) << _bossPct << "% with "
@@ -452,7 +460,7 @@ void DungeonLeaderAI::AfterFight()
                     TC_LOG_INFO("server.questbot", "DUNGEONBOT event=evade run=%u dungeon=%u map=%u bot=%s boss=%u detail=%s",
                         _runId, _dungeonId, _mapId, _name.c_str(), boss->Entry, detail.str().c_str());
             }
-            else
+            else if (!creature->IsAlive())
                 BossResult(RESULT_KILLED, "the boss died but its encounter is not DONE (encounter bit " + std::to_string(boss->Bit) + " not set)");
         }
     }
