@@ -11,6 +11,8 @@ global $site_db;
 $stmt = $site_db->prepare("SELECT role FROM " . DB_SITE . ".user_currencies WHERE account_id = ?"); $stmt->bind_param("i", $_SESSION['user_id']); $stmt->execute(); $r = $stmt->get_result();
 $_SESSION['role'] = $r->num_rows > 0 ? $r->fetch_assoc()['role'] : 'player'; $stmt->close();
 if (!in_array($_SESSION['role'], ['admin', 'moderator'])) { header("Location: {$base_path}login"); exit; }
+session_write_close();      // the page polls every 2 s: don't hold the session lock while reading (dev-check)
+header('X-Content-Type-Options: nosniff');
 
 // Live dungeon bot runs. The worldserver writes cache/botwatch/run_<id>.json every 2 s.
 if (isset($_GET['json'])) {
@@ -56,8 +58,11 @@ if (isset($_GET['json'])) {
         $files = glob($project_root . 'cache/botwatch/run_*.json');
         foreach ($files ?: [] as $f) {
             $mt = @filemtime($f);
-            if ($mt === false || $now - $mt > 600) continue;
-            $run = json_decode((string)@file_get_contents($f), true);
+            if ($mt === false) continue;
+            if ($now - $mt > 3600) { @unlink($f); continue; }     // a new run id every pass: old files go after an hour
+            if ($now - $mt > 600 || @filesize($f) > 1048576) continue;
+            // a name cut in half by the log line limit costs one character, not the whole run (dev-check)
+            $run = json_decode((string)@file_get_contents($f), true, 512, JSON_INVALID_UTF8_SUBSTITUTE);
             if (!is_array($run)) continue;
             $runs[] = $run;
         }
@@ -279,7 +284,7 @@ tr.dead td { color:#6b7280; }
       tr.appendChild(td);
       var pt = str(b.powerType).toLowerCase(), pw = Math.round(num(b.power));
       td = el('td');
-      td.appendChild(bar(pw, 100, pw, POWER[pt] || '#a855f7', (pt || 'power') + ' ' + pw + '%'));
+      td.appendChild(bar(pw, 100, pw, (Object.prototype.hasOwnProperty.call(POWER, pt) ? POWER[pt] : '#a855f7'), (pt || 'power') + ' ' + pw + '%'));
       tr.appendChild(td);
       tr.appendChild(el('td', null, str(b.target) ? str(b.target) + ' (' + Math.round(num(b.targetHp)) + '%)' : '-'));
       tbl.appendChild(tr);
