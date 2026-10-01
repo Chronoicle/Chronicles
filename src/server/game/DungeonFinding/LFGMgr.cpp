@@ -267,7 +267,7 @@ void LFGMgr::LoadLFGDungeons(bool reload /* = false */)
     {
         Field* fields = result->Fetch();
         uint32 dungeonId = fields[0].GetUInt32();
-        LFGDungeonData* dungeon = LfgDungeonVStore[dungeonId];
+        LFGDungeonData* dungeon = dungeonId < LfgDungeonVStore.size() ? LfgDungeonVStore[dungeonId] : nullptr;
         if (!dungeon)
         {
             TC_LOG_ERROR("sql.sql", "table `lfg_entrances` contains coordinates for wrong dungeon %u", dungeonId);
