@@ -82,6 +82,7 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     bool InSight(Unit* unit, float range) const;
     bool Approach(Unit* unit);                             // false: gave up (no path, or too long)
     void StandStill();
+    void PetAttack(Unit* target);                         // the bot's pet attacks its target (pets start passive)
     void PositionRanged(Unit* target, Player* leader);
     void PositionHealer(Player* leader);
     uint32 GroupMembersBelow(int32 pct) const;

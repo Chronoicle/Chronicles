@@ -7,6 +7,8 @@
 #include "MovementPackets.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
+#include "CharmInfo.h"
+#include "Pet.h"
 #include "Player.h"
 #include "World.h"
 #include "Chat.h"
@@ -405,6 +407,7 @@ void PartyBotAI::UpdateAI(uint32 diff)
         bool newTarget = me->getVictim() != target;
         if (newTarget)
             me->Attack(target, !IsRanged());
+        PetAttack(target);
 
         if (healer)
             PositionHealer(leader);
@@ -661,6 +664,25 @@ Unit* PartyBotAI::TauntTarget() const
                     return attacker;
         }
     return nullptr;
+}
+
+// owner 2026-10-01: the bots' pets (warlock imp) stayed passive. Like the pet bar's Attack (PetHandler COMMAND_ATTACK):
+// the pet's AI starts on the bot's target; once per target
+void PartyBotAI::PetAttack(Unit* target)
+{
+    Pet* pet = me->GetPet();
+    CharmInfo* charmInfo = pet ? pet->GetCharmInfo() : nullptr;
+    if (!charmInfo || !pet->IsAlive() || !pet->IsAIEnabled || (pet->getVictim() == target && charmInfo->IsCommandAttack()))
+        return;
+
+    if (pet->getVictim())
+        pet->AttackStop();
+    pet->ClearUnitState(UNIT_STATE_FOLLOW);
+    charmInfo->SetIsCommandAttack(true);
+    charmInfo->SetIsAtStay(false);
+    charmInfo->SetIsFollowing(false);
+    charmInfo->SetIsReturning(false);
+    pet->AI()->AttackStart(target);
 }
 
 bool PartyBotAI::CastRotation(Unit* target)

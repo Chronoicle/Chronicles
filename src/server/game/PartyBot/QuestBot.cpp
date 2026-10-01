@@ -169,6 +169,7 @@ private:
     bool ForOtherCharacter(Quest const* quest, uint8 depth);
 
     Move MoveTo(Position const& pos, float dist);
+    std::string MoveFailed() const { return _noPath ? "no path to the " : "not getting closer for 15 s to the "; }
     void Fight(Unit* target);
     bool CastStarter(Unit* target);     // target null: out of combat
     bool CanPay(SpellInfo const* info) const;
@@ -214,6 +215,7 @@ private:
     Position _moveDest;
     float _moveBest = 0.0f;
     uint32 _moveMs = 0;
+    bool _noPath = false;                   // the last failed MoveTo: no navmesh path (else not getting closer for 15 s)
     ObjectGuid _fightGuid;
     uint64 _fightHealth = 0;
     uint32 _fightMs = 0;
@@ -450,7 +452,7 @@ void QuestBotAI::GoToGiver()
     {
         Move move = MoveTo(_giver.Pos, 5.0f);
         if (move == Move::Failed)
-            EndQuest(RESULT_NOT_OFFERED, "no path to the quest giver " + std::to_string(entry));
+            EndQuest(RESULT_NOT_OFFERED, MoveFailed() + "quest giver " + std::to_string(entry));
         else if (move == Move::Arrived)
             EndQuest(RESULT_NOT_OFFERED, "quest giver " + std::to_string(entry) + " not at its spawn (not spawned, dead or phased away)");
         return;
@@ -458,7 +460,7 @@ void QuestBotAI::GoToGiver()
 
     Move move = MoveTo(giver->GetPosition(), InteractDist);
     if (move == Move::Failed)
-        EndQuest(RESULT_NOT_OFFERED, "no path to the quest giver " + std::to_string(entry));
+        EndQuest(RESULT_NOT_OFFERED, MoveFailed() + "quest giver " + std::to_string(entry));
     if (move != Move::Arrived)
         return;
 
@@ -686,7 +688,7 @@ void QuestBotAI::TurnIn()
             }
             Move move = MoveTo(spawn->Pos, 5.0f);
             if (move == Move::Failed)
-                EndQuest(RESULT_STUCK, "no path to the quest ender " + std::to_string(spawn->Entry));
+                EndQuest(RESULT_STUCK, MoveFailed() + "quest ender " + std::to_string(spawn->Entry));
             else if (move == Move::Arrived)
                 EndQuest(RESULT_STUCK, "quest ender " + std::to_string(spawn->Entry) + " not at its spawn (not spawned, dead or phased away)");
             return;
@@ -694,7 +696,7 @@ void QuestBotAI::TurnIn()
 
         Move move = MoveTo(found->GetPosition(), InteractDist);
         if (move == Move::Failed)
-            EndQuest(RESULT_STUCK, "no path to the quest ender " + std::to_string(found->GetEntry()));
+            EndQuest(RESULT_STUCK, MoveFailed() + "quest ender " + std::to_string(found->GetEntry()));
         if (move != Move::Arrived)
             return;
         ender = found;
@@ -867,6 +869,7 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
     else if ((_moveMs += _tick) > MoveStuckMs)
     {
         _moveDest = Position();
+        _noPath = false;
         return Move::Failed;
     }
 
@@ -879,6 +882,7 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
         if (path.GetPathType() & PATHFIND_NOPATH)
         {
             _moveDest = Position();
+            _noPath = true;
             return Move::Failed;
         }
         motion->MovePoint(0, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), true);
@@ -892,6 +896,10 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
 // casts nothing
 void QuestBotAI::Fight(Unit* target)
 {
+    // the walk measure (MoveTo) starts again after a fight: a ranged bot stands still (no chase) and may end it further
+    // away, which read as "not getting closer" (priests and mages STUCK on their way to the quest ender)
+    _moveDest = Position();
+
     if (_fightGuid != target->GetGUID() || target->GetHealth() < _fightHealth)
     {
         _fightGuid = target->GetGUID();
@@ -909,6 +917,7 @@ void QuestBotAI::Fight(Unit* target)
 
     if (me->getVictim() != target)
         me->Attack(target, true);
+    PetAttack(target);
 
     auto spells = StarterSpells.find(me->getClass());
     SpellInfo const* filler = spells != StarterSpells.end() ? sSpellMgr->GetSpellInfo(spells->second.back().Spell) : nullptr;
@@ -997,6 +1006,7 @@ void QuestBotAI::CastFailed(uint32 spell, SpellCastResult result)
         case SPELL_FAILED_NOT_READY:
         case SPELL_FAILED_NO_POWER:
         case SPELL_FAILED_NO_COMBO_POINTS:
+        case SPELL_FAILED_NO_CHARGES_REMAIN:  // Crusader Strike, Judgment
         case SPELL_FAILED_CASTER_AURASTATE: // Victory Rush without a kill
         case SPELL_FAILED_TARGET_AURASTATE:
         case SPELL_FAILED_BAD_TARGETS:      // Power Word: Shield on a shielded bot (dev-check)
