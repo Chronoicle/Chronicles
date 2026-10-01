@@ -26,6 +26,7 @@
 #include "Containers.h"
 #include "DatabaseEnv.h"
 #include "DB2Stores.h"
+#include "GameTime.h"
 #include "Group.h"
 #include "GroupMgr.h"
 #include "LFGMgr.h"
@@ -47,6 +48,8 @@ namespace
     uint32 const LoginTimeoutMs     = 3 * MINUTE * IN_MILLISECONDS;
     uint32 const QueueTimeoutMs     = 3 * MINUTE * IN_MILLISECONDS;     // role check 45 s + proposal 45 s; a full group matches at once
     uint32 const LeaveTimeoutMs     = 2 * MINUTE * IN_MILLISECONDS;
+    uint32 const MaxFailedPasses    = 3;                                // dungeons in a row not cleared: stop, no endless requeue
+    time_t const TankGoneSec        = 4 * MINUTE;                       // the tank's session hasn't run the run this long: stop
     uint32 const LeaveForceMs       = 15 * IN_MILLISECONDS;             // still in the dungeon: teleport out without the Dungeon Finder
 
     enum class Step { Login, Queued, Dungeon, Ending, Leaving };
@@ -75,6 +78,8 @@ namespace
         bool Cleared;
         std::string Reason;
         std::vector<Member> Members;                    // [0] the tank, the group's leader
+        uint32 Fails = 0;                               // dungeons in a row not cleared
+        time_t TankSeen = 0;                            // the tank's session last ran the run's steps
 
         Member* Find(ObjectGuid guid)
         {
@@ -400,7 +405,9 @@ namespace
                 // wait until nobody is between maps: the Dungeon Finder's teleport out skips a bot in a teleport
                 if (!Settled(run, players) && run.StepMs < LeaveTimeoutMs)
                     return;
-                LogEnd(run, "requeue", run.Reason);
+                run.Fails = run.Cleared ? 0 : run.Fails + 1;
+                if (run.Fails < MaxFailedPasses)        // else StopRun logs the end once everyone is out
+                    LogEnd(run, "requeue", run.Reason);
                 ReplaceAI(tank, nullptr);
                 // leaving the LFG group clears the Dungeon Finder state and teleports each out (LFGGroupScript::OnRemoveMember);
                 // the tank (leader) last
@@ -424,7 +431,9 @@ namespace
                             player->TeleportTo(player->GetBattlegroundEntryPoint());    // where the Dungeon Finder took it from
                     }
                 }
-                if (out)
+                if (out && run.Fails >= MaxFailedPasses)    // a dungeon the bots can't do at all: no endless requeue (dev-check)
+                    StopRun(itr, run.Reason + "; " + std::to_string(MaxFailedPasses) + " dungeons in a row not cleared");
+                else if (out)
                     Requeue(itr, players);
                 else if (run.StepMs > LeaveTimeoutMs)
                     StopRun(itr, "not all five bots got out of the dungeon within 2 min");
@@ -501,7 +510,14 @@ void PartyBotSession::DungeonUpdate(Player* bot, uint32 diff)
     }
     itr->Find(_botGuid)->Ready = true;
     if (tank)
+    {
+        itr->TankSeen = GameTime::GetGameTime();
         RunStep(itr, bot, diff);
+    }
+    // only the tank's session runs the steps and their timeouts: a tank whose login failed or who was kicked would keep
+    // the run (and these bots) up until .partybot dungeontest stop (dev-check)
+    else if (GameTime::GetGameTime() - itr->TankSeen > TankGoneSec)
+        StopRun(itr, "the tank's session is gone");
 }
 
 // ---------------------------------------------------------------- manager
@@ -571,6 +587,10 @@ std::string PartyBotMgr::StartDungeonTest(Player* gm, std::string text)
 {
     static char const* const Usage = "Usage: .partybot dungeontest <dungeon id | name | random> [level] | stop   "
         "e.g. .partybot dungeontest deadmines, .partybot dungeontest random 20";
+    // the run steps touch players and groups of other maps (group, resurrect, Dungeon Finder state): only safe while all
+    // maps update on one thread (dev-check)
+    if (sWorld->getIntConfig(CONFIG_NUMTHREADS) != 1)
+        return "Dungeon tests need MapUpdate.Threads = 1 in worldserver.conf.";
     {
         std::lock_guard<std::recursive_mutex> guard(RunLock);
         if (Runs.size() >= MaxDungeonRuns)
@@ -633,6 +653,7 @@ std::string PartyBotMgr::StartDungeonTest(Player* gm, std::string text)
     run.Id = ++NextRunId;
     Runs.push_back(run);
     DungeonRun& added = Runs.back();
+    added.TankSeen = GameTime::GetGameTime();
     TC_LOG_INFO("server.questbot", "DUNGEONBOT event=create run=%u dungeon=%u \"%s\" level=%u by=%s bots=%s", added.Id, dungeon->id,
         dungeon->name.c_str(), uint32(level), gm->GetName(), bots.str().c_str());
     for (Member& member : added.Members)
