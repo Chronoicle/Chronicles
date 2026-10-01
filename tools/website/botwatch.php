@@ -14,6 +14,99 @@ if (!in_array($_SESSION['role'], ['admin', 'moderator'])) { header("Location: {$
 session_write_close();      // the page polls every 2 s: don't hold the session lock while reading (dev-check)
 header('X-Content-Type-Options: nosniff');
 
+// Navmesh outline for the map view (tools/mmap_to_json.py writes cache/botwatch/mesh_<map>.json).
+if (isset($_GET['mesh'])) {
+    header('Content-Type: application/json');
+    $map = (int)$_GET['mesh'];
+    if ($map < 0 || $map > 2000) { http_response_code(400); echo json_encode(['error' => 'bad map']); exit; }
+    if (isset($_GET['demo'])) {
+        if ($map !== 389) { http_response_code(404); echo json_encode(['error' => 'no mesh']); exit; }
+        // fake Ragefire Chasm: rooms + corridors at the bots' level and a cave ~20 yd under it
+        header('Cache-Control: max-age=3600');
+        echo <<<'MESH'
+{"map":389,"tiles":1,"bounds":[-372,-12,29,224],"polys":[[-22,5,12,29,12,19.4,26.4],
+[-22,5,12,19.4,26.4,5,36],
+[-22,5,12,5,36,-9.4,26.4],
+[-22,5,12,-9.4,26.4,-19,12],
+[-22,5,12,-19,12,-9.4,-2.4],
+[-22,5,12,-9.4,-2.4,5,-12],
+[-22,5,12,5,-12,19.4,-2.4],
+[-22,5,12,19.4,-2.4,29,12],
+[-21.7,1.9,2.5,-26.5,11.8,-20.2,30.8,8.1,21.5],
+[-21,-26.5,11.8,-54.8,21.2,-48.5,40.2,-20.2,30.8],
+[-20.3,-54.8,21.2,-83.1,30.5,-76.9,49.5,-48.5,40.2],
+[-20,-80,40,-50,40,-62,58],
+[-20,-80,40,-62,58,-80,70],
+[-20,-80,40,-80,70,-98,58],
+[-20,-80,40,-98,58,-110,40],
+[-20,-80,40,-110,40,-98,22],
+[-20,-80,40,-98,22,-80,10],
+[-20,-80,40,-80,10,-62,22],
+[-20,-80,40,-62,22,-50,40],
+[-20.6,-85.8,31.8,-111.3,49.8,-99.7,66.2,-74.2,48.2],
+[-21.9,-111.3,49.8,-136.8,67.8,-125.2,84.2,-99.7,66.2],
+[-23.1,-136.8,67.8,-162.3,85.8,-150.7,102.2,-125.2,84.2],
+[-24.4,-162.3,85.8,-187.8,103.8,-176.2,120.2,-150.7,102.2],
+[-25,-182,112,-144,112,-159.2,134.8],
+[-25,-182,112,-159.2,134.8,-182,150],
+[-25,-182,112,-182,150,-204.8,134.8],
+[-25,-182,112,-204.8,134.8,-220,112],
+[-25,-182,112,-220,112,-204.8,89.2],
+[-25,-182,112,-204.8,89.2,-182,74],
+[-25,-182,112,-182,74,-159.2,89.2],
+[-25,-182,112,-159.2,89.2,-144,112],
+[-25.8,-185.7,103.8,-213.4,116.5,-205.9,132.8,-178.3,120.2],
+[-27.5,-213.4,116.5,-241.1,129.2,-233.6,145.5,-205.9,132.8],
+[-29.2,-241.1,129.2,-268.7,141.8,-261.3,158.2,-233.6,145.5],
+[-30,-265,150,-235,150,-247,168],
+[-30,-265,150,-247,168,-265,180],
+[-30,-265,150,-265,180,-283,168],
+[-30,-265,150,-283,168,-295,150],
+[-30,-265,150,-295,150,-283,132],
+[-30,-265,150,-283,132,-265,120],
+[-30,-265,150,-265,120,-247,132],
+[-30,-265,150,-247,132,-235,150],
+[-30.5,-269.4,142.1,-294.4,156.1,-285.6,171.9,-260.6,157.9],
+[-31.5,-294.4,156.1,-319.4,170.1,-310.6,185.9,-285.6,171.9],
+[-32.5,-319.4,170.1,-344.4,184.1,-335.6,199.9,-310.6,185.9],
+[-33,-340,192,-308,192,-320.8,211.2],
+[-33,-340,192,-320.8,211.2,-340,224],
+[-33,-340,192,-340,224,-359.2,211.2],
+[-33,-340,192,-359.2,211.2,-372,192],
+[-33,-340,192,-372,192,-359.2,172.8],
+[-33,-340,192,-359.2,172.8,-340,160],
+[-33,-340,192,-340,160,-320.8,172.8],
+[-33,-340,192,-320.8,172.8,-308,192],
+[-45,-130,150,-100,150,-112,168],
+[-45,-130,150,-112,168,-130,180],
+[-45,-130,150,-130,180,-148,168],
+[-45,-130,150,-148,168,-160,150],
+[-45,-130,150,-160,150,-148,132],
+[-45,-130,150,-148,132,-130,120],
+[-45,-130,150,-130,120,-112,132],
+[-45,-130,150,-112,132,-100,150],
+[-45.1,-123.3,144,-144.5,120.2,-158,132.3,-136.7,156],
+[-45.4,-144.5,120.2,-165.8,96.5,-179.2,108.5,-158,132.3],
+[-45.6,-165.8,96.5,-187,72.7,-200.5,84.8,-179.2,108.5],
+[-45.9,-187,72.7,-208.3,49,-221.7,61,-200.5,84.8],
+[-46,-215,55,-189,55,-199.4,70.6],
+[-46,-215,55,-199.4,70.6,-215,81],
+[-46,-215,55,-215,81,-230.6,70.6],
+[-46,-215,55,-230.6,70.6,-241,55],
+[-46,-215,55,-241,55,-230.6,39.4],
+[-46,-215,55,-230.6,39.4,-215,29],
+[-46,-215,55,-215,29,-199.4,39.4],
+[-46,-215,55,-199.4,39.4,-189,55]]}
+MESH;
+        exit;
+    }
+    $f = $project_root . 'cache/botwatch/mesh_' . $map . '.json';
+    if (!is_file($f)) { http_response_code(404); echo json_encode(['error' => 'no mesh']); exit; }
+    header('Cache-Control: max-age=3600');
+    readfile($f);
+    exit;
+}
+
 // Live dungeon bot runs. The worldserver writes cache/botwatch/run_<id>.json every 2 s.
 if (isset($_GET['json'])) {
     header('Content-Type: application/json');
@@ -43,6 +136,7 @@ if (isset($_GET['json'])) {
                 ['name' => 'Shootbot', 'class' => 'Hunter', 'spec' => 'Marksmanship', 'role' => 'dps', 'level' => 15, 'hp' => 940, 'maxhp' => 1050, 'power' => 70, 'powerType' => 'focus', 'alive' => true, 'x' => -152.0, 'y' => 125.0, 'z' => -24.0, 'o' => 2.2, 'target' => 'Taragaman the Hungerer', 'targetHp' => 62],
             ],
             'trail' => $trail,
+            'route' => [[-179.0, 108.0], [-196.0, 116.0], [-214.0, 125.0], [-232.0, 134.0], [-249.0, 142.0], [-262.0, 148.0]],
             'events' => [
                 ['t' => '02:35:23', 'text' => 'event=start run=12 dungeon=7 map=389 level=15'],
                 ['t' => '02:36:40', 'text' => 'event=pull run=12 target=Oggleflint'],
@@ -150,17 +244,49 @@ tr.dead td { color:#6b7280; }
     return b;
   }
 
+  // Navmesh per map id, fetched once: 'loading', null (no mesh / failed) or [{z, v: Float32Array x,y,..., b: [minx,miny,maxx,maxy]}] in WoW coords.
+  var meshes = {}, last = null;
+  function prepMesh(d) {
+    var out = [];
+    arr(d && d.polys).forEach(function (p) {
+      p = arr(p);
+      if (p.length < 7) return;
+      var n = (p.length - 1) >> 1, v = new Float32Array(n * 2), b = [Infinity, Infinity, -Infinity, -Infinity], area = 0, i, j;
+      for (i = 0; i < n; i++) { j = (i + 1) % n; area += num(p[1 + 2 * i]) * num(p[2 + 2 * j]) - num(p[1 + 2 * j]) * num(p[2 + 2 * i]); }
+      for (i = 0; i < n; i++) {
+        j = area < 0 ? n - 1 - i : i; // one winding for all, or overlapping polygons cancel out in the single nonzero fill
+        v[2 * i] = num(p[1 + 2 * j]); v[2 * i + 1] = num(p[2 + 2 * j]);
+        b[0] = Math.min(b[0], v[2 * i]); b[1] = Math.min(b[1], v[2 * i + 1]);
+        b[2] = Math.max(b[2], v[2 * i]); b[3] = Math.max(b[3], v[2 * i + 1]);
+      }
+      out.push({ z: num(p[0]), v: v, b: b });
+    });
+    return out.length ? out : null;
+  }
+  function getMesh(map) {
+    if (Object.prototype.hasOwnProperty.call(meshes, map)) return meshes[map] === 'loading' ? null : meshes[map];
+    meshes[map] = 'loading';
+    // ponytail: any failure (404, network, bad JSON) is cached as "no mesh" until the page is reloaded
+    fetch('?mesh=' + map + (demo ? '&demo=1' : ''), { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { meshes[map] = prepMesh(d); }, function () { meshes[map] = null; })
+      .then(function () { if (meshes[map] && last) render(last); });
+    return null;
+  }
+
   function drawMap(cv, run) {
     var W = 600, H = 400, dpr = window.devicePixelRatio || 1;
     cv.width = W * dpr; cv.height = H * dpr;
     var c = cv.getContext('2d');
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, W, H);
-    var bosses = arr(run.bosses), bots = arr(run.bots), trail = arr(run.trail);
+    var bosses = arr(run.bosses), bots = arr(run.bots), trail = arr(run.trail), route = arr(run.route);
+    var mesh = getMesh(num(run.map));
+    var tank = bots.filter(function (b) { return b && str(b.role) === 'tank'; })[0] || bots[0];
     // WoW: x = north, y = west. Plot px = -y (east right), py = x (north up).
-    var pts = [];
-    bosses.forEach(function (b) { pts.push([-num(b.y), num(b.x)]); });
-    bots.forEach(function (b) { pts.push([-num(b.y), num(b.x)]); });
+    var pts = [], actors = [];
+    bosses.forEach(function (b) { actors.push([num(b.x), num(b.y)]); pts.push([-num(b.y), num(b.x)]); });
+    bots.forEach(function (b) { actors.push([num(b.x), num(b.y)]); pts.push([-num(b.y), num(b.x)]); });
     trail.forEach(function (p) { p = arr(p); pts.push([-num(p[1]), num(p[0])]); });
     if (!pts.length) {
       c.fillStyle = '#8a92a3'; c.font = '14px system-ui, sans-serif';
@@ -172,11 +298,63 @@ tr.dead td { color:#6b7280; }
       minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]);
       minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]);
     });
+    if (mesh) {
+      // grow the view to the mesh around the bosses and bots (within 150 yd), not the whole map
+      var R = 150, ax0 = Infinity, ay0 = Infinity, ax1 = -Infinity, ay1 = -Infinity;
+      actors.forEach(function (a) { ax0 = Math.min(ax0, a[0]); ay0 = Math.min(ay0, a[1]); ax1 = Math.max(ax1, a[0]); ay1 = Math.max(ay1, a[1]); });
+      mesh.forEach(function (p) {
+        var b = p.b;
+        if (b[2] < ax0 - R || b[0] > ax1 + R || b[3] < ay0 - R || b[1] > ay1 + R) return;
+        for (var i = 0; i < p.v.length; i += 2) {
+          for (var k = 0; k < actors.length; k++) {
+            var dx = p.v[i] - actors[k][0], dy = p.v[i + 1] - actors[k][1];
+            if (dx * dx + dy * dy < R * R) {
+              minX = Math.min(minX, -b[3]); maxX = Math.max(maxX, -b[1]);
+              minY = Math.min(minY, b[0]); maxY = Math.max(maxY, b[2]);
+              return;
+            }
+          }
+        }
+      });
+    }
     var spanX = Math.max(maxX - minX, 20), spanY = Math.max(maxY - minY, 20);
     var M = 50; // padding in px, room for labels
     var s = Math.min((W - 2 * M) / spanX, (H - 2 * M) / spanY);
     var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     function P(x, y) { return [W / 2 + (-y - cx) * s, H / 2 - (x - cy) * s]; } // WoW (x,y) -> canvas
+
+    // navmesh: polygons near the tank's height (within 8 yd) = the current floor, the rest faint
+    if (mesh) {
+      var vx0 = cx - W / 2 / s, vx1 = cx + W / 2 / s, vy0 = cy - H / 2 / s, vy1 = cy + H / 2 / s; // view box, plot coords
+      var tz = tank ? num(tank.z) : NaN;
+      [false, true].forEach(function (cur) {
+        c.beginPath();
+        mesh.forEach(function (p) {
+          var b = p.b;
+          if (-b[3] > vx1 || -b[1] < vx0 || b[0] > vy1 || b[2] < vy0) return;
+          if ((isNaN(tz) || Math.abs(p.z - tz) <= 8) !== cur) return;
+          for (var i = 0; i < p.v.length; i += 2) {
+            var q = P(p.v[i], p.v[i + 1]);
+            if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]);
+          }
+          c.closePath();
+        });
+        c.fillStyle = cur ? '#343a46' : 'rgba(120,128,145,0.13)';
+        c.fill();
+      });
+    }
+
+    // planned path (corridor corners), from the tank
+    if (route.length) {
+      c.setLineDash([6, 5]); c.strokeStyle = 'rgba(255,209,102,0.85)'; c.lineWidth = 2; c.beginPath();
+      var r0 = tank ? P(num(tank.x), num(tank.y)) : null;
+      if (r0) c.moveTo(r0[0], r0[1]);
+      route.forEach(function (p, i) {
+        p = arr(p); var q = P(num(p[0]), num(p[1]));
+        if (i || r0) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]);
+      });
+      c.stroke(); c.setLineDash([]);
+    }
 
     // north arrow + scale hint
     c.fillStyle = '#5b6270'; c.font = '11px system-ui, sans-serif';
@@ -308,6 +486,7 @@ tr.dead td { color:#6b7280; }
 
   var box = document.getElementById('runs'), err = document.getElementById('err'), status = document.getElementById('status');
   function render(data) {
+    last = data;
     var now = num(data && data.now) || Math.floor(Date.now() / 1000);
     var runs = arr(data && data.runs);
     box.textContent = '';
