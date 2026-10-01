@@ -108,8 +108,9 @@ public:
     std::string CreateBot(Player* creator, uint32 specId, std::string& name);
     static ChrSpecializationEntry const* FindSpec(std::string const& className, std::string const& specName);
     std::string RemoveBot(Player* leader, std::string const& name);   // empty name = all of the leader's bots
-    // .partybot questtest <class> [race] [max level]: a fresh level-1 quest-test bot (QuestBot.cpp)
+    // .partybot questtest <class> [race] [max level]: a fresh level-1 quest-test bot (QuestBot.cpp), one at a time
     std::string StartQuestTest(Player* gm, std::string text);
+    uint32 StopQuestTests();            // .partybot questtest stop: any GM's run
     std::vector<std::shared_ptr<PartyBotSession>> GetBots(ObjectGuid leaderGuid);
     uint8 CountBots(ObjectGuid leaderGuid);
     // rotation of a spec, in priority order (world.partybot_spells, loaded once)
@@ -120,6 +121,7 @@ public:
 private:
     void Cleanup();
     uint32 FreeBotAccount();            // a partybot account without characters
+    bool QuestTestRunning();            // _lock held
 
     std::mutex _lock;
     std::vector<std::weak_ptr<PartyBotSession>> _bots;

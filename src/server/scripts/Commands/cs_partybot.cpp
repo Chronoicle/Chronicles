@@ -120,22 +120,15 @@ public:
     static bool HandleQuestTestCommand(ChatHandler* handler, char const* args)
     {
         std::string text = args ? args : "";
-        Player* gm = handler->GetSession()->GetPlayer();
         if (boost::iequals(text, "stop"))
         {
-            uint32 stopped = 0;
-            for (auto const& session : sPartyBotMgr->GetBots(gm->GetGUID()))
-                if (session->IsQuestTest())
-                {
-                    session->RequestDismiss();
-                    ++stopped;
-                }
-            handler->SendSysMessage(stopped ? "Quest test stopped." : "You have no quest test running.");
+            handler->SendSysMessage(sPartyBotMgr->StopQuestTests() ? "Quest test stopped." : "No quest test is running.");
             return true;
         }
 
-        std::string error = sPartyBotMgr->StartQuestTest(gm, text);
-        handler->SendSysMessage(error.empty() ? "Quest test bot is logging in: QUESTBOT lines in Server.log, .partybot questtest stop to end it." : error.c_str());
+        std::string error = sPartyBotMgr->StartQuestTest(handler->GetSession()->GetPlayer(), text);
+        handler->SendSysMessage(error.empty() ? "Quest test bot is logging in. Results: QUESTBOT lines in Server.log (run=end is the summary); "
+            ".partybot questtest stop ends it." : error.c_str());
         return true;
     }
 

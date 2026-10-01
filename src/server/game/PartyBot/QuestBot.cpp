@@ -15,9 +15,7 @@
  * the client's packet handlers, so quest scripts fire as for a player. Runs in Player::Update on the bot's map thread.
  */
 #include "PartyBot.h"
-#include "Chat.h"
 #include "CellImpl.h"
-#include "DatabaseEnv.h"
 #include "DB2Stores.h"
 #include "DisableMgr.h"
 #include "GameObject.h"
@@ -28,7 +26,6 @@
 #include "LootMgr.h"
 #include "LootPackets.h"
 #include "MotionMaster.h"
-#include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "PathGenerator.h"
 #include "Player.h"
@@ -36,6 +33,7 @@
 #include "QuestDef.h"
 #include "QuestPackets.h"
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <iomanip>
 #include <sstream>
@@ -106,7 +104,7 @@ namespace
 class QuestBotAI : public PartyBotAI
 {
 public:
-    QuestBotAI(Player* bot, ObjectGuid gmGuid, uint8 maxLevel) : PartyBotAI(bot, gmGuid, 0), _gmGuid(gmGuid), _maxLevel(maxLevel), _name(bot->GetName()) { }
+    QuestBotAI(Player* bot, ObjectGuid gmGuid, uint8 maxLevel) : PartyBotAI(bot, gmGuid, 0), _maxLevel(maxLevel), _name(bot->GetName()) { }
     ~QuestBotAI() override;
 
     void UpdateAI(uint32 diff) override;
@@ -141,7 +139,6 @@ private:
     void Ignore(ObjectGuid guid) { _ignore[guid] = _runMs + IgnoreMs; }
     uint32 QuestId() const { return _quest ? _quest->GetQuestId() : 0; }
 
-    ObjectGuid _gmGuid;
     uint8 _maxLevel;
     std::string _name;
     bool _finished = false;
@@ -186,7 +183,8 @@ PlayerAI* NewQuestBotAI(Player* bot, ObjectGuid gmGuid, uint8 maxLevel)
 
 QuestBotAI::~QuestBotAI()
 {
-    // stopped (.partybot questtest stop / .partybot remove); a shutdown ends the run without this line
+    // stopped (.partybot questtest stop / .partybot remove); a shutdown ends the run without this line.
+    // No `me` here: only the AI's own fields
     if (!_finished)
         TC_LOG_INFO("server.questbot", "QUESTBOT run=end bot=%s reason=stopped time=%u quest=%u done=%u stuck=%u unsupported=%u not_offered=%u",
             _name.c_str(), _runMs / IN_MILLISECONDS, QuestId(), _counts[RESULT_DONE], _counts[RESULT_STUCK], _counts[RESULT_UNSUPPORTED], _counts[RESULT_NOT_OFFERED]);
@@ -291,7 +289,8 @@ void QuestBotAI::UpdateAI(uint32 diff)
     }
 }
 
-// index the creature and object spawns around the start (one world DB read), then pick the first quest
+// index the creature and object spawns around the start, then pick the first quest. In memory, from the per-cell spawn
+// index the grid loader reads too (no world DB query on the map thread, dev-check)
 void QuestBotAI::Start()
 {
     _startZone = me->GetZoneId();
@@ -299,18 +298,22 @@ void QuestBotAI::Start()
     _startPos = me->GetPosition();
     uint32 map = _startMap;
     float x = me->GetPositionX(), y = me->GetPositionY();
-    if (QueryResult result = WorldDatabase.PQuery(
-        "SELECT id, position_x, position_y, position_z, zoneId, 0 FROM creature WHERE map = %u AND position_x BETWEEN %f AND %f AND position_y BETWEEN %f AND %f "
-        "UNION ALL SELECT id, position_x, position_y, position_z, zoneId, 1 FROM gameobject WHERE map = %u AND position_x BETWEEN %f AND %f AND position_y BETWEEN %f AND %f",
-        map, x - SpawnRadius, x + SpawnRadius, y - SpawnRadius, y + SpawnRadius, map, x - SpawnRadius, x + SpawnRadius, y - SpawnRadius, y + SpawnRadius))
-    {
-        do
-        {
-            Field* fields = result->Fetch();
-            _spawns.push_back({ fields[0].GetUInt32(), fields[5].GetUInt32() != 0, fields[4].GetUInt32(),
-                Position(fields[1].GetFloat(), fields[2].GetFloat(), fields[3].GetFloat()) });
-        } while (result->NextRow());
-    }
+    CellCoord low = Trinity::ComputeCellCoord(x - SpawnRadius, y - SpawnRadius);
+    CellCoord high = Trinity::ComputeCellCoord(x + SpawnRadius, y + SpawnRadius);
+    auto inBox = [x, y](float spawnX, float spawnY) { return std::fabs(spawnX - x) <= SpawnRadius && std::fabs(spawnY - y) <= SpawnRadius; };
+    for (uint32 cellX = low.x_coord; cellX <= high.x_coord && cellX < TOTAL_NUMBER_OF_CELLS_PER_MAP; ++cellX)
+        for (uint32 cellY = low.y_coord; cellY <= high.y_coord && cellY < TOTAL_NUMBER_OF_CELLS_PER_MAP; ++cellY)
+            if (CellObjectGuids const* cell = sObjectMgr->GetCellObjectGuids(map, me->GetMap()->GetSpawnMode(), CellCoord(cellX, cellY).GetId()))
+            {
+                for (ObjectGuid::LowType guid : cell->creatures)
+                    if (CreatureData const* data = sObjectMgr->GetCreatureData(guid))
+                        if (data->mapid == map && inBox(data->posX, data->posY))
+                            _spawns.push_back({ data->id, false, data->zoneId, Position(data->posX, data->posY, data->posZ) });
+                for (ObjectGuid::LowType guid : cell->gameobjects)
+                    if (GameObjectData const* data = sObjectMgr->GetGOData(guid))
+                        if (data->mapid == map && inBox(data->posX, data->posY))
+                            _spawns.push_back({ data->id, true, data->zoneId, Position(data->posX, data->posY, data->posZ) });
+            }
 
     TC_LOG_INFO("server.questbot", "QUESTBOT event=start bot=%s race=%u class=%u level=%u maxlevel=%u zone=%u pos=%u:%.1f,%.1f,%.1f spawns=%u",
         _name.c_str(), me->getRace(), me->getClass(), me->getLevel(), _maxLevel, _startZone, map, x, y, me->GetPositionZ(), uint32(_spawns.size()));
@@ -720,13 +723,10 @@ void QuestBotAI::Finish(std::string const& reason)
                         quest->LogTitle.c_str(), me->getLevel(), _name.c_str(), WhyNotTaken(quest, reason).c_str());
                 }
 
+    // only logged: a chat line to the GM from this map thread could hit a GM logging out (dev-check)
     TC_LOG_INFO("server.questbot", "QUESTBOT run=end bot=%s reason=%s time=%u level=%u done=%u stuck=%u unsupported=%u not_offered=%u", _name.c_str(),
         reason.c_str(), _runMs / IN_MILLISECONDS, me->getLevel(), _counts[RESULT_DONE], _counts[RESULT_STUCK], _counts[RESULT_UNSUPPORTED], _counts[RESULT_NOT_OFFERED]);
     _finished = true;
-
-    if (Player* gm = ObjectAccessor::FindPlayer(_gmGuid))
-        ChatHandler(gm->GetSession()).PSendSysMessage("Quest test %s ended (%s): %u done, %u stuck, %u unsupported, %u not offered. Details: QUESTBOT lines in Server.log.",
-            _name.c_str(), reason.c_str(), _counts[RESULT_DONE], _counts[RESULT_STUCK], _counts[RESULT_UNSUPPORTED], _counts[RESULT_NOT_OFFERED]);
 
     static_cast<PartyBotSession*>(me->GetSession())->RequestDismiss();   // logs out on the session's next update
 }
@@ -834,7 +834,8 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
     return Move::Moving;
 }
 
-// attack + chase + the party bot rotation; a target taking no damage for 30 s is left alone for a minute
+// attack + chase + the party bot rotation; a target taking no damage for 30 s is left alone for a minute. Below level 10
+// a character has no specialization, so the rotation is likely empty and auto attack does the work (fine for the test)
 void QuestBotAI::Fight(Unit* target)
 {
     if (_fightGuid != target->GetGUID() || target->GetHealth() < _fightHealth)

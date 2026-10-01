@@ -936,9 +936,12 @@ static std::string BotName(std::string const& raw)
     return "";
 }
 
+// the bot accounts partybot1@bot..partybot50@bot (made by the owner), matched exactly
+static char const* const BotAccountPattern = "^PARTYBOT[0-9]+@BOT$";
+
 uint32 PartyBotMgr::FreeBotAccount()
 {
-    if (QueryResult accounts = LoginDatabase.Query("SELECT id FROM account WHERE username LIKE 'PARTYBOT%@BOT' ORDER BY id"))
+    if (QueryResult accounts = LoginDatabase.PQuery("SELECT id FROM account WHERE username REGEXP '%s' ORDER BY id", BotAccountPattern))
     {
         do
         {
@@ -1006,12 +1009,44 @@ std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& 
     return "";
 }
 
+// a quest-test bot is running (one at a time, dev-check); _lock held
+bool PartyBotMgr::QuestTestRunning()
+{
+    Cleanup();
+    for (auto const& bot : _bots)
+        if (std::shared_ptr<PartyBotSession> session = bot.lock())
+            if (session->IsQuestTest())
+                return true;
+    return false;
+}
+
+uint32 PartyBotMgr::StopQuestTests()
+{
+    std::lock_guard<std::mutex> guard(_lock);
+    uint32 stopped = 0;
+    for (auto const& bot : _bots)
+        if (std::shared_ptr<PartyBotSession> session = bot.lock())
+            if (session->IsQuestTest() && !session->IsDismissed())
+            {
+                session->RequestDismiss();
+                ++stopped;
+            }
+    return stopped;
+}
+
 // .partybot questtest <class> [race] [max level] (owner 2026-10-01, #65): a fresh level-1 character of that race and
-// class (default: the GM's faction, like .partybot create) plays its starting zone's quests alone (QuestBot.cpp). Each
-// run starts from level 1: the previous quest-test character of that race and class is deleted first. Only characters
-// named Qt... on a partybot account that are no party bot (no partybot_characters row) are ever deleted.
+// class (default: the GM's faction, like .partybot create) plays its starting zone's quests alone (QuestBot.cpp). One
+// run at a time. Each run starts from level 1: the new character is made first, then the previous quest-test character
+// of that race and class is deleted. Only a character named Qt... (case-sensitive) on a partybot account
+// (partybotN@bot exactly) that is no party bot (no partybot_characters row) is ever deleted.
 std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
 {
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        if (QuestTestRunning())
+            return "A quest test is already running (one at a time; .partybot questtest stop).";
+    }
+
     uint8 maxLevel = 5;
     size_t space = text.find_last_of(' ');
     if (space != std::string::npos && isdigit(uint8(text[space + 1])))
@@ -1051,12 +1086,13 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
     // the previous quest-test character of this race and class (a player's Qt... character is skipped)
     uint32 accountId = 0;
     ObjectGuid oldGuid;
-    if (QueryResult result = CharacterDatabase.PQuery("SELECT c.guid, c.account FROM characters c LEFT JOIN partybot_characters p ON p.guid = c.guid "
+    if (QueryResult result = CharacterDatabase.PQuery("SELECT c.guid, c.account, c.name FROM characters c LEFT JOIN partybot_characters p ON p.guid = c.guid "
         "WHERE p.guid IS NULL AND c.name LIKE 'Qt%%' AND c.race = %u AND c.class = %u", race, cls))
         do
         {
             uint32 account = (*result)[1].GetUInt32();
-            if (LoginDatabase.PQuery("SELECT 1 FROM account WHERE id = %u AND username LIKE 'PARTYBOT%%@BOT'", account))
+            if ((*result)[2].GetString().compare(0, 2, "Qt") == 0
+                && LoginDatabase.PQuery("SELECT 1 FROM account WHERE id = %u AND username REGEXP '%s'", account, BotAccountPattern))
             {
                 oldGuid = ObjectGuid::Create<HighGuid::Player>((*result)[0].GetUInt64());
                 accountId = account;
@@ -1073,22 +1109,25 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
     if (name.empty())
         return "Could not find a free name.";
 
+    // the new character first; the old one goes only once the new one exists
+    ObjectGuid guid = NewCharacter(accountId, race, cls, name);
+    if (guid.IsEmpty())
+        return "The character could not be created (" + raceName + " " + classEntry->Name->Str[DEFAULT_LOCALE] + " allowed?).";
+    _usedAccounts.insert(accountId);
+
     if (!oldGuid.IsEmpty())
     {
         sWorld->DeleteCharacterNameData(oldGuid);
         Player::DeleteFromDB(oldGuid, accountId, true, true);
     }
 
-    ObjectGuid guid = NewCharacter(accountId, race, cls, name);
-    if (guid.IsEmpty())
-        return "The character could not be created (" + raceName + " " + classEntry->Name->Str[DEFAULT_LOCALE] + " allowed?).";
-    _usedAccounts.insert(accountId);
-
     std::string accountName;
     AccountMgr::GetName(accountId, accountName);
     std::shared_ptr<PartyBotSession> session = std::make_shared<PartyBotSession>(accountId, std::move(accountName), guid, gm->GetGUID(), maxLevel);
     {
         std::lock_guard<std::mutex> guard(_lock);
+        if (QuestTestRunning())         // another GM started one meanwhile; the new character is replaced at the next run
+            return "A quest test is already running (one at a time; .partybot questtest stop).";
         _bots.push_back(session);
     }
     sWorld->AddSession(session);
