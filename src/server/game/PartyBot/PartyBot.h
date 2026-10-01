@@ -93,6 +93,7 @@ protected:                              // the quest-test bot (QuestBotAI) fight
     uint32 _checkTimer = 0;
     ObjectGuid _approachGuid;           // who the bot is walking to (positioning)
     uint8 _approachTicks = 0;           // AI ticks spent walking to an unseen target
+    SpellCastResult _castResult = SPELL_FAILED_DONT_REPORT;    // the last TryCast's CastSpell result (DONT_REPORT: not tried)
 };
 
 class TC_GAME_API PartyBotMgr

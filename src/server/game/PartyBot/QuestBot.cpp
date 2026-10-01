@@ -32,6 +32,8 @@
 #include "QuestData.h"
 #include "QuestDef.h"
 #include "QuestPackets.h"
+#include "SpellInfo.h"
+#include "SpellMgr.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -50,6 +52,45 @@ namespace
     float const SpawnRadius         = 1500.0f;                          // spawns indexed around the start (targets, enders)
     float const SearchRange         = 50.0f;                            // live creatures and objects
     float const InteractDist        = 4.0f;                             // center distance for quest givers, objects, loot
+
+    // #138: below level 10 a character has its class's recommended spec (ChrSpecialization flag 0x40) without having
+    // picked it, and that spec's party-bot rotation is made of level 10+ spells. These are the spells a level 1-9
+    // character really has (the class skill line + that spec's SpecializationSpells, SpellLevels.SpellLevel <= 9; all
+    // on the default action bars, playercreateinfo_action), in priority order, the filler last. Types as in
+    // world.partybot_spells: heal / hot = the bot itself below param % health, dot aura = the DoT's aura id when the
+    // spell applies it through another spell (0 = the spell itself), finisher param = combo points.
+    using T = PartyBotSpellType;
+    std::unordered_map<uint8, std::vector<PartyBotSpell>> const StarterSpells =
+    {
+        { CLASS_WARRIOR, { { 34428, T::SelfHeal, 80, 0 },       // Victory Rush (5, Arms), after a kill
+                           { 100, T::Damage, 0, 0 },            // Charge (3), 8-25 yd opener, rage
+                           { 163201, T::Execute, 20, 0 },       // Execute (8, Arms)
+                           { 1464, T::Damage, 0, 0 } } },       // Slam (1, Arms)
+        { CLASS_PALADIN, { { 19750, T::Heal, 50, 0 },           // Flash of Light (5, Retribution)
+                           { 20271, T::Damage, 0, 0 },          // Judgment (3)
+                           { 35395, T::Damage, 0, 0 } } },      // Crusader Strike (1)
+        { CLASS_HUNTER,  { { 193455, T::Damage, 0, 0 } } },     // Cobra Shot (1, Beast Mastery); no pet (none tamed)
+        { CLASS_ROGUE,   { { 196819, T::Finisher, 3, 0 },       // Eviscerate (3, Assassination)
+                           { 1752, T::Damage, 0, 0 } } },       // Sinister Strike (1, Assassination)
+        { CLASS_PRIEST,  { { 17, T::Hot, 50, 0 },               // Power Word: Shield (8, Discipline), when not shielded
+                           { 2061, T::Heal, 50, 0 },            // Flash Heal (5, Discipline)
+                           { 589, T::Dot, 0, 0 },               // Shadow Word: Pain (3, Discipline)
+                           { 585, T::Damage, 0, 0 } } },        // Smite (1)
+        { CLASS_SHAMAN,  { { 8004, T::Heal, 50, 0 },            // Healing Surge (5, Elemental)
+                           { 188389, T::Dot, 0, 0 },            // Flame Shock (3, Elemental)
+                           { 188196, T::Damage, 0, 0 } } },     // Lightning Bolt (1, Elemental)
+        { CLASS_MAGE,    { { 108853, T::Damage, 0, 0 },         // Fire Blast (3, Frost), instant, 12 s cooldown
+                           { 116, T::Damage, 0, 0 } } },        // Frostbolt (1, Frost)
+        { CLASS_WARLOCK, { { 688, T::Pet, 0, 0 },               // Summon Imp (5), out of combat, a soul shard
+                           { 172, T::Dot, 0, 146739 },          // Corruption (3, Affliction), aura from 146739
+                           { 232670, T::Damage, 0, 0 } } },     // Shadow Bolt (1, Affliction)
+        { CLASS_MONK,    { { 116694, T::Heal, 50, 0 },          // Effuse (8, Windwalker)
+                           { 100784, T::Damage, 0, 0 },         // Blackout Kick (3), chi
+                           { 100780, T::Damage, 0, 0 } } },     // Tiger Palm (1)
+        { CLASS_DRUID,   { { 8936, T::Heal, 50, 0 },            // Regrowth (5)
+                           { 8921, T::Dot, 0, 164812 },         // Moonfire (3), aura 164812 (spell_dummy_trigger)
+                           { 190984, T::Damage, 0, 0 } } },     // Solar Wrath (1, Balance)
+    };
 
     enum Result { RESULT_DONE, RESULT_STUCK, RESULT_UNSUPPORTED, RESULT_NOT_OFFERED, MAX_RESULT };
     char const* const ResultNames[MAX_RESULT] = { "DONE", "STUCK", "UNSUPPORTED", "NOT_OFFERED" };
@@ -129,6 +170,9 @@ private:
 
     Move MoveTo(Position const& pos, float dist);
     void Fight(Unit* target);
+    bool CastStarter(Unit* target);     // target null: out of combat
+    bool CanPay(SpellInfo const* info) const;
+    void CastFailed(uint32 spell, SpellCastResult result);
     void UseObject(GameObject* go);
     void TakeQuestLoot(ObjectGuid guid, Loot* loot);
     uint32 RewardChoice() const;
@@ -174,6 +218,7 @@ private:
     uint64 _fightHealth = 0;
     uint32 _fightMs = 0;
     bool _resting = false;
+    std::map<uint32, uint32> _castFails;    // spell -> failures that are not the moment's (range, power, cooldown)
 };
 
 PlayerAI* NewQuestBotAI(Player* bot, ObjectGuid gmGuid, uint8 maxLevel)
@@ -255,12 +300,19 @@ void QuestBotAI::UpdateAI(uint32 diff)
         return;
     }
 
-    // below 40% health: rest to 90% (no food, the out-of-combat regeneration)
-    if (!me->isInCombat() && me->GetHealthPct() < (_resting ? 90.0f : 40.0f))
+    // out of combat: summon the pet and heal itself below 80% (CastStarter), rest below 40% health, mana users below
+    // 60% health or 30% mana, up to 90% health and 80% mana (no food, the out-of-combat regeneration)
+    if (!me->isInCombat())
     {
-        _resting = true;
-        StandStill();
-        return;
+        if (CastStarter(nullptr))
+            return;
+        bool mana = me->GetMaxPower(POWER_MANA) > 0;
+        if (me->GetHealthPct() < (_resting ? 90.0f : mana ? 60.0f : 40.0f) || (mana && me->GetPowerPct(POWER_MANA) < (_resting ? 80.0f : 30.0f)))
+        {
+            _resting = true;
+            StandStill();
+            return;
+        }
     }
     _resting = false;
 
@@ -834,8 +886,10 @@ QuestBotAI::Move QuestBotAI::MoveTo(Position const& pos, float dist)
     return Move::Moving;
 }
 
-// attack + chase + the party bot rotation; a target taking no damage for 30 s is left alone for a minute. Below level 10
-// a character has no specialization, so the rotation is likely empty and auto attack does the work (fine for the test)
+// attack + spells; a target taking no damage for 30 s is left alone for a minute. Casters and hunters (a ranged filler
+// they can pay for) stand where they see the target within 30 yd, the others (and a caster out of mana) chase it into
+// melee. Spells: below level 10 the starter spells, later the spec's party bot rotation, the starter spells when it
+// casts nothing
 void QuestBotAI::Fight(Unit* target)
 {
     if (_fightGuid != target->GetGUID() || target->GetHealth() < _fightHealth)
@@ -855,10 +909,105 @@ void QuestBotAI::Fight(Unit* target)
 
     if (me->getVictim() != target)
         me->Attack(target, true);
-    if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
+
+    auto spells = StarterSpells.find(me->getClass());
+    SpellInfo const* filler = spells != StarterSpells.end() ? sSpellMgr->GetSpellInfo(spells->second.back().Spell) : nullptr;
+    if (filler && filler->GetMaxRange() > NOMINAL_MELEE_RANGE && me->HasSpell(filler->Id) && CanPay(filler) && InSight(target, 30.0f))
+        StandStill();
+    else if (me->GetMotionMaster()->GetCurrentMovementGeneratorType() != CHASE_MOTION_TYPE)
         me->GetMotionMaster()->MoveChase(target);
     me->SetInFront(target);
-    CastRotation(target);
+
+    if (me->getLevel() < 10 || !CastRotation(target))
+        CastStarter(target);
+}
+
+// the class's starter spell of the highest priority that the bot knows, can pay for and the spell code accepts (the
+// normal, untriggered cast: cast times, costs, cooldowns, range and sight apply). In a fight: heals and the shield on
+// itself below their health %, a missing DoT, the finisher, the filler. Out of combat (target null): the pet, heals below
+// 80%. True when a cast started
+bool QuestBotAI::CastStarter(Unit* target)
+{
+    auto spells = StarterSpells.find(me->getClass());
+    if (spells == StarterSpells.end())
+        return false;
+
+    for (PartyBotSpell entry : spells->second)
+    {
+        if (!target)
+        {
+            if (entry.Type == PartyBotSpellType::Heal)
+                entry.Param = 80;
+            else if (entry.Type != PartyBotSpellType::Pet)
+                continue;
+        }
+        else if (entry.Type == PartyBotSpellType::Pet)          // no summon cast in a fight
+            continue;
+
+        SpellInfo const* info = sSpellMgr->GetSpellInfo(entry.Spell);
+        if (!info || !me->HasSpell(entry.Spell))
+        {
+            if (!info || info->SpellLevel <= me->getLevel())   // a wrong id, or a spell this level should have taught
+                CastFailed(entry.Spell, SPELL_FAILED_NOT_KNOWN);
+            continue;
+        }
+        if (!CanPay(info))
+            continue;
+
+        // a heal or summon has a cast time: stop (chasing, walking), then cast. Not for attacks: a caster walking to a
+        // target out of sight would stop for every try (Fight stands it still once it sees the target)
+        bool cast = TryCast(entry, target);
+        if (!cast && _castResult == SPELL_FAILED_MOVING && (entry.Type == PartyBotSpellType::Heal || entry.Type == PartyBotSpellType::Pet))
+        {
+            StandStill();
+            if (me->IsStopped())
+                me->RemoveUnitMovementFlag(MOVEMENTFLAG_FORWARD);
+            cast = TryCast(entry, target);
+        }
+        if (cast)
+            return true;
+        CastFailed(entry.Spell, _castResult);
+    }
+    return false;
+}
+
+// the bot has the power the spell costs (mana, rage, energy, focus, combo points, chi, soul shards...)
+bool QuestBotAI::CanPay(SpellInfo const* info) const
+{
+    SpellPowerCost cost;
+    info->CalcPowerCost(me, info->GetSchoolMask(), cost);
+    for (uint8 power = 0; power < MAX_POWERS; ++power)
+        if (cost[power] > 0 && me->GetPower(Powers(power)) < cost[power])
+            return false;
+    return true;
+}
+
+// a starter spell failing again and again (or unknown at its level): a wrong spell id or a missing requirement in the
+// log, once per spell and run. Failures of the moment (range, sight, facing, power, cooldown, a proc) don't count
+void QuestBotAI::CastFailed(uint32 spell, SpellCastResult result)
+{
+    switch (result)
+    {
+        case SPELL_FAILED_DONT_REPORT:      // not tried (its condition, cooldown or global cooldown)
+        case SPELL_FAILED_MOVING:
+        case SPELL_FAILED_OUT_OF_RANGE:
+        case SPELL_FAILED_TOO_CLOSE:
+        case SPELL_FAILED_LINE_OF_SIGHT:
+        case SPELL_FAILED_UNIT_NOT_INFRONT:
+        case SPELL_FAILED_NOT_READY:
+        case SPELL_FAILED_NO_POWER:
+        case SPELL_FAILED_NO_COMBO_POINTS:
+        case SPELL_FAILED_CASTER_AURASTATE: // Victory Rush without a kill
+        case SPELL_FAILED_TARGET_AURASTATE:
+        case SPELL_FAILED_BAD_TARGETS:      // Power Word: Shield on a shielded bot (dev-check)
+        case SPELL_FAILED_SPELL_IN_PROGRESS:
+            return;
+        default:
+            break;
+    }
+    if (++_castFails[spell] == 5)
+        TC_LOG_INFO("server.questbot", "QUESTBOT event=castfail bot=%s spell=%u result=%u class=%u level=%u quest=%u", _name.c_str(), spell, uint32(result),
+            me->getClass(), me->getLevel(), QuestId());
 }
 
 void QuestBotAI::UseObject(GameObject* go)

@@ -677,6 +677,7 @@ bool PartyBotAI::CastRotation(Unit* target)
 
 bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
 {
+    _castResult = SPELL_FAILED_DONT_REPORT;
     SpellInfo const* info = sSpellMgr->GetSpellInfo(entry.Spell);
     if (!info || !me->HasSpell(entry.Spell) || me->HasSpellCooldown(entry.Spell) || me->GetGlobalCooldownMgr().HasGlobalCooldown(info))
         return false;
@@ -747,9 +748,9 @@ bool PartyBotAI::TryCast(PartyBotSpell const& entry, Unit* target)
 
     // ground-targeted spells (Death and Decay, Flamestrike, ...) go to the target's position
     if (info->GetExplicitTargetMask() & TARGET_FLAG_DEST_LOCATION)
-        return me->CastSpell(castTarget->GetPositionX(), castTarget->GetPositionY(), castTarget->GetPositionZ(), entry.Spell, false) == SPELL_CAST_OK;
+        return (_castResult = me->CastSpell(castTarget->GetPositionX(), castTarget->GetPositionY(), castTarget->GetPositionZ(), entry.Spell, false)) == SPELL_CAST_OK;
 
-    return me->CastSpell(castTarget, info, false) == SPELL_CAST_OK;
+    return (_castResult = me->CastSpell(castTarget, info, false)) == SPELL_CAST_OK;
 }
 
 // ---------------------------------------------------------------- manager
