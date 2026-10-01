@@ -200,6 +200,12 @@ LFGDungeonData const* LFGMgr::GetLFGDungeon(uint16 scenarioId, uint16 mapId)
 
 LFGDungeonData const* LFGMgr::GetLFGDungeon(uint32 id, uint32 team)
 {
+    // the selected dungeons are client slots (id | type << 24): FinishDungeon passed one and this read far past the
+    // vector (crash 2026-10-01 11:33 UTC at the end of a Stormwind Stockade run); bounds-checked like GetLFGDungeon(id)
+    id &= 0x00FFFFFF;
+    if (id >= LfgDungeonVStore.size())
+        return nullptr;
+
     if (LFGDungeonData* dungeon = LfgDungeonVStore[id])
         if (LFGDungeonsEntry const* dungeonEntry = dungeon->dbc)
             if (dungeonEntry->FitsTeam(team))
@@ -1681,7 +1687,7 @@ void LFGMgr::FinishDungeon(ObjectGuid gguid, const uint32 dungeonId)
         uint32 rDungeonId = 0;
         const LfgDungeonSet& dungeons = GetSelectedDungeons(guid, queueId);
         if (!dungeons.empty())
-            rDungeonId = *dungeons.begin();
+            rDungeonId = *dungeons.begin() & 0x00FFFFFF;     // a client slot (id | type << 24): the id for the reward lookup
 
         SetState(guid, LFG_STATE_FINISHED_DUNGEON, queueId);
         SendLfgUpdatePlayer(guid, LfgUpdateData(LFG_UPDATETYPE_DUNGEON_FINISHED, GetSelectedDungeons(guid, queueId)));
