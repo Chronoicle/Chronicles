@@ -38,7 +38,8 @@ enum eCreatures
     NPC_TIRION_FORDRING_2       = 92676,  //При смерти
     NPC_TIRION_FORDRING_3       = 100332, //Мертв
     NPC_TIRION_FORDRING_SOUL    = 94595,
-    
+    NPC_KC_FLY_TO_LIGHTS_HOPE   = 103773, // Kill Credit: Fly to Light's Hope Chapel
+
 //< Trash
     //Allies forces
     NPC_ARGENT_PHALANX_1        = 92858,

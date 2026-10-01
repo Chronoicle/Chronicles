@@ -1058,7 +1058,7 @@ public:
     }
 };
 
-//92940
+//92940 (Light's Hope / Dalaran -> scenario), 92907 (scenario -> Light's Hope, summoned by clicking 91145)
 class npc_bs_argent_hippogryph : public CreatureScript
 {
 public:
@@ -1083,7 +1083,8 @@ public:
         {
             if (apply)
             {
-                if (me->GetMapId() == 0)
+                // 1500: the flight out of the finished scenario (#66), path 9290700
+                if (me->GetMapId() == 0 || me->GetMapId() == 1500)
                     me->GetMotionMaster()->MovePath(me->GetEntry() * 100, false);
                 else if (me->GetMapId() == 1220)
                     me->GetMotionMaster()->MovePath(me->GetEntry() * 100 + 1, false);
@@ -1100,8 +1101,18 @@ public:
                 if (me->GetAnyOwner())
                     if (Player* owner = me->GetAnyOwner()->ToPlayer())
                     {
-                        owner->SetScenarioId(775);
-                        owner->CastSpell(owner, SPELL_FLY_TO_THE_BROKEN_SHORE, true);
+                        if (me->GetMapId() == 1500)
+                        {
+                            // Leaving the scenario: the optional "Fly to Light's Hope Chapel" of We Meet at Light's Hope,
+                            // then land next to the hippogryph that flew the player out (#66)
+                            owner->KilledMonsterCredit(NPC_KC_FLY_TO_LIGHTS_HOPE);
+                            owner->TeleportTo(0, 2275.8f, -5279.9f, 82.6f, 5.08f);
+                        }
+                        else
+                        {
+                            owner->SetScenarioId(775);
+                            owner->CastSpell(owner, SPELL_FLY_TO_THE_BROKEN_SHORE, true);
+                        }
                         me->DespawnOrUnsummon(500);
                     }
             }
