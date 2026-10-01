@@ -10,12 +10,16 @@
  * per quest. A quest the bot cannot finish is the useful result: it is logged with the state, position and objective
  * counts, abandoned, and the bot goes on with the next one. Handled objectives: kill (MONSTER, also creatures whose
  * kill credit counts for it), collect (ITEM: kill the creatures / open the objects whose loot has a quest drop for the
- * bot, take the quest items) and use (GAMEOBJECT). Everything else (talk to, spells to learn or cast, items to use,
- * area triggers, escorts, currencies...) is UNSUPPORTED. Accepting, turning in, using objects and looting go through
- * the client's packet handlers, so quest scripts fire as for a player. Runs in Player::Update on the bot's map thread.
+ * bot, take the quest items) and use (GAMEOBJECT). The quest's own item (given on accept or a quest drop) is used on
+ * kill targets the bot cannot attack, on the creatures its spell is limited to when the objective is an unspawned
+ * credit bunny, and on objective objects its spell targets (#138). Everything else (talk to, spells to learn or cast,
+ * items used at a place, area triggers, escorts, currencies...) is UNSUPPORTED. Accepting, turning in, using objects
+ * and items and looting go through the client's packet handlers, so quest scripts fire as for a player. Runs in
+ * Player::Update on the bot's map thread.
  */
 #include "PartyBot.h"
 #include "CellImpl.h"
+#include "ConditionMgr.h"
 #include "DB2Stores.h"
 #include "DisableMgr.h"
 #include "GameObject.h"
@@ -34,6 +38,7 @@
 #include "QuestPackets.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
+#include "SpellPackets.h"
 #include <algorithm>
 #include <cmath>
 #include <functional>
@@ -175,6 +180,8 @@ private:
     bool CanPay(SpellInfo const* info) const;
     void CastFailed(uint32 spell, SpellCastResult result);
     void UseObject(GameObject* go);
+    Item* QuestItem(SpellInfo const*& spell) const;
+    bool UseItem(WorldObject* target);
     void TakeQuestLoot(ObjectGuid guid, Loot* loot);
     uint32 RewardChoice() const;
     bool IsObjectiveItem(uint32 itemId) const;
@@ -208,6 +215,7 @@ private:
     int32 _progress = 0;                // sum of the objective counters
     std::set<uint32> _killEntries;      // creatures to kill for the objective
     std::set<uint32> _useEntries;       // objects to use / open for the objective
+    std::set<uint32> _itemEntries;      // creatures to use the quest item on (its spell's target conditions)
     std::vector<Position> _points;      // where to look when nothing is in range
     uint32 _pointIndex = 0;
     uint8 _turnInTries = 0;
@@ -542,6 +550,7 @@ bool QuestBotAI::SetupObjective(QuestObjective const& objective)
 {
     _killEntries.clear();
     _useEntries.clear();
+    _itemEntries.clear();
     _points.clear();
     _pointIndex = 0;
 
@@ -557,6 +566,18 @@ bool QuestBotAI::SetupObjective(QuestObjective const& objective)
                         for (uint32 credit : info->KillCredit)
                             if (credit == uint32(objective.ObjectID))
                                 _killEntries.insert(spawn.Entry);
+            // an unspawned credit bunny: the creatures the quest item's spell is limited to (conditions on its targets)
+            // get the item instead (24471 "Aid for the Wounded", 9303 "Inoculation")
+            if (std::none_of(_spawns.begin(), _spawns.end(), [this](Spawn const& spawn) { return !spawn.GO && _killEntries.count(spawn.Entry); }))
+            {
+                SpellInfo const* spell = nullptr;
+                if (QuestItem(spell))
+                    for (SpellEffectInfo const* effect : spell->Effects)
+                        if (effect->ImplicitTargetConditions)
+                            for (Condition const* cond : *effect->ImplicitTargetConditions)
+                                if (cond->ConditionType == CONDITION_OBJECT_ENTRY && cond->ConditionValue1 == TYPEID_UNIT && cond->ConditionValue2 && !cond->NegativeCondition)
+                                    _itemEntries.insert(cond->ConditionValue2);
+            }
             break;
         case QUEST_OBJECTIVE_ITEM:      // creatures and objects whose loot has a quest drop for the bot (its only quest)
             for (Spawn const& spawn : _spawns)
@@ -593,7 +614,7 @@ bool QuestBotAI::SetupObjective(QuestObjective const& objective)
     // where to look: the spawns of the targets, nearest first, else the quest's map POI for the objective
     std::vector<std::pair<float, Position>> spawns;
     for (Spawn const& spawn : _spawns)
-        if ((spawn.GO ? _useEntries : _killEntries).count(spawn.Entry))
+        if (spawn.GO ? _useEntries.count(spawn.Entry) != 0 : (_killEntries.count(spawn.Entry) || _itemEntries.count(spawn.Entry)))
             spawns.emplace_back(me->GetExactDist(spawn.Pos), spawn.Pos);
     std::sort(spawns.begin(), spawns.end(), [](std::pair<float, Position> const& a, std::pair<float, Position> const& b) { return a.first < b.first; });
     for (uint32 i = 0; i < spawns.size() && i < 10; ++i)
@@ -622,8 +643,8 @@ bool QuestBotAI::SetupObjective(QuestObjective const& objective)
         return false;
     }
 
-    TC_LOG_INFO("server.questbot", "QUESTBOT event=objective bot=%s quest=%u index=%d %s kill=%u use=%u points=%u", _name.c_str(), _quest->GetQuestId(),
-        _objective, what.c_str(), uint32(_killEntries.size()), uint32(_useEntries.size()), uint32(_points.size()));
+    TC_LOG_INFO("server.questbot", "QUESTBOT event=objective bot=%s quest=%u index=%d %s kill=%u use=%u item=%u points=%u", _name.c_str(), _quest->GetQuestId(),
+        _objective, what.c_str(), uint32(_killEntries.size()), uint32(_useEntries.size()), uint32(_itemEntries.size()), uint32(_points.size()));
     return true;
 }
 
@@ -632,7 +653,12 @@ void QuestBotAI::Hunt(QuestObjective const& objective)
     if (!_useEntries.empty())
         if (GameObject* go = NearestObject([this](GameObject* go) { return _useEntries.count(go->GetEntry()) && go->isSpawned() && !Ignored(go->GetGUID()); }))
         {
-            UseObject(go);
+            // an objective object the quest item's spell targets gets the item (6395 "Marla's Last Wish"), else a click
+            SpellInfo const* spell = nullptr;
+            if (objective.Type != QUEST_OBJECTIVE_GAMEOBJECT || !QuestItem(spell) || !(spell->GetExplicitTargetMask() & TARGET_FLAG_GAMEOBJECT_MASK))
+                UseObject(go);
+            else
+                UseItem(go);
             return;
         }
 
@@ -645,11 +671,14 @@ void QuestBotAI::Hunt(QuestObjective const& objective)
             return;
         }
 
-    // only ones the bot cannot attack: the credit comes from a spell, an item or gossip
+    // ones the bot cannot attack (the credit comes from a spell, an item or gossip) and the quest item's targets: the
+    // quest item on them (26391 "Extinguishing Hope": the extinguisher on the vineyard fires)
     if (objective.Type == QUEST_OBJECTIVE_MONSTER)
-        if (Creature* creature = NearestCreature([this](Creature* creature) { return _killEntries.count(creature->GetEntry()) && creature->IsAlive() && !me->IsValidAttackTarget(creature); }))
+        if (Creature* creature = NearestCreature([this](Creature* creature) { return creature->IsAlive() && !Ignored(creature->GetGUID())
+            && (_itemEntries.count(creature->GetEntry()) || (_killEntries.count(creature->GetEntry()) && !me->IsValidAttackTarget(creature))); }))
         {
-            EndQuest(RESULT_UNSUPPORTED, "kill target " + std::to_string(creature->GetEntry()) + " cannot be attacked (credit from a spell, an item or gossip?)");
+            if (!UseItem(creature))
+                EndQuest(RESULT_UNSUPPORTED, "kill target " + std::to_string(creature->GetEntry()) + " cannot be attacked and the bot has no quest item to use on it (credit from a spell or gossip?)");
             return;
         }
 
@@ -1043,6 +1072,55 @@ void QuestBotAI::UseObject(GameObject* go)
     if (me->GetLootGUID() == go->GetGUID())
         TakeQuestLoot(go->GetGUID(), &go->loot);
     TC_LOG_INFO("server.questbot", "QUESTBOT event=use bot=%s quest=%u object=%u", _name.c_str(), QuestId(), entry);
+}
+
+// the quest's own item the bot carries (given on accept, or a quest drop) with a use spell.
+// ponytail: the first one; match the spell to the target (kill credit, conditions, SmartAI spell hit) if a quest has two
+Item* QuestBotAI::QuestItem(SpellInfo const*& spell) const
+{
+    uint32 const ids[] = { _quest->SourceItemId, _quest->ItemDrop[0], _quest->ItemDrop[1], _quest->ItemDrop[2], _quest->ItemDrop[3] };
+    for (uint32 id : ids)
+        if (Item* item = id ? me->GetItemByEntry(id) : nullptr)
+            for (ItemEffectEntry const* effect : item->GetTemplate()->Effects)
+                if (effect->TriggerType == ITEM_SPELLTRIGGER_ON_USE && (spell = sSpellMgr->GetSpellInfo(effect->SpellID)))
+                    return item;
+    return nullptr;
+}
+
+// the quest item on the target as a client uses it (CMSG_USE_ITEM: item scripts, cooldowns, charges and the spell's
+// checks apply): walk next to it (any spell range), wait out the item's cooldown and the combat for a spell not usable in
+// one, stand still facing it (cones, channels), use. Once per target. False: the bot has no quest item to use
+bool QuestBotAI::UseItem(WorldObject* target)
+{
+    SpellInfo const* spell = nullptr;
+    Item* item = QuestItem(spell);
+    if (!item)
+        return false;
+
+    Move move = MoveTo(target->GetPosition(), InteractDist);
+    if (move == Move::Failed)
+        Ignore(target->GetGUID());
+    if (move != Move::Arrived || me->HasSpellCooldown(spell->Id) || (me->isInCombat() && !spell->CanBeUsedInCombat()))
+        return true;
+
+    StandStill();
+    me->SetFacingToObject(target);
+    me->RemoveUnitMovementFlag(MOVEMENTFLAG_FORWARD);   // set by the facing spline: fails cast-time and channeled spells
+
+    // the item can be used up: what the log needs first
+    uint32 itemId = item->GetEntry(), entry = target->GetEntry();
+    Ignore(target->GetGUID());
+    WorldPacket data(CMSG_USE_ITEM);
+    WorldPackets::Spells::ItemUse packet(std::move(data));
+    packet.bagIndex = item->GetBagSlot();
+    packet.slot = item->GetSlot();
+    packet.itemGUID = item->GetGUID();
+    packet.Cast.SpellID = int32(spell->Id);
+    packet.Cast.Target.Flags = target->IsUnit() ? TARGET_FLAG_UNIT : TARGET_FLAG_GAMEOBJECT;  // dropped by spells without one
+    packet.Cast.Target.Unit = target->GetGUID();
+    me->GetSession()->HandleUseItemOpcode(packet);
+    TC_LOG_INFO("server.questbot", "QUESTBOT event=useitem bot=%s quest=%u item=%u spell=%u target=%u", _name.c_str(), QuestId(), itemId, spell->Id, entry);
+    return true;
 }
 
 // take the quest items (and the items the quest asks for) and release the loot, as a player looting
