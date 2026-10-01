@@ -150,4 +150,12 @@ private:
 // QuestBot.cpp: the AI of a quest-test bot
 PlayerAI* NewQuestBotAI(Player* bot, ObjectGuid gmGuid, uint8 maxLevel);
 
+// ---- B (DungeonBotAI.cpp, #140): the tank's AI in a dungeon run. The four others keep PartyBotAI with the tank as leader.
+PlayerAI* NewDungeonLeaderAI(Player* tank, uint32 runId);
+// B: call from the tank's session update while the tank is dead (Player::Update runs no AI then): wipe handling,
+// the tank back to the entrance and up (the members' sessions then resurrect them next to it)
+void DungeonLeaderDeadUpdate(Player* tank, uint32 diff);
+// C (DungeonRun.cpp): called by B when the run is over (all bosses dead, or given up); C logs out / requeues
+void DungeonRunEnded(uint32 runId, bool cleared, std::string const& reason);
+
 #endif
