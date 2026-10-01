@@ -120,7 +120,9 @@ public:
 
 private:
     void Cleanup();
-    uint32 FreeBotAccount();            // a partybot account without characters
+    uint32 FreeBotAccount();            // a partybot account without characters; _lock held
+    uint32 ReserveBotAccount();         // FreeBotAccount + mark it used, under _lock (0 = none)
+    void ReleaseBotAccount(uint32 accountId);   // undo a reservation whose character was not created
     uint32 QuestTestCount();            // _lock held
 
     std::mutex _lock;

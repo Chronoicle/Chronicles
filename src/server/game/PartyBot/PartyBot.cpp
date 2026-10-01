@@ -953,6 +953,22 @@ uint32 PartyBotMgr::FreeBotAccount()
     return 0;
 }
 
+// commands run on the GM's map thread: two GMs creating bots at once must not pick the same free account (dev-check)
+uint32 PartyBotMgr::ReserveBotAccount()
+{
+    std::lock_guard<std::mutex> guard(_lock);
+    uint32 accountId = FreeBotAccount();
+    if (accountId)
+        _usedAccounts.insert(accountId);
+    return accountId;
+}
+
+void PartyBotMgr::ReleaseBotAccount(uint32 accountId)
+{
+    std::lock_guard<std::mutex> guard(_lock);
+    _usedAccounts.erase(accountId);
+}
+
 // a level-1 character on a bot account, as the character screen makes it (without a client); empty guid on failure
 static ObjectGuid NewCharacter(uint32 accountId, uint8 race, uint8 cls, std::string const& name)
 {
@@ -990,19 +1006,24 @@ std::string PartyBotMgr::CreateBot(Player* creator, uint32 specId, std::string& 
     if (!spec || !spec->ClassID || spec->ClassID >= MAX_CLASSES)
         return "Unknown specialization.";
 
-    uint32 accountId = FreeBotAccount();
+    uint32 accountId = ReserveBotAccount();
     if (!accountId)
         return "No free partybot account left (partybotN@bot).";
 
     name = BotName(std::string(spec->Name->Str[DEFAULT_LOCALE]) + sChrClassesStore.AssertEntry(spec->ClassID)->Name->Str[DEFAULT_LOCALE]);
     if (name.empty())
+    {
+        ReleaseBotAccount(accountId);
         return "Could not find a free name.";
+    }
 
     ObjectGuid guid = NewCharacter(accountId, BotRace(spec->ClassID, creator->GetTeam() == ALLIANCE), spec->ClassID, name);
     if (guid.IsEmpty())
+    {
+        ReleaseBotAccount(accountId);
         return "The character could not be created.";
+    }
 
-    _usedAccounts.insert(accountId);
     CharacterDatabase.PExecute("REPLACE INTO partybot_characters (guid, account, spec, setup) VALUES (%u, %u, %u, 0)", guid.GetCounter(), accountId, specId);
 
     TC_LOG_INFO("server.partybot", "Party bot character %s (spec %u, account %u) created by %s", name.c_str(), specId, accountId, creator->GetName());
@@ -1105,12 +1126,9 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
 
     if (!oldGuid.IsEmpty() && (ObjectAccessor::FindPlayer(oldGuid) || sWorld->FindSession(accountId)))
         return "A quest test of this race and class is running, or its account is in use (.partybot questtest stop).";
-    if (!accountId)     // under the lock: two GMs starting at once must not pick the same free account (dev-check)
-    {
-        std::lock_guard<std::mutex> guard(_lock);
-        if ((accountId = FreeBotAccount()))
-            _usedAccounts.insert(accountId);
-    }
+    bool reserved = false;
+    if (!accountId)
+        reserved = (accountId = ReserveBotAccount()) != 0;
     // no free account left: reuse the account of the longest-unused other quest-test character, which is then deleted
     // like the old one (same guard: Qt..., no party bot, partybotN@bot, not online, no session)
     if (!accountId)
@@ -1133,13 +1151,25 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
 
     std::string name = BotName("Qt" + raceName + classEntry->Name->Str[DEFAULT_LOCALE]);   // the old name is still taken
     if (name.empty())
+    {
+        if (reserved)
+            ReleaseBotAccount(accountId);
         return "Could not find a free name.";
+    }
 
     // the new character first; the old one goes only once the new one exists
     ObjectGuid guid = NewCharacter(accountId, race, cls, name);
     if (guid.IsEmpty())
+    {
+        if (reserved)
+            ReleaseBotAccount(accountId);
         return "The character could not be created (" + raceName + " " + classEntry->Name->Str[DEFAULT_LOCALE] + " allowed?).";
-    _usedAccounts.insert(accountId);
+    }
+    if (!reserved)      // reused or same race/class account: mark it too (asynchronous character save)
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        _usedAccounts.insert(accountId);
+    }
 
     if (!oldGuid.IsEmpty())
     {
