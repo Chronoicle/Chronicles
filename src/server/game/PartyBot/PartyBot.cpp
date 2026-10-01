@@ -1105,8 +1105,31 @@ std::string PartyBotMgr::StartQuestTest(Player* gm, std::string text)
 
     if (!oldGuid.IsEmpty() && (ObjectAccessor::FindPlayer(oldGuid) || sWorld->FindSession(accountId)))
         return "A quest test of this race and class is running, or its account is in use (.partybot questtest stop).";
-    if (!accountId && !(accountId = FreeBotAccount()))
-        return "No free partybot account left (partybotN@bot).";
+    if (!accountId)     // under the lock: two GMs starting at once must not pick the same free account (dev-check)
+    {
+        std::lock_guard<std::mutex> guard(_lock);
+        if ((accountId = FreeBotAccount()))
+            _usedAccounts.insert(accountId);
+    }
+    // no free account left: reuse the account of the longest-unused other quest-test character, which is then deleted
+    // like the old one (same guard: Qt..., no party bot, partybotN@bot, not online, no session)
+    if (!accountId)
+        if (QueryResult result = CharacterDatabase.PQuery("SELECT c.guid, c.account, c.name FROM characters c LEFT JOIN partybot_characters p ON p.guid = c.guid "
+            "WHERE p.guid IS NULL AND c.name LIKE 'Qt%%' AND c.online = 0 ORDER BY c.logout_time"))
+            do
+            {
+                ObjectGuid candidate = ObjectGuid::Create<HighGuid::Player>((*result)[0].GetUInt64());
+                uint32 account = (*result)[1].GetUInt32();
+                if ((*result)[2].GetString().compare(0, 2, "Qt") == 0 && !ObjectAccessor::FindPlayer(candidate) && !sWorld->FindSession(account)
+                    && LoginDatabase.PQuery("SELECT 1 FROM account WHERE id = %u AND username REGEXP '%s'", account, BotAccountPattern))
+                {
+                    oldGuid = candidate;
+                    accountId = account;
+                    break;
+                }
+            } while (result->NextRow());
+    if (!accountId)
+        return "No free partybot account left (partybotN@bot) and no idle quest-test character to replace.";
 
     std::string name = BotName("Qt" + raceName + classEntry->Name->Str[DEFAULT_LOCALE]);   // the old name is still taken
     if (name.empty())
