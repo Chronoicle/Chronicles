@@ -113,6 +113,7 @@ namespace
     }
 
     // the quests of a zone (QuestSortID > 0), built once
+    // Quest const* of the quest store: valid while the templates aren't reloaded (no .reload on this server, AGENTS.md)
     std::vector<Quest const*> const& ZoneQuests(uint32 zoneId)
     {
         static std::unordered_map<uint32, std::vector<Quest const*>> const zones = []
@@ -1009,8 +1010,10 @@ bool DungeonLeaderAI::QuestObject()
     {
         Player* user = nullptr;
         uint32 questId = 0;
-        // the searcher keeps the last match, the nearest: user / questId are set by that last accepted call
-        std::function<bool(GameObject*)> pred = [&](GameObject* go)
+        // a living member with an open objective for go (user / questId: who and for which quest). Asked again for the
+        // object found: the searcher also checks canSeeOrDetect after the predicate, so the last accepted call may not
+        // be the object it keeps (dev-check)
+        auto needs = [&](GameObject* go) -> bool
         {
             if (!go->isSpawned() || _usedObjects.count(go->GetGUID()))
                 return false;
@@ -1026,11 +1029,12 @@ bool DungeonLeaderAI::QuestObject()
                             }
             return false;
         };
+        std::function<bool(GameObject*)> pred = needs;
         GameObject* found = nullptr;
         NearestCheck<GameObject> check(me, ObjectRange, pred);
         Trinity::GameObjectLastSearcher<NearestCheck<GameObject>> searcher(me, found, check);
         me->VisitNearbyObject(ObjectRange, searcher);
-        if (!found)
+        if (!found || !needs(found))
             return false;
         _objectGuid = found->GetGUID();
         _objectUser = user->GetGUID();
@@ -1044,6 +1048,9 @@ bool DungeonLeaderAI::QuestObject()
     Player* user = ObjectAccessor::GetPlayer(*me, _objectUser);
     if (!go || !user || !user->IsAlive() || (_objectMs += _tick) > ObjectMaxMs)
     {
+        if (go && user && _objectMs > ObjectMaxMs)  // the member never came within reach of it (dev-check)
+            Log("event=useobject run=%u dungeon=%u bot=%s object=%u \"%s\" result=timeout", _runId, _dungeonId, user->GetName(),
+                go->GetEntry(), go->GetName());
         _objectGuid.Clear();
         return false;
     }
