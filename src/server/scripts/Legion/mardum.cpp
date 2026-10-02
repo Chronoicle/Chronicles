@@ -869,7 +869,7 @@ public:
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
         player->PlayerTalkClass->ClearMenus();
-        if (action == 1)
+        if (action == 0) // DB option: action is its OptionNpc (0), no longer the old OptionType 1 (#151)
         {
             player->CLOSE_GOSSIP_MENU();
             if (player->GetQuestStatus(QUEST) == QUEST_STATUS_INCOMPLETE && !player->GetReqKillOrCastCurrentCount(QUEST, creature->GetEntry()))
@@ -2738,21 +2738,8 @@ class npc_93127 : public CreatureScript
 {
 public:
     npc_93127() : CreatureScript("npc_93127") {}
-    
-    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
-    {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == 1)
-        {
-            player->CLOSE_GOSSIP_MENU();
 
-            player->CastSpell(player, 195020, true);
-            sCreatureTextMgr->SendChat(creature, TEXT_GENERIC_3, player->GetGUID());  
-        }
-
-        return true;
-    }
-    
+    // The "teach" gossip option (menu 18435, option 1) is SmartAI, like the other trainers (#151).
     bool OnQuestAccept(Player* player, Creature* creature, Quest const* quest) override
     {
         switch(quest->GetQuestId()) 
