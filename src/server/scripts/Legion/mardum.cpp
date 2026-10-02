@@ -2217,6 +2217,7 @@ public:
                 check = true;
                 me->GetMotionMaster()->MovePoint(1, 913.92f, 2848.63f, -0.69f);
                 me->Mount(64385);
+                me->SetAnimTier(AnimTier::Ground); // #152: no flying animation on the Nightsaber, see npc_93127 (39663)
                 me->DespawnOrUnsummon(10000);
             }
             else 
@@ -2324,6 +2325,7 @@ public:
             {
                 sCreatureTextMgr->SendChat(me, 0, summoner->GetGUID());
                 me->Mount(64385);
+                me->SetAnimTier(AnimTier::Ground); // #152: no flying animation on the Nightsaber, see npc_93127 (39663)
                 me->GetMotionMaster()->MovePath(10267113, false);
                 me->DespawnOrUnsummon(10000);
             }
@@ -2394,6 +2396,7 @@ public:
             {
                 sCreatureTextMgr->SendChat(me, 2, summoner->GetGUID());
                 me->Mount(64385);
+                me->SetAnimTier(AnimTier::Ground); // #152: no flying animation on the Nightsaber, see npc_93127 (39663)
                 me->GetMotionMaster()->MovePoint(0, 825.57f, 2488.19f, -59.78f);
                 me->DespawnOrUnsummon(10000);
             }
@@ -2755,11 +2758,14 @@ public:
                 break;
             case 39663:
             {
+                // #152: creature_template_addon gives 93127/99045/96420/96655 bytes1 0x03000000 = AnimTier::Fly and the
+                // summons keep it: on the Nightsaber (64385) they ran to Izal Whitemoon in the flying animation. Ground tier.
                 if (Creature* targ = player->SummonCreature(93127, creature->GetPositionX(), creature->GetPositionY(), creature->GetPositionZ(), creature->GetOrientation(), TEMPSUMMON_MANUAL_DESPAWN, 0, player->GetGUID(), NULL))
                 {
                    // targ->AddPlayerInPersonnalVisibilityList(player->GetGUID());
                     sCreatureTextMgr->SendChat(targ, TEXT_GENERIC_4, player->GetGUID());  
                     targ->Mount(64385);
+                    targ->SetAnimTier(AnimTier::Ground); // #152
                     targ->GetMotionMaster()->MovePath(10267121, false);
                     targ->DespawnOrUnsummon(25000);
                 } 
@@ -2767,6 +2773,7 @@ public:
                 {
                   //  targ->AddPlayerInPersonnalVisibilityList(player->GetGUID()); 
                     targ->Mount(64385);
+                    targ->SetAnimTier(AnimTier::Ground); // #152
                     targ->GetMotionMaster()->MovePath(10267121, false);
                     targ->DespawnOrUnsummon(25000);
                 } 
@@ -2774,6 +2781,7 @@ public:
                 {
                   //  targ->AddPlayerInPersonnalVisibilityList(player->GetGUID()); 
                     targ->Mount(64385);
+                    targ->SetAnimTier(AnimTier::Ground); // #152
                     targ->GetMotionMaster()->MovePath(10267121, false);
                     targ->DespawnOrUnsummon(25000);
                 } 
@@ -2781,6 +2789,7 @@ public:
                 {
                   //  targ->AddPlayerInPersonnalVisibilityList(player->GetGUID()); 
                     targ->Mount(64385);
+                    targ->SetAnimTier(AnimTier::Ground); // #152
                     targ->GetMotionMaster()->MovePath(10267121, false);
                     targ->DespawnOrUnsummon(25000);
                 } 
