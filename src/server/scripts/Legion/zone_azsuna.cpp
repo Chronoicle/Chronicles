@@ -1,5 +1,6 @@
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
+#include "GameObjectAI.h"
 
 enum eSpells
 {
@@ -443,6 +444,36 @@ public:
     }
 };
 
+// 252158 Murloc Cage (Murloc Mind Control 43374, #158): only a mind-controlled Salteye's Chew Cage (220326) opens it
+class go_murloc_cage_43374 : public GameObjectScript
+{
+public:
+    go_murloc_cage_43374() : GameObjectScript("go_murloc_cage_43374") { }
+
+    struct go_murloc_cage_43374AI : public GameObjectAI
+    {
+        go_murloc_cage_43374AI(GameObject* go) : GameObjectAI(go) { }
+
+        // the player's own click (GAME_OBJ_USE or its open-lock cast) does nothing
+        bool GossipUse(Player* /*player*/) override { return true; }
+
+        // Chew Cage (ACTIVATE_OBJECT) -> UseDoorOrButton -> SetLootState(GO_ACTIVATED, murloc): credit to the priest controlling it
+        void OnStateChanged(uint32 state, Unit* unit) override
+        {
+            if (state != GO_ACTIVATED || !unit || !unit->IsCreature())
+                return;
+
+            if (Player* player = unit->GetCharmerOrOwnerPlayerOrPlayerItself())
+                player->KillCreditGO(go->GetEntry(), go->GetGUID());
+        }
+    };
+
+    GameObjectAI* GetAI(GameObject* go) const override
+    {
+        return new go_murloc_cage_43374AI(go);
+    }
+};
+
 void AddSC_azsuna()
 {
     new boss_levantus();
@@ -450,4 +481,5 @@ void AddSC_azsuna()
     new boss_calamir();
     new boss_withered_jim();
     new spell_resonance();
+    new go_murloc_cage_43374();
 }
