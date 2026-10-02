@@ -71,6 +71,10 @@ public:
             */
             if (player->GetQuestStatus(40077) == QUEST_STATUS_INCOMPLETE)
             {
+                // #148: once (the click stays possible while the 15 demons are not slain yet)
+                if (player->GetReqKillOrCastCurrentCount(40077, go->GetEntry()))
+                    return true;
+
                 player->CastSpell(player, SCENE, true);
                 player->KillCreditGO(go->GetEntry(), go->GetGUID());
                 return true;
@@ -961,7 +965,7 @@ public:
             if (!isUse)
                 return true;
 
-            if (player->GetQuestStatus(QUEST) == QUEST_STATUS_INCOMPLETE)
+            if (player->GetQuestStatus(QUEST) == QUEST_STATUS_INCOMPLETE && !player->GetReqKillOrCastCurrentCount(QUEST, CREDIT)) // #148: once
             {
                 player->KilledMonsterCredit(CREDIT);
                 player->CastSpell(player, SPELL, false);
