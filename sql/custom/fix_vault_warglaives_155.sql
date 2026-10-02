@@ -9,3 +9,6 @@ UPDATE world.gameobject_template SET name = 'Illidari Warglaives' WHERE entry = 
 
 -- 2) Tie the chest to quest 38669 (data8 = chest questID) so it lights up while the quest is in progress.
 UPDATE world.gameobject_template SET Data8 = 38669 WHERE entry = 241553 AND type = 3 AND Data8 = 0;
+
+-- 3) Russian cast bar ("Извлечение"): empty like its English twin 253189 (dev-owner, after dev-check's note).
+UPDATE world.gameobject_template SET castBarCaption = '' WHERE entry = 241553 AND castBarCaption = 'Извлечение';
