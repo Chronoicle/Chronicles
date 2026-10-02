@@ -2,6 +2,11 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-10-02 (Oslo)
+
+- Claude (desktop team dev-owner + subagents + help-helper, dev-check reviews) — restart 00:06 UTC (owner OK, 60 s timer, clean shutdown), worldserver 22cad76 (ready 00:06:52 UTC): Frost Blizzard -> Frozen Orb reverted (owner), #79 Broken Shore scenario, #66 Ashbringer scenario, #148 Mardum quest objects + Legion Banner name, #151 Kayn teach, #149 Mardum Infernal placeholders + Despair Ridge phases, #150 DH start facing; SQL applied right before: #144 #130 #145 (2) #122 #146 + fix_ashbringer_scenario_66, fix_legion_banner_name_148, fix_kayn_vengeance_teach_151, fix_mardum_149, fix_dh_start_facing_150 — live, changelog 1555371110693085295, 11 reporters told — undo: the undo_*.sql next to each fix (~ and ~/LegionCore/sql/custom), `git revert` c4ff0e1..22cad76 (ced3975 a0694b7 96dc5c2 4365066 3dbf919 6dc9ed8 3c3283f 7de9a90 34525a3 22cad76) + rebuild.
+- Claude (desktop team dev-owner) — Discord: private text channel #owner-amibari (id 1555370335820316714) under 🔒 Staff, visible only to the owner (chronwastaken) and amibari (gabrielf03d), owner request — live — undo: delete the channel.
+
 ## 2026-10-01 (Oslo)
 
 - Claude (desktop team dev-owner + subagents, dev-check reviews) — restart 21:21 UTC (owner OK, 60 s timer, clean shutdown), worldserver 1562fc5 (ready 21:22:48 UTC): Frost Blizzard 20% per tick Frozen Orb (owner custom, fix_blizzard_frozen_orb.sql applied right before), #143 Worm Call grubs on the ground (Neltharion's Lair) — live, changelog 1555329240029855814 — undo: ~/undo_blizzard_frozen_orb.sql, `git revert` 1562fc5 7097039 + rebuild.
