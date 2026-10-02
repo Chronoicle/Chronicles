@@ -684,6 +684,11 @@ void SmartAI::EnterCombat(Unit* enemy)
 
 void SmartAI::JustDied(Unit* killer)
 {
+    // #154: a pet, guardian or totem killing blow counts for its player (on-death invoker casts give personal credit,
+    // items or phase auras: on the pet they were lost). Vehicles and charmed units keep themselves as the invoker
+    if (killer && (killer->isGuardian() || killer->isTotem()))
+        if (Player* owner = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+            killer = owner;
     GetScript()->ProcessEventsFor(SMART_EVENT_DEATH, killer);
     if (HasEscortState(SMART_ESCORT_ESCORTING))
         EndPath(true);
