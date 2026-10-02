@@ -120,6 +120,10 @@ bool Conversation::CreateConversation(ObjectGuid::LowType guidlow, uint32 trigge
     if (!duration)
         duration = 30000;
 
+    // The DB actor durations are often shorter than the lines: run until the last line has started (#154)
+    for (ConversationDynamicFieldLines const& line : GetLines())
+        duration = std::max(duration, line.textId);
+
     // possible it should be add.
     duration += 5000;
 
