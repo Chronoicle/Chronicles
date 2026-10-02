@@ -1,0 +1,11 @@
+-- #160 (help-helper, Claude 2026-10-02): Mardum, Enter the Illidari: Ashtongue (40378). Clicking the Felsaber (101518,
+-- spellclick 200255 -> credit 101518 + linked 200175 Felsaber mount) put the player on the saber and threw them off
+-- again, and the mount then said "ground mounts are not allowed here": the player still had 179665 Disable ALL Mounts
+-- (aura 336 MOD_FLYING_RESTRICTIONS), the zone-wide mount ban of the intro.
+-- Its spell_area row (zone 7705, quest_end 40077, quest_end_status 64 = REWARDED, autocast) was written for the
+-- TrinityCore meaning of quest_end_status (statuses that END the aura). This core reads it the other way round
+-- (SpellArea::IsFitToRequirements: the aura fits only while quest_end's status IS in the mask), so the ban started
+-- when The Invasion Begins (40077) was rewarded and never ended. With the mask NONE|COMPLETE|INCOMPLETE (1|2|8 = 11)
+-- the ban holds from arrival until 40077 is rewarded, as intended; on the reward SetQuestUpdate removes the aura.
+-- Undo: undo_mardum_mounts_160.sql
+UPDATE world.spell_area SET quest_end_status = 11 WHERE spell = 179665 AND area = 7705 AND quest_start = 0 AND quest_end = 40077 AND quest_end_status = 64;
