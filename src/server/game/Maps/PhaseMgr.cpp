@@ -55,8 +55,10 @@ void PhaseMgr::RemoveUpdateFlag(PhaseUpdateFlag updateFlag)
     if (updateFlag == PHASE_UPDATE_FLAG_ZONE_UPDATE ||
         updateFlag == PHASE_UPDATE_FLAG_AREA_UPDATE)
     {
-        // Update zone changes
-        if (phaseData.HasActiveDefinitions())
+        // Update zone changes. #152: the definitions are keyed by zone, so an area change inside the zone keeps them:
+        // resetting them here resent the whole phase shift + world states at every subarea border (choppy Mardum
+        // flight). Recalculate() still flags a real change
+        if (updateFlag == PHASE_UPDATE_FLAG_ZONE_UPDATE && phaseData.HasActiveDefinitions())
         {
             phaseData.ResetDefinitions();
             _UpdateFlags |= (PHASE_UPDATE_FLAG_CLIENTSIDE_CHANGED | PHASE_UPDATE_FLAG_SERVERSIDE_CHANGED);
@@ -90,6 +92,10 @@ void PhaseMgr::Recalculate()
     if (!player->GetCurrentZoneID()) // Is not in world and not have map and zone
         return;
 
+    // #152: an unchanged result keeps the flags as they were (no phase shift resend)
+    std::list<PhaseDefinition const*> const oldDefinitions = phaseData.activePhaseDefinitions;
+    uint8 const oldUpdateFlags = _UpdateFlags;
+
     if (phaseData.HasActiveDefinitions())
     {
         _updateLock.lock();
@@ -116,6 +122,9 @@ void PhaseMgr::Recalculate()
                 if (phase->IsLastDefinition())
                     break;
             }
+
+    if (phaseData.activePhaseDefinitions == oldDefinitions) // #152
+        _UpdateFlags = oldUpdateFlags;
 
     std::set<uint32> phaseIds;
     for (std::list<PhaseDefinition const*>::const_iterator itr_ = phaseData.activePhaseDefinitions.begin(); itr_ != phaseData.activePhaseDefinitions.end(); ++itr_)
