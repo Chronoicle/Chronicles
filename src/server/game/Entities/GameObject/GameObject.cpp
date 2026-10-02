@@ -1398,6 +1398,9 @@ bool GameObject::ActivateToQuest(Player* target) const
     {
         case GAMEOBJECT_TYPE_CHEST: // scan GO chest with loot including quest items
         {
+            // chest tied to a quest (data8) lights up while that quest is in progress, as in TrinityCore (#155)
+            if (GetGOInfo()->chest.questID && target->GetQuestStatus(GetGOInfo()->chest.questID) == QUEST_STATUS_INCOMPLETE)
+                return true;
             if (LootTemplates_Gameobject.HaveQuestLootForPlayer(GetEntry(), target))
             {
                 //TODO: fix this hack
