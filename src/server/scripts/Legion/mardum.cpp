@@ -908,12 +908,9 @@ public:
             CREDIT_REQUARE = 99914,
         };
 
-        bool GossipUse(Player* player) override
-        {
-            if (player->GetReqKillOrCastCurrentCount(QUEST, CREDIT) || !player->GetReqKillOrCastCurrentCount(QUEST, CREDIT_REQUARE))
-                return true;
-            return false;
-        }
+        // #161: see go_q40077 (a goober click only reaches GossipUse; this one only checked and handed the click back to the
+        // native use, so the credit 94406, the scene and the summon in GossipHello never ran)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {
