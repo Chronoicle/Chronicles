@@ -2086,6 +2086,86 @@ public:
     };
 };
 
+//100333 Skittering Broodling: about half the sniffed spawns hang in the webs ~32 yd above Tyranna's lair (z 275-277,
+// floor 243) and nothing brought them down: melee was "out of range" and they never aggroed (z > 3 rule). Drop to the
+// ground when a player comes near or hits them, then fight there (#153). Tyranna's summons are on the ground, unaffected.
+class npc_q38728_skittering_broodling : public CreatureScript
+{
+public:
+    npc_q38728_skittering_broodling() : CreatureScript("npc_q38728_skittering_broodling") { }
+
+    CreatureAI* GetAI(Creature* creature) const override
+    {
+        return new npc_q38728_skittering_broodlingAI(creature);
+    }
+
+    struct npc_q38728_skittering_broodlingAI : public ScriptedAI
+    {
+        npc_q38728_skittering_broodlingAI(Creature* creature) : ScriptedAI(creature), dropping(false) { }
+
+        enum data
+        {
+            POINT_DROP = 1,
+        };
+
+        bool dropping;
+
+        void Reset() override
+        {
+            dropping = false;
+        }
+
+        bool IsHanging() const
+        {
+            float ground = me->GetHeight(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), true, MAX_FALL_DISTANCE);
+            return ground > INVALID_HEIGHT && me->GetPositionZ() - ground > 5.0f;
+        }
+
+        void Drop()
+        {
+            if (dropping || !IsHanging())
+                return;
+
+            dropping = true;
+            me->GetMotionMaster()->MoveFall(POINT_DROP);
+        }
+
+        void MoveInLineOfSight(Unit* who) override
+        {
+            if (who->IsPlayer() && me->GetExactDist2d(who) < 15.0f && me->IsValidAttackTarget(who) && IsHanging())
+            {
+                Drop();
+                AttackStart(who);
+                return;
+            }
+
+            ScriptedAI::MoveInLineOfSight(who);
+        }
+
+        void EnterCombat(Unit* /*victim*/) override
+        {
+            Drop(); // pulled from range while still in the web (#153)
+        }
+
+        void MovementInform(uint32 type, uint32 id) override
+        {
+            if (type != EFFECT_MOTION_TYPE || id != POINT_DROP)
+                return;
+
+            dropping = false;
+            me->SetHomePosition(*me); // evade stays on the ground instead of flying back into the web (#153)
+        }
+
+        void UpdateAI(uint32 /*diff*/) override
+        {
+            if (!UpdateVictim())
+                return;
+
+            DoMeleeAttackIfReady();
+        }
+    };
+};
+
 //245728
 class go_q38729 : public GameObjectScript
 {
@@ -2884,6 +2964,7 @@ void AddSC_Mardum()
     new npc_q39495_prolifica();
     new npc_q38728_tyranna();
     new npc_q38728_progres1();
+    new npc_q38728_skittering_broodling();
     new go_q38729();
     new go_q39262();
     new npc_q40378_1();
