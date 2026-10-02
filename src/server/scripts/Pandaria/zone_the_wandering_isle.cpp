@@ -2085,7 +2085,7 @@ public:
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
-        if (action == 1)
+        if (action == 0) // DB option: action is its OptionNpc (0), no longer the old OptionType 1 (#157)
         {
             player->CLOSE_GOSSIP_MENU();
             if (player->GetQuestStatus(QUEST_NOT_IN_FACE) == QUEST_STATUS_INCOMPLETE)
@@ -2320,7 +2320,7 @@ class mob_master_shang_xi_temple : public CreatureScript
 
     bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
     {
-        if (action == 1)
+        if (action == 0) // DB option: action is its OptionNpc (0), no longer the old OptionType 1 (#157)
         {
             player->CastSpell(player, SPELL_SUMMON_WIND_TELEPORTER, true);
             //player->NearTeleportTo(926.58f, 3605.33f, 251.63f, 3.114f);
@@ -5015,17 +5015,19 @@ class npc_shang_xi_choose_faction : public CreatureScript
     public:
         npc_shang_xi_choose_faction() : CreatureScript("npc_shang_xi_choose_faction") { }
 
-    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 action)
+    bool OnGossipSelect(Player* player, Creature* /*creature*/, uint32 /*sender*/, uint32 /*action*/)
     {
-        if (action == 1)
+        // #157: menu 13726's three DB options all pass action 0 (their OptionNpc), so pick by race like the option
+        // conditions do: option 0 neutral (choose a faction), 1 Alliance (Stormwind), 2 Horde (Orgrimmar) Pandaren
+        if (player->getRace() == RACE_PANDAREN_NEUTRAL)
         {
             if (player->GetQuestStatus(QUSRT_NEW_FATE) == QUEST_STATUS_REWARDED || 
                 player->GetQuestStatus(QUSRT_NEW_FATE) == QUEST_STATUS_INCOMPLETE)
                 player->ShowNeutralPlayerFactionSelectUI();
         }
-        else if (action == 2)
+        else if (player->getRace() == RACE_PANDAREN_ALLIANCE)
             player->TeleportTo(0, -8866.55f, 671.93f, 97.90f, 5.31f);
-        else if (action == 3)
+        else if (player->getRace() == RACE_PANDAREN_HORDE)
             player->TeleportTo(1, 1577.30f, -4453.64f, 15.68f, 1.84f);
 
         player->PlayerTalkClass->SendCloseGossip();

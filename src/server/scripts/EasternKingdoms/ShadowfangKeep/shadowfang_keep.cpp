@@ -27,7 +27,7 @@ class npc_apothecary_hummel : public CreatureScript
             pPlayer->PlayerTalkClass->ClearMenus();
             pPlayer->CLOSE_GOSSIP_MENU();
 
-            if (uiAction == 1)
+            if (uiAction == 0) // DB option: action is its OptionNpc (0), no longer the old OptionType 1 (#157)
             {
                 if (Creature* pFrye = pCreature->FindNearestCreature(NPC_APOTHECARY_FRYE, 100.0f))
                     pFrye->setFaction(14);

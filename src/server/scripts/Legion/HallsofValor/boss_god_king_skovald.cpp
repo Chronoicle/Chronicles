@@ -374,7 +374,7 @@ public:
         player->PlayerTalkClass->ClearMenus();
         switch (action)
         {
-            case 1:
+            case 0: // DB option: action is its OptionNpc (0), no longer the old OptionType 1 (#157)
                 if (Unit* owner = creature->GetAnyOwner())
                     owner->GetAI()->DoAction(ACTION_1, creature);
                 player->CLOSE_GOSSIP_MENU();

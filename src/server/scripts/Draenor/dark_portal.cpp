@@ -471,7 +471,7 @@ public:
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
         player->PlayerTalkClass->ClearMenus();
-        if (action == 1)
+        if (action == 0) // DB option: action is its OptionNpc (0), no longer the old OptionType 1 (#157)
         {
             player->CLOSE_GOSSIP_MENU();
             if (player->GetQuestStatus(QUEST) == QUEST_STATUS_INCOMPLETE)
@@ -1250,9 +1250,11 @@ public:
 
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
     {
-        player->PlayerTalkClass->ClearMenus();
-        if (action == 1)
+        // #157: option 1 (tank) is OptionNpc 0, option 0 is the vendor (OptionNpc 1); only clear the menu for the tank
+        // option, so the vendor option still reaches the core
+        if (action == 0)
         {
+            player->PlayerTalkClass->ClearMenus();
             player->CLOSE_GOSSIP_MENU();
             if (player->GetQuestStatus(QUEST) == QUEST_STATUS_INCOMPLETE)
             {

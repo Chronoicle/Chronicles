@@ -391,7 +391,7 @@ class npc_foreman_dampwick : public CreatureScript
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     { 
         player->CLOSE_GOSSIP_MENU();
-        if (action == 1)
+        if (action == 0) // both DB options: action is their OptionNpc (0), no longer the old OptionType 1 (#157)
         {
             if (player->GetQuestStatus(QUEST_MINER_TROUBLES) != QUEST_STATUS_INCOMPLETE)
                 return true;
