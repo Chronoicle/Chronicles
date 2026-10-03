@@ -3050,6 +3050,7 @@ bool SpellInfo::_IsPositiveEffect(uint8 effIndex, bool deep) const
                 case 144683:// OO: Corrupted Prison
                 case 144684:// OO: Corrupted Prison
                     return false;
+                case 30298: // Tree Disguise (Tree's Company 9531): its root made it a debuff that could not be clicked off (#173)
                 case 30877: // Tag Murloc
                 case 61716: // Rabbit Costume
                 case 61734: // Noblegarden Bunny

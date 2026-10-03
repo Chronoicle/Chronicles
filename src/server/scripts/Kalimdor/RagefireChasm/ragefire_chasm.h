@@ -40,7 +40,12 @@ enum RFCCreatureIds
     NPC_ADAROGG               = 61408,
     NPC_DARK_SHAMAN_KORANTHAL = 61412,
     NPC_SLAGMAW               = 61463,
-    NPC_LAVA_GUARD_GORDOTH    = 61528
+    NPC_LAVA_GUARD_GORDOTH    = 61528,
+
+    // Horde quest NPCs
+    NPC_KORKRON_ELITE         = 61404,
+    NPC_INVOKER_XORENTH       = 61716,
+    NPC_COMMANDER_BAGRAN      = 61724
 };
 
 template <class AI, class T>

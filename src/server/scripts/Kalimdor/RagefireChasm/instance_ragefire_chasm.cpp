@@ -50,6 +50,45 @@ public:
             LoadObjectData(creatureData, nullptr);
             LoadDungeonEncounterData(encounters);
         }
+
+        // The Horde quest NPCs at the end (Invoker Xorenth, Commander Bagran, Kor'kron Elite past Slagmaw's cave) are
+        // permanent spawns: they stood in front of Lava Guard Gordoth. They appear when he dies (#174).
+        void OnCreatureCreate(Creature* creature) override
+        {
+            InstanceScript::OnCreatureCreate(creature);
+
+            switch (creature->GetEntry())
+            {
+                case NPC_KORKRON_ELITE:
+                case NPC_INVOKER_XORENTH:
+                case NPC_COMMANDER_BAGRAN:
+                    if (creature->GetPositionX() < -250.0f)
+                    {
+                        _endNpcs.push_back(creature->GetGUID());
+                        if (GetBossState(BOSS_LAVA_GUARD_GORDOTH) != DONE)
+                            creature->SetVisible(false);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        bool SetBossState(uint32 type, EncounterState state) override
+        {
+            if (!InstanceScript::SetBossState(type, state))
+                return false;
+
+            if (type == BOSS_LAVA_GUARD_GORDOTH && state == DONE)
+                for (ObjectGuid const& guid : _endNpcs)
+                    if (Creature* creature = instance->GetCreature(guid))
+                        creature->SetVisible(true);
+
+            return true;
+        }
+
+    private:
+        GuidVector _endNpcs;
     };
 
     InstanceScript* GetInstanceScript(InstanceMap* map) const override

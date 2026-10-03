@@ -47,10 +47,23 @@ std::array<uint32, 4> const SlagmawTeleportSpells =
     SPELL_MAGNAW_TELEPORT_WEST
 };
 
+// The teleports are serverside spells this core does not have (TrinityCore: serverside_spell + spell_target_position),
+// so the casts did nothing and Slagmaw chased players through the floor (#174): same holes, NearTeleportTo.
+Position const SlagmawTeleportPositions[4] =
+{
+    { -222.94f,  165.703f, -19.721f, 3.797819f  }, // North
+    { -226.477f, 135.704f, -19.721f, 2.330294f  }, // East
+    { -263.212f, 136.244f, -19.721f, 0.7556769f }, // South
+    { -256.389f, 172.884f, -19.721f, 5.577933f  }  // West
+};
+
 // 61463 - Slagmaw
 struct boss_slagmaw : public BossAI
 {
-    boss_slagmaw(Creature* creature) : BossAI(creature, BOSS_SLAGMAW), _lavaSpitCounter(0), _lastTeleportSpell(SPELL_MAGNAW_TELEPORT_WEST) { }
+    boss_slagmaw(Creature* creature) : BossAI(creature, BOSS_SLAGMAW), _lavaSpitCounter(0), _lastTeleportSpell(SPELL_MAGNAW_TELEPORT_WEST)
+    {
+        SetCombatMovement(false); // stays in his lava hole, only moves by the teleports (#174)
+    }
 
     void Reset() override
     {
@@ -131,7 +144,10 @@ struct boss_slagmaw : public BossAI
             }
             case EVENT_TELEPORT:
             {
-                DoCastSelf(GetNextTeleportSpell());
+                uint32 spell = GetNextTeleportSpell();
+                for (uint8 i = 0; i < SlagmawTeleportSpells.size(); ++i)
+                    if (SlagmawTeleportSpells[i] == spell)
+                        me->NearTeleportTo(SlagmawTeleportPositions[i]);
                 events.ScheduleEvent(EVENT_EMERGE, 1s);
                 break;
             }
