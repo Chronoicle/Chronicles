@@ -127,8 +127,17 @@ class boss_helix_gearbreaker : public CreatureScript
             {
                 _Reset();
 
-                me->SummonCreature(NPC_LUMBERING_OAF, oafPos[0]);
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
+
+                // #176: nothing ever put Helix on the Oaf, he stood untargetable at his spawn point
+                if (!me->GetVehicle())
+                {
+                    Creature* oaf = me->FindNearestCreature(NPC_LUMBERING_OAF, 60.0f, true);
+                    if (!oaf)
+                        oaf = me->SummonCreature(NPC_LUMBERING_OAF, oafPos[0]);
+                    if (oaf)
+                        me->EnterVehicle(oaf, 0);
+                }
             }
 
             void SummonedCreatureDies(Creature* summon, Unit* /*killer*/) override
@@ -170,10 +179,10 @@ class boss_helix_gearbreaker : public CreatureScript
                     return;
 
                 if (!me->GetVehicle())
-                    if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE))
+                    if (me->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE))
                     {
                         //Talk(SAY_OAF_DEAD);
-                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
+                        me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
                         return;
                     }
 
@@ -269,6 +278,13 @@ class npc_lumbering_oaf : public CreatureScript
             void EnterCombat(Unit* /*who*/) override
             {
                 events.RescheduleEvent(EVENT_CHARGE_OAF0, 10000);
+
+                // #176: Helix is untargetable on the Oaf, so only the Oaf is ever attacked: bring Helix (bombs, texts, boss
+                // state) into the fight with it
+                if (instance)
+                    if (Creature* helix = ObjectAccessor::GetCreature(*me, instance->GetGuidData(DATA_HELIX)))
+                        if (helix->IsAlive() && !helix->isInCombat() && helix->IsAIEnabled)
+                            DoZoneInCombat(helix, 100.0f);
             }
 
             void EnterEvadeMode() override
@@ -387,11 +403,9 @@ class npc_sticky_bomb : public CreatureScript
 
             void Reset() override
             {
+                // #176: the bomb is passive and unselectable, so it never entered combat (the arming/explosion timers started
+                // in EnterCombat) and never went off: start them when it appears
                 events.Reset();
-            }
-     
-            void EnterCombat(Unit* /*who*/) override
-            {
                 events.RescheduleEvent(EVENT_BOMB_READY, 6000);
                 events.RescheduleEvent(EVENT_BOMB_EXPLODE, 18000);
             }
@@ -403,9 +417,6 @@ class npc_sticky_bomb : public CreatureScript
 
             void UpdateAI(uint32 diff) override
             {
-                if (!UpdateVictim())
-                    return;
-
                 events.Update(diff);
 
                 if (uint32 eventId = events.ExecuteEvent())
