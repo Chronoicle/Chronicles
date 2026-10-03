@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-10-03 (Oslo)
+
+- Claude (desktop team dev-owner + help-helper, dev-check reviews) — restart 07:24 UTC 2026-10-03 (owner OK, 60 s timer, clean shutdown), worldserver 3ae62bb (ready 07:25:43 UTC): #164 creature tooltips show quest-drop progress (ObjectMgr::LoadCreatureQuestItemsFromLoot, 10,558 QuestItem slots filled from creature_loot_template QuestRequired rows); #166 Fenryr 95674 targetable (IMMUNE_TO_PC removed) + 54 dungeon/raid boss templates CC-immune (mechanic_immune_mask 0 -> 617299803); #167 Odyn waits for the gossip option to start the fight, re-offered after a wipe, intro line 1 gets 9 s (PR #169) — live, changelog 1555843393941409814 — undo: git revert 3ae62bb 7f23d8b 28a65e0 cd48eb9, `mysql < ~/LegionCore/sql/custom/undo_boss_cc_immunity_166.sql`
+
 ## 2026-10-02 (Oslo)
 
 - Claude (desktop team dev-owner + subagents + help-helper, dev-check reviews) — restart 00:50 UTC (requested by amibari in #owner-amibari, owner-authorized; 60 s timer, clean shutdown), worldserver eefffbd (ready 00:52:06 UTC): #157 gossip options (Pandaren faction choice + 7 NPCs), #152 Felbat Wings riders + PhaseMgr no identical phase-shift resend, #153 broodlings drop, #154 conversations last to their last line + beacon/Demon Stone to all + pet/totem killer counts as owner, #155 warglaives rack + 20 quests English, #156 Zabra Hexx dispel + phases, #158 murloc cage, #159 POIs, #160 Mardum mount ban (spell_area 179665), #161 Coilskar gateway, #162 Vicar Eliza POI, #163 Brewfest camp music; SQL applied right before (sql/custom): fix_zabra_hexx_156, fix_zabra_hexx_phases_156, fix_murloc_cage_158, fix_ample_supply_poi_159, fix_mardum_mounts_160, fix_recruiting_more_troops_poi_162, fix_brewfest_music_163, fix_mardum_felbat_152, fix_mardum_broodlings_153, fix_vault_warglaives_155, fix_bringer_of_the_light_154, fix_eredar_mage_demon_stone_154, fix_quest_titles_ru_155, fix_quest_texts_ru_18 — live, changelog 1555381879182459071, 11 reporters told — undo: the undo_*.sql next to each fix, `git revert` b2edf82..2ab4ebd + rebuild.
