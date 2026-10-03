@@ -432,6 +432,41 @@ public:
     }
 };
 
+// Fel Secrets: Havoc Spec Chosen - 194939, Vengeance Spec Chosen - 194940 (player choice 231 from the Tome of Fel Secrets)
+// The choice says "Choosing Vengeance grants Metamorphosis ...", but the spells only give the credit and the tracking quest:
+// switch the specialization like retail (the talent UI can't switch until Fel Secrets is done, SpellEffects.cpp).
+class spell_legion_fel_secrets_spec_choice : public SpellScriptLoader
+{
+public:
+    spell_legion_fel_secrets_spec_choice() : SpellScriptLoader("spell_legion_fel_secrets_spec_choice") { }
+
+    class spell_legion_fel_secrets_spec_choice_SpellScript : public SpellScript
+    {
+        PrepareSpellScript(spell_legion_fel_secrets_spec_choice_SpellScript);
+
+        void HandleAfterHit()
+        {
+            Player* player = GetHitUnit() ? GetHitUnit()->ToPlayer() : nullptr;
+            if (!player || player->getClass() != CLASS_DEMON_HUNTER)
+                return;
+
+            uint32 specId = GetSpellInfo()->Id == 194940 ? 581 : 577; // Vengeance : Havoc
+            // not inside the spell's own hit: the switch removes and learns spells
+            player->AddDelayedEvent(100, [player, specId]() { player->ForceChangeTalentGroup(specId); });
+        }
+
+        void Register() override
+        {
+            AfterHit += SpellHitFn(spell_legion_fel_secrets_spec_choice_SpellScript::HandleAfterHit);
+        }
+    };
+
+    SpellScript* GetSpellScript() const override
+    {
+        return new spell_legion_fel_secrets_spec_choice_SpellScript();
+    }
+};
+
 //94410
 class npc_q40378 : public CreatureScript
 {
@@ -2940,6 +2975,7 @@ void AddSC_Mardum()
     new go_q40378();
     new go_q39279();
     new spell_legion_q39279();
+    new spell_legion_fel_secrets_spec_choice();
     new spell_legion_197486();
     new spell_legion_197505_197598();
     new spell_legion_197523();
