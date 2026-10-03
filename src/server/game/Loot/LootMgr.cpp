@@ -3288,8 +3288,11 @@ bool LootTemplate::HasQuestDrop(LootTemplateMap const& store, uint8 groupId) con
     return false;
 }
 
-void LootTemplate::CollectQuestItems(std::vector<uint32>& items) const
+void LootTemplate::CollectQuestItems(std::vector<uint32>& items, uint8 depth) const
 {
+    if (depth > 8) // reference loops are not caught at load
+        return;
+
     auto add = [&items](LootStoreItem const& i)
     {
         if (i.needs_quest && i.itemid && std::find(items.begin(), items.end(), i.itemid) == items.end())
@@ -3301,8 +3304,7 @@ void LootTemplate::CollectQuestItems(std::vector<uint32>& items) const
         if (i.reference > 0)
         {
             if (LootTemplate const* ref = LootTemplates_Reference.GetLootFor(i.reference))
-                if (ref != this)
-                    ref->CollectQuestItems(items);
+                ref->CollectQuestItems(items, depth + 1);
             continue;
         }
         add(i);

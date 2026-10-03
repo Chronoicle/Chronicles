@@ -7336,7 +7336,7 @@ void ObjectMgr::LoadCreatureQuestItemsFromLoot()
 {
     uint32 oldMSTime = getMSTime();
     uint32 added = 0;
-    uint8 const maxSlots = 6; // most any DB row uses; the client reads the list as is
+    uint8 const maxSlots = MAX_CREATURE_QUEST_ITEMS;
 
     for (auto& itr : _creatureTemplateStoreMap)
     {
