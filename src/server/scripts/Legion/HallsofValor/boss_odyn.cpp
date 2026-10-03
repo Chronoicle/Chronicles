@@ -198,7 +198,7 @@ public:
 
             intro = false;
             Talk(SAY_INTRO_1); //Most impressive! I never thought I would meet anyone who could match the Valarjar's strength... and yet here you stand.
-            events.RescheduleEvent(EVENT_SKOVALD_DONE_1, 5000);
+            events.RescheduleEvent(EVENT_SKOVALD_DONE_1, 9000); // let SAY_INTRO_1 finish before the jump (#167)
         }
 
         void SpellHit(Unit* caster, SpellInfo const* spell) override
