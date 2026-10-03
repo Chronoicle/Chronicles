@@ -36,7 +36,7 @@ public:
             if (!isUse)
                 return true;
 
-            for (int32 i = 0; i < sizeof(q38690); ++i)
+            for (int32 i = 0; i < int32(std::size(q38690)); ++i)
             {
                 if (!player->GetReqKillOrCastCurrentCount(QUEST, q38690[i]))
                 {
@@ -724,7 +724,11 @@ public:
         };
 
         // #148: see go_q38690 (a goober click only reaches GossipUse)
-        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+        bool GossipUse(Player* player) override
+        {
+            GossipHello(player, true);
+            return false; // the native use still runs, as before
+        }
 
         bool GossipHello(Player* player, bool isUse) override
         {
