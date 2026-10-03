@@ -24,6 +24,13 @@ public:
             QUEST = 38690,
         };
 
+        // #148: a goober click only reaches GossipUse, never GossipHello(isUse = true): no credit was given
+        bool GossipUse(Player* player) override
+        {
+            GossipHello(player, true);
+            return false; // the native use (cell animation) still runs
+        }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
@@ -610,14 +617,20 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            Player *player = killer->ToPlayer();
-            if (!player)
-                return;
+            // every player who tapped him, not only the killing blow (a pet's kill gave nothing)
+            Player* killingPlayer = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
+            std::list<Player*> players;
+            me->GetPlayerListInGrid(players, 100.0f);
+            for (Player* player : players)
+            {
+                if (player != killingPlayer && !me->isTappedBy(player))
+                    continue;
 
-            sCreatureTextMgr->SendChat(me, TEXT_GENERIC_3, player->GetGUID());
-            player->CastSpell(player, REWARD_SPELL, true);
-            player->CastSpell(player, REWARD_SPELL2, true);
-            player->KilledMonsterCredit(CREDIT);
+                sCreatureTextMgr->SendChat(me, TEXT_GENERIC_3, player->GetGUID());
+                player->CastSpell(player, REWARD_SPELL, true);
+                player->CastSpell(player, REWARD_SPELL2, true);
+                player->KilledMonsterCredit(CREDIT);
+            }
         }
         void UpdateAI(uint32 diff) override
         {
@@ -709,6 +722,9 @@ public:
             QUEST = 39687,
             CREDIT = 100166,
         };
+
+        // #148: see go_q38690 (a goober click only reaches GossipUse)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {
@@ -845,10 +861,7 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            Player *player = killer->ToPlayer();
-            if (!player)
-                return;
-
+            // a pet's kill or a group member's kill counted for nobody: the players in the room get it either way
             Talk(2);
 
             std::list<Player*> playerList;
