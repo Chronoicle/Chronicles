@@ -8,3 +8,4 @@ DELETE FROM world.creature WHERE map = 36 AND id = 48266 AND guid > (SELECT val 
 UPDATE world.creature_template SET AIName = '' WHERE entry = 48284;
 DELETE FROM world.smart_scripts WHERE entryorguid = 48284 AND source_type = 0 AND id = 4;
 UPDATE world.creature_template SET ScriptName = '' WHERE entry = 47404;
+DELETE FROM world.conditions WHERE SourceTypeOrReferenceId = 13 AND SourceEntry = 89132;

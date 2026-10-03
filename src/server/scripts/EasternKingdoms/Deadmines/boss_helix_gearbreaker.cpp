@@ -129,15 +129,19 @@ class boss_helix_gearbreaker : public CreatureScript
 
                 me->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
 
-                // #176: nothing ever put Helix on the Oaf, he stood untargetable at his spawn point
-                if (!me->GetVehicle())
+                // #176: nothing ever put Helix on the Oaf, he stood untargetable at his spawn point.
+                // Delayed: Reset runs from AddToWorld, before the grid (and a spawned Oaf) is loaded.
+                me->AddDelayedEvent(1000, [this]()
                 {
+                    if (!me->IsAlive() || me->GetVehicle())
+                        return;
+
                     Creature* oaf = me->FindNearestCreature(NPC_LUMBERING_OAF, 60.0f, true);
                     if (!oaf)
                         oaf = me->SummonCreature(NPC_LUMBERING_OAF, oafPos[0]);
                     if (oaf)
                         me->EnterVehicle(oaf, 0);
-                }
+                });
             }
 
             void SummonedCreatureDies(Creature* summon, Unit* /*killer*/) override
