@@ -55,6 +55,7 @@ class instance_deadmines : public InstanceMapScript
                 TeamInInstance = 0;
 
                 State = CANNON_NOT_USED;
+                uiFoeReaperIntro = 0;
                 uiVanessaEvent = 0;
                 TeamInInstance = 0;
             };
@@ -206,6 +207,9 @@ class instance_deadmines : public InstanceMapScript
                         if (data == DONE)
                             SaveToDB();
                         break;
+                    case DATA_FOEREAPER_INTRO:
+                        uiFoeReaperIntro = data;
+                        break;
                 }
             }
 
@@ -215,6 +219,8 @@ class instance_deadmines : public InstanceMapScript
                     return uiVanessaEvent;
                 if (type == DATA_TEAM_IN_INSTANCE)
                     return TeamInInstance;
+                if (type == DATA_FOEREAPER_INTRO)
+                    return uiFoeReaperIntro;
                 return 0;
             }
 
@@ -311,6 +317,7 @@ class instance_deadmines : public InstanceMapScript
 
             uint32 State;
             uint32 uiVanessaEvent;
+            uint32 uiFoeReaperIntro;
         };
 };
 

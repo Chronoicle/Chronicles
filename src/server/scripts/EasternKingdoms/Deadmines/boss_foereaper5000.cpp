@@ -14,6 +14,7 @@ enum ScriptTexts
 enum Spells
 {
     SPELL_OFF_LINE             = 88348,
+    SPELL_ENERGIZE             = 89132,
     SPELL_REAPER_STRIKE        = 88490,
     SPELL_REAPER_STRIKE_H      = 91717,
     SPELL_SAFETY               = 88522,
@@ -90,16 +91,34 @@ class boss_foereaper5000 : public CreatureScript
                 me->ApplySpellImmune(0, IMMUNITY_MECHANIC, MECHANIC_DISORIENTED, true);
                 me->ApplySpellImmune(0, IMMUNITY_STATE, SPELL_AURA_MOD_CONFUSE, true);
                 me->setActive(true);
+                me->SetPowerType(POWER_ENERGY);
+                me->SetMaxPower(POWER_ENERGY, 100);
             }
 
             ObjectGuid harvestTargetGuid;
             bool bEnrage;
+
+            // #176: the Defias Watchers (47404) energize the Reaper (89132, +power each); at 100 it comes on-line
+            void GoOnline()
+            {
+                me->RemoveAurasDueToSpell(SPELL_OFF_LINE);
+                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED | UNIT_FLAG_IMMUNE_TO_PC);
+                instance->SetData(DATA_FOEREAPER_INTRO, DONE);
+            }
+
+            void SpellHit(Unit* /*caster*/, SpellInfo const* spell) override
+            {
+                if (spell->Id == SPELL_ENERGIZE && me->GetPower(POWER_ENERGY) >= 100)
+                    GoOnline();
+            }
 
             void Reset() override
             {
                 _Reset();
 
                 bEnrage = false;
+                if (instance->GetData(DATA_FOEREAPER_INTRO) == DONE)
+                    GoOnline();
             }
 
             void UpdateAI(uint32 diff) override
@@ -166,7 +185,8 @@ class boss_foereaper5000 : public CreatureScript
             void EnterCombat(Unit* /*who*/) override
             {
                 Talk(SAY_AGGRO);
-                me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);
+                // #176: the Reaper kept "Off-line" (88348) and was attackable but did not fight: whoever engages it brings it on-line
+                GoOnline();
                 events.RescheduleEvent(EVENT_REAPER_STRIKE, urand(5000, 8000));
                 events.RescheduleEvent(EVENT_OVERDRIVE, urand(10000, 15000));
                 events.RescheduleEvent(EVENT_HARVEST, urand(25000, 30000));

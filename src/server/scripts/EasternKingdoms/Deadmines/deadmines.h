@@ -19,6 +19,7 @@ enum NPCs
     NPC_LUMBERING_OAF        = 47297,
     NPC_MINE_RAT             = 51462,
     NPC_FOE_REAPER_5000      = 43778,
+    NPC_DEFIAS_WATCHER       = 47404,
     NPC_ADMIRAL_RIPSNARL     = 47626,
     NPC_CAPTAIN_COOKIE       = 47739,
     NPC_VANESSA_VANCLEEF     = 49541,
@@ -48,7 +49,8 @@ enum Data
     DATA_CANNON_EVENT     = 6,
     DATA_OAF              = 7,
     DATA_VANESSA_EVENT    = 8,
-    DATA_TEAM_IN_INSTANCE = 9
+    DATA_TEAM_IN_INSTANCE = 9,
+    DATA_FOEREAPER_INTRO  = 10
 };
 
 enum GameObjects
