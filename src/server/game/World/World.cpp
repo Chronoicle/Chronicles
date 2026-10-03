@@ -1985,6 +1985,7 @@ void World::SetInitialWorldSettings()
 
     // Loot tables
     LoadLootTables();
+    sObjectMgr->LoadCreatureQuestItemsFromLoot();               // must be after LoadLootTables() (#164)
 
     TC_LOG_INFO("server.loading", "Loading Skill Discovery Table...");
     LoadSkillDiscoveryTable();

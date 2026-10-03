@@ -3288,6 +3288,35 @@ bool LootTemplate::HasQuestDrop(LootTemplateMap const& store, uint8 groupId) con
     return false;
 }
 
+void LootTemplate::CollectQuestItems(std::vector<uint32>& items) const
+{
+    auto add = [&items](LootStoreItem const& i)
+    {
+        if (i.needs_quest && i.itemid && std::find(items.begin(), items.end(), i.itemid) == items.end())
+            items.push_back(i.itemid);
+    };
+
+    for (LootStoreItem const& i : Entries)
+    {
+        if (i.reference > 0)
+        {
+            if (LootTemplate const* ref = LootTemplates_Reference.GetLootFor(i.reference))
+                if (ref != this)
+                    ref->CollectQuestItems(items);
+            continue;
+        }
+        add(i);
+    }
+
+    for (LootGroup const& g : Groups)
+    {
+        for (LootStoreItem const& i : g.ExplicitlyChanced)
+            add(i);
+        for (LootStoreItem const& i : g.EqualChanced)
+            add(i);
+    }
+}
+
 // True if template includes at least 1 quest drop for an active quest of the player
 bool LootTemplate::HasQuestDropForPlayer(LootTemplateMap const& store, Player const* player, uint8 groupId) const
 {

@@ -620,6 +620,7 @@ class TC_GAME_API ObjectMgr
         void LoadCreatureLocales();
         void LoadCreatureDifficultyStat();
         void LoadCreatureTemplates();
+        void LoadCreatureQuestItemsFromLoot();
         void LoadCreatureScalingData();
         void LoadWDBCreatureTemplates();
         void LoadCreatureTemplateAddons();

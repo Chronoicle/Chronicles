@@ -33,6 +33,7 @@
 #include "Language.h"
 #include "LFGMgr.h"
 #include "Log.h"
+#include "LootMgr.h"
 #include "MapManager.h"
 #include "ObjectMgr.h"
 #include "Packets/BattlePayPackets.h"
@@ -7326,6 +7327,49 @@ CreatureDifficultyStat const* ObjectMgr::GetCreatureDifficultyStat(uint32 entry,
                 return &(*itr);
 
     return nullptr;
+}
+
+// The client shows a quest drop's progress (x/50) in a creature's tooltip only for the items in its
+// QuestItem list. Most templates miss the quest drops of their loot (11,742 creatures), so add them from
+// creature_loot_template (QuestRequired rows, references and groups included) into the free slots (#164).
+void ObjectMgr::LoadCreatureQuestItemsFromLoot()
+{
+    uint32 oldMSTime = getMSTime();
+    uint32 added = 0;
+    uint8 const maxSlots = 6; // most any DB row uses; the client reads the list as is
+
+    for (auto& itr : _creatureTemplateStoreMap)
+    {
+        CreatureTemplate& cInfo = itr.second;
+        if (!cInfo.lootid)
+            continue;
+
+        LootTemplate const* loot = LootTemplates_Creature.GetLootFor(cInfo.lootid);
+        if (!loot)
+            continue;
+
+        std::vector<uint32> items;
+        loot->CollectQuestItems(items);
+        for (uint32 item : items)
+        {
+            uint8 free = maxSlots;
+            bool known = false;
+            for (uint8 i = 0; i < maxSlots; ++i)
+            {
+                if (cInfo.QuestItem[i] == item)
+                    known = true;
+                else if (!cInfo.QuestItem[i] && free == maxSlots)
+                    free = i;
+            }
+            if (known || free == maxSlots)
+                continue;
+
+            cInfo.QuestItem[free] = item;
+            ++added;
+        }
+    }
+
+    TC_LOG_INFO("server.loading", ">> Added %u creature quest items from loot in %u ms", added, GetMSTimeDiffToNow(oldMSTime));
 }
 
 CreatureTemplate const* ObjectMgr::GetCreatureTemplate(uint32 entry)
