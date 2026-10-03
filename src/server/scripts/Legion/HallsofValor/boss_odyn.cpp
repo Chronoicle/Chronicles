@@ -92,6 +92,21 @@ class boss_odyn : public CreatureScript
 public:
     boss_odyn() : CreatureScript("boss_odyn") { }
 
+    bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
+    {
+        player->PlayerTalkClass->ClearMenus();
+        // DB option: action is its OptionNpc (0), not the old OptionType 1 (#157). Only offered once the intro is over (#167).
+        if (action == 0 && creature->HasFlag(UNIT_FIELD_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP))
+        {
+            creature->RemoveFlag(UNIT_FIELD_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
+            creature->setFaction(16);
+            if (creature->IsAIEnabled)
+                creature->AI()->AttackStart(player);
+        }
+        player->CLOSE_GOSSIP_MENU();
+        return true;
+    }
+
     struct boss_odynAI : public BossAI
     {
         boss_odynAI(Creature* creature) : BossAI(creature, DATA_ODYN) 
@@ -133,8 +148,19 @@ public:
             for (uint8 i = 0; i < 5; i++)
                 instance->DoRemoveAurasDueToSpellOnPlayers(SpellsRunicColour[i]);
 
-            if (instance->GetBossState(DATA_SKOVALD) == DONE && intro)
-                DoAction(true);
+            if (instance->GetBossState(DATA_SKOVALD) == DONE)
+            {
+                if (intro)
+                    DoAction(true);
+                else
+                    EnableFightGossip(); // wipe or evade after the intro: talk to him again to restart the fight
+            }
+        }
+
+        void EnableFightGossip()
+        {
+            me->setFaction(35);
+            me->SetFlag(UNIT_FIELD_NPC_FLAGS, UNIT_NPC_FLAG_GOSSIP);
         }
 
         void MoveInLineOfSight(Unit* who) override
@@ -280,7 +306,7 @@ public:
                     case EVENT_SKOVALD_DONE_2:
                         me->SetHomePosition(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation());
                         Talk(SAY_INTRO_3); //It has been ages since I faced a worthy opponent. Let the battle begin!
-                        me->setFaction(16);
+                        EnableFightGossip(); // he waits for the gossip option instead of attacking (#167)
                         break;
                     case EVENT_SPEAR_OF_LIGHT:
                         DoCast(SPELL_SPEAR_OF_LIGHT);
