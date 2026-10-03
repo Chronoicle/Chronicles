@@ -64,7 +64,8 @@ public:
                 case NPC_COMMANDER_BAGRAN:
                     if (creature->GetPositionX() < -250.0f)
                     {
-                        _endNpcs.push_back(creature->GetGUID());
+                        if (std::find(_endNpcs.begin(), _endNpcs.end(), creature->GetGUID()) == _endNpcs.end())
+                            _endNpcs.push_back(creature->GetGUID());
                         if (GetBossState(BOSS_LAVA_GUARD_GORDOTH) != DONE)
                             creature->SetVisible(false);
                     }
