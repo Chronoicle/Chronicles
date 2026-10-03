@@ -68,6 +68,8 @@ UPDATE world.dm176_spawn s SET s.our_guid = (SELECT c.guid FROM world.creature c
 -- a creature may be claimed by two staging rows (two paths close together): keep the nearest claim only
 -- (check: SELECT our_guid, COUNT(*) FROM world.dm176_spawn WHERE our_guid IS NOT NULL GROUP BY our_guid HAVING COUNT(*) > 1; must return nothing)
 -- check the match: SELECT * FROM world.dm176_spawn;   (NULL our_guid = no spawn of that entry near the CPP point, skipped)
+-- dev-owner: no patrol for Admiral Ripsnarl (47626, scripted boss)
+DELETE FROM world.dm176_spawn WHERE id = 47626;
 
 DROP TEMPORARY TABLE IF EXISTS world.dm176_wp;
 CREATE TEMPORARY TABLE world.dm176_wp (cpp_n INT NOT NULL, point INT NOT NULL, x FLOAT, y FLOAT, z FLOAT, o FLOAT, delay INT, move_type INT, action INT, action_chance INT, PRIMARY KEY (cpp_n, point));
@@ -447,3 +449,11 @@ SELECT -122.925 x, -388.813 y, 59.0769 z, 0.401426 o
     UNION ALL SELECT -46.901 x, -783.154 y, 18.4898 z, 1.16937 o) p
 WHERE NOT EXISTS (SELECT 1 FROM world.creature e WHERE e.map = 36 AND e.id = 48266 AND POW(e.position_x - p.x, 2) + POW(e.position_y - p.y, 2) <= 9);
 -- undo: DELETE the 48266 rows with guid between bak_dm176_base.cannon_base + 1 and + 8 (undo_deadmines_176.sql).
+
+-- 3) dev-owner 2026-10-04: Mining Powder 48284 had SmartAI rows (Explode 89769 on aggro) but AIName '' so they never ran;
+--    after the explosion the keg despawns. Defias Watcher 47404: the new C++ script (npc_deadmines_defias_watcher).
+UPDATE world.creature_template SET AIName = 'SmartAI' WHERE entry = 48284 AND AIName = '';
+DELETE FROM world.smart_scripts WHERE entryorguid = 48284 AND source_type = 0 AND id = 4;
+INSERT INTO world.smart_scripts (entryorguid, source_type, id, link, Difficulties, event_type, event_phase_mask, event_chance, event_flags, event_param1, event_param2, event_param3, event_param4, event_param5, action_type, action_param1, action_param2, action_param3, action_param4, action_param5, action_param6, target_type, target_param1, target_param2, target_param3, target_param4, target_x, target_y, target_z, target_o, comment) VALUES
+(48284, 0, 4, 0, '', 4, 0, 100, 1, 0, 0, 0, 0, 0, 41, 1500, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 'Mining Powder - On Aggro - Despawn after the explosion (#176)');
+UPDATE world.creature_template SET ScriptName = 'npc_deadmines_defias_watcher' WHERE entry = 47404 AND ScriptName = '';

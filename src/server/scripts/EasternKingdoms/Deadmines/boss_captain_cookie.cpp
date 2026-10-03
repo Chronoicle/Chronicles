@@ -173,8 +173,16 @@ class boss_captain_cookie : public CreatureScript
 
             void UpdateAI(uint32 diff) override
             {
-                if (!UpdateVictim())
+                // He is passive without a victim from EnterCombat on (AttackStop), so UpdateVictim() stopped every
+                // event: he stood in his cauldron and never threw food (#176). Run while in combat, evade on a wipe.
+                if (!me->isInCombat())
                     return;
+
+                if (me->getThreatManager().isThreatListEmpty())
+                {
+                    EnterEvadeMode();
+                    return;
+                }
 
                 events.Update(diff);
 
