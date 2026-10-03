@@ -689,15 +689,22 @@ public:
         {
             sCreatureTextMgr->SendChat(me, TEXT_GENERIC_2);
 
-            Player *player = attacker->ToPlayer();
-            if (!player)
-                return;
+            // every player who tapped it gets the credit and the spell (TrinityCore: GetTapList), not only the killing blow:
+            // a pet's kill and group members had none
+            Player* killer = attacker ? attacker->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
+            std::list<Player*> players;
+            me->GetPlayerListInGrid(players, 100.0f);
+            for (Player* player : players)
+            {
+                if (player != killer && !me->isTappedBy(player))
+                    continue;
 
-            if (player->GetQuestStatus(QUEST) != QUEST_STATUS_INCOMPLETE)
-                return;
+                if (player->GetQuestStatus(QUEST) != QUEST_STATUS_INCOMPLETE)
+                    continue;
 
-            player->KilledMonsterCredit(CREDIT);
-            player->CastSpell(player, SPELL_LEARN, false);
+                player->KilledMonsterCredit(CREDIT);
+                player->CastSpell(player, SPELL_LEARN, false);
+            }
         }
         
         void JustSummoned(Creature* summon) override
@@ -1260,11 +1267,12 @@ public:
                 Tyranna->DespawnOrUnsummon(500);
                 TyrannaGuid = ObjectGuid::Empty;
             }
-            Player* player = killer->ToPlayer();
-            if (!player)
-                return;
-
-            Talk(TEXT_GENERIC_1, player->GetGUID());
+            // a pet's killing blow gave nobody the credit (the loop below only needs the players around)
+            Player* player = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
+            if (player)
+                Talk(TEXT_GENERIC_1, player->GetGUID());
+            else
+                Talk(TEXT_GENERIC_1);
 
             std::list<Player*> playerList;
             me->GetPlayerListInGrid(playerList, 60.0f);
@@ -1353,12 +1361,19 @@ public:
         
         void JustDied(Unit* killer) override
         {
-            Player *player = killer->ToPlayer();
-            if (!player)
-                return;
-            sCreatureTextMgr->SendChat(me, TEXT_GENERIC_2, player->GetGUID());
-            player->KilledMonsterCredit(CREDIT);
-            player->CastSpell(player, SPELL_AT_DEATH, false);
+            // every player who tapped him gets the credit (TrinityCore: GetTapList), not only the killing blow
+            Player* killingPlayer = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
+            std::list<Player*> players;
+            me->GetPlayerListInGrid(players, 100.0f);
+            for (Player* player : players)
+            {
+                if (player != killingPlayer && !me->isTappedBy(player))
+                    continue;
+
+                sCreatureTextMgr->SendChat(me, TEXT_GENERIC_2, player->GetGUID());
+                player->KilledMonsterCredit(CREDIT);
+                player->CastSpell(player, SPELL_AT_DEATH, false);
+            }
         }
         
         void UpdateAI(uint32 diff) override
