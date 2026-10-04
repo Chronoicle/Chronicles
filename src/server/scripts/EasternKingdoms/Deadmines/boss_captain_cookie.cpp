@@ -141,7 +141,7 @@ class boss_captain_cookie : public CreatureScript
                 // He hides inside his cauldron: the generic aggro check (canStartAttack) needs line of sight, which the
                 // cauldron blocks, so he never started (#176 retest). A living player next to him starts the fight.
                 Player* player = who->ToPlayer();
-                if (!player || !player->isAlive() || player->isGameMaster() || me->isInCombat())
+                if (!player || !player->isAlive() || player->isGameMaster() || me->isInCombat() || !me->IsValidAttackTarget(player))
                     return;
 
                 AttackStart(player);

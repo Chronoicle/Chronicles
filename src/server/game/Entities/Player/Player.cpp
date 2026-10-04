@@ -19283,14 +19283,15 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
             if (uint32 itemId = quest->RewardItemId[i])
             {
                 ItemPosCountVec dest;
-                if (CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, quest->RewardItemCount[i]) == EQUIP_ERR_OK)
+                InventoryResult storeResult = CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemId, quest->RewardItemCount[i]);
+                if (storeResult == EQUIP_ERR_OK)
                 {
                     Item* item = StoreNewItem(dest, itemId, true, Item::GenerateItemRandomPropertyId(itemId, GetLootSpecID()), GuidSet(), sObjectMgr->GetItemBonusTree(itemId, GetMap()->GetDifficultyLootItemContext(), getLevel()), GetMap()->GetDifficultyLootItemContext());
                     // triggers some lua events
                     SendDisplayToast(itemId, ToastType::ITEM, false, quest->RewardItemCount[i], DisplayToastMethod::DISPLAY_TOAST_SPECIAL_UNK, quest_id, item);
                     SendNewItem(item, quest->RewardItemCount[i], true, false);
                 }
-                else if (quest->IsDFQuest())
+                else if (quest->IsDFQuest() && storeResult == EQUIP_ERR_INV_FULL)
                 {
                     // Dungeon Finder reward with full bags: mail it, like retail (the Satchel of Helpful Goods was lost, #175)
                     if (Item* item = Item::CreateItem(itemId, quest->RewardItemCount[i], this))
@@ -19299,7 +19300,7 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
                         item->SaveToDB(trans);
                         MailDraft draft("Dungeon Finder reward", "Your bags were full, so your dungeon reward was sent here.");
                         draft.AddItem(item);
-                        draft.SendMailTo(trans, this, MailSender(this, MAIL_STATIONERY_GM), MAIL_CHECK_MASK_COPIED);
+                        draft.SendMailTo(trans, this, MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM), MAIL_CHECK_MASK_COPIED);
                         CharacterDatabase.CommitTransaction(trans);
                     }
                 }

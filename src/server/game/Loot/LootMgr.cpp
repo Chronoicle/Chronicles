@@ -2988,7 +2988,10 @@ void LootTemplate::ProcessItemLoot(Loot& loot) const
 
                 if(!lootOwner->CanGetItemForLoot(_proto, loot._specCheck))
                 {
-                    if (!_delete && i->reference <= 0)
+                    // only for opened containers, never the weekly keystone or another class's / race's item (dev-check)
+                    if (!_delete && i->reference <= 0 && loot._isItemLoot && _proto->GetId() != 138019
+                        && (_proto->AllowableClass & lootOwner->getClassMask())
+                        && (_proto->AllowableRace & int64(lootOwner->getRaceMask())))
                         ItemFallbackDrops.push_back(*i);
                     _delete = true;
                 }
