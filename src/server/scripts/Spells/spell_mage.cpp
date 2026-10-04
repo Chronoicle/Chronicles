@@ -2158,7 +2158,7 @@ public:
 
     bool Execute(uint64 /*time*/, uint32 /*diff*/) override
     {
-        _caster->CastSpell(_dest.GetPositionX() + frand(-3.0f, 3.0f), _dest.GetPositionY() + frand(-3.0f, 3.0f), _dest.GetPositionZ(), SPELL_MAGE_COMET_STORM_VISUAL, true);
+        _caster->CastSpell(_dest.GetPositionX() + frand(-3.0f, 3.0f), _dest.GetPositionY() + frand(-3.0f, 3.0f), _dest.GetPositionZ(), 228601, true); // the comet missile; its hit casts the damage 153596 (spell_mage_comet_storm_damage)
         ++_count;
 
         if (_count >= 7)
@@ -2191,7 +2191,7 @@ class spell_mage_comet_storm : public SpellScript
     }
 };
 
-// 228601 - Comet Storm (damage, triggered by the visual 242210)
+// 228601 - Comet Storm (the comet missile cast by spell_mage_comet_storm; its hit casts the damage 153596)
 class spell_mage_comet_storm_damage : public SpellScript
 {
     PrepareSpellScript(spell_mage_comet_storm_damage);
