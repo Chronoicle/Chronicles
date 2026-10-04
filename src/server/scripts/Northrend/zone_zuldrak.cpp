@@ -694,7 +694,7 @@ public:
                     pWhisker->RemoveFromWorld();
 
             // a pet's killing blow counts too
-            if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+            if (Player* player = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
                 player->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_TUSKARRMAGEDDON, killer);
 
         }
@@ -793,7 +793,7 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+            if (Player* player = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
                 player->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_KORRAK_BLOODRAGER, killer);
         }
     };
@@ -879,7 +879,7 @@ public:
                 summoner->MonsterYell(sText.c_str(), LANG_UNIVERSAL, ObjectGuid::Empty);
             }
 
-            if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+            if (Player* player = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
             {
                 player->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_YGGDRAS_1, killer);
                 player->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_YGGDRAS_2, killer);
@@ -1015,7 +1015,7 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+            if (Player* player = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
                 player->GetCharmerOrOwnerPlayerOrPlayerItself()->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_MAGNATAUR, killer);
 
             std::string sText = ("And with AUTHORITY, " + std::string(killer->GetName()) + " dominates the magnataur lord! Stinkbeard's clan is gonna miss him back home in the Dragonblight!");
@@ -1158,7 +1158,7 @@ public:
                     if (Creature* temp = Unit::GetCreature(*me, *itr))
                         temp->DespawnOrUnsummon();
 
-            if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+            if (Player* player = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
                 player->GetCharmerOrOwnerPlayerOrPlayerItself()->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_FROM_BEYOND, killer);
 
             std::string sText = (std::string(killer->GetName()) + " is victorious once more!");
