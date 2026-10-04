@@ -574,14 +574,15 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            if (killer->ToPlayer() && killer->ToPlayer()->GetTypeId() == TYPEID_PLAYER)
+            if (me->FindNearestCreature(NPC_WAR_GOLEM, 10.0f, true))
             {
-                if (me->FindNearestCreature(NPC_WAR_GOLEM, 10.0f, true))
-                {
-                    if (killer->ToPlayer()->GetQuestStatus(QUEST_OR_MAYBE_WE_DONT_A) == QUEST_STATUS_INCOMPLETE ||
-                        killer->ToPlayer()->GetQuestStatus(QUEST_OR_MAYBE_WE_DONT_H) == QUEST_STATUS_INCOMPLETE)
-                        killer->ToPlayer()->KilledMonsterCredit(NPC_WAR_GOLEM, ObjectGuid::Empty);
-                }
+                // every tapper, not only the killing blow
+                std::list<Player*> players;
+                GetKillCreditPlayers(me, killer, players);
+                for (Player* player : players)
+                    if (player->GetQuestStatus(QUEST_OR_MAYBE_WE_DONT_A) == QUEST_STATUS_INCOMPLETE ||
+                        player->GetQuestStatus(QUEST_OR_MAYBE_WE_DONT_H) == QUEST_STATUS_INCOMPLETE)
+                        player->KilledMonsterCredit(NPC_WAR_GOLEM, ObjectGuid::Empty);
             }
         }
     };
