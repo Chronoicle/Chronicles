@@ -6586,8 +6586,13 @@ struct npc_molten_behemoth : public ScriptedAI
     void JustDied(Unit* killer) override
     {
         if (notSpellHited)
-            if (auto player = killer->ToPlayer())
+        {
+            // every tapper, not only the killing blow
+            std::list<Player*> players;
+            GetKillCreditPlayers(me, killer, players);
+            for (Player* player : players)
                 player->UpdateAchievementCriteria(CRITERIA_TYPE_BE_SPELL_TARGET, 101167);
+        }
     }
 
     void Reset()
@@ -6652,8 +6657,12 @@ struct npc_flamewaker_sentinel : public ScriptedAI
     void JustDied(Unit* killer) override
     {
         if (passengerIn)
-            if (auto player = killer->ToPlayer())
+        {
+            std::list<Player*> players;
+            GetKillCreditPlayers(me, killer, players);
+            for (Player* player : players)
                 player->UpdateAchievementCriteria(CRITERIA_TYPE_KILL_CREATURE, 53085);
+        }
     }
 
     uint32 GetData(uint32 type) const override
@@ -6718,8 +6727,12 @@ struct npc_flamewaker_shaman : public ScriptedAI
     void JustDied(Unit* killer) override
     {
         if (damaged >= 3)
-            if (auto player = killer->ToPlayer())
+        {
+            std::list<Player*> players;
+            GetKillCreditPlayers(me, killer, players);
+            for (Player* player : players)
                 player->UpdateAchievementCriteria(CRITERIA_TYPE_BE_SPELL_TARGET, 100992);
+        }
     }
 
     void SpellHit(Unit* caster, const SpellInfo* spell) override

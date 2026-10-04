@@ -1708,9 +1708,11 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            Player *pl = killer->ToPlayer();
-            if (!pl)
-                return;
+            // every tapper gets the scene (personal summons), not only the killing blow
+            std::list<Player*> players;
+            GetKillCreditPlayers(me, killer, players);
+            for (Player* pl : players)
+            {
             sCreatureTextMgr->SendChat(me, TEXT_GENERIC_2, pl->GetGUID());
             
             Conversation* conversation = new Conversation;
@@ -1732,6 +1734,7 @@ public:
                 tr->GetMotionMaster()->MovePoint(0, 1811.69f, 1195.42f, 80.83f);
             }
 
+            }
         }
         
         void UpdateAI(uint32 diff) override

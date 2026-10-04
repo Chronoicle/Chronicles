@@ -596,7 +596,7 @@ public:
                 garona->AI()->DoAction(true);
                 garona->SetVisible(true);
             }
-            if (Player* pl = who->ToPlayer())
+            if (Player* pl = who ? who->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
             {
                 pl->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 51615);
             }

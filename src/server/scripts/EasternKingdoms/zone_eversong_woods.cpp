@@ -397,17 +397,15 @@ public:
 
 void npc_second_trial_paladin::npc_secondTrialAI::JustDied(Unit* Killer)
 {
-    if (Killer->IsPlayer())
+    // a pet's killing blow counts too
+    if (Player* killingPlayer = Killer ? Killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
     {
         if (Creature* summoner = Unit::GetCreature((*me), summonerGuid))
             CAST_AI(npc_second_trial_controller::master_kelerun_bloodmournAI, summoner->AI())->SecondTrialKill();
 
         // last kill quest complete for group
         if (me->GetEntry() == CHAMPION_SUNSTRIKER)
-        {
-            if (Killer->IsPlayer())
-                Killer->ToPlayer()->GroupEventHappens(QUEST_SECOND_TRIAL, Killer);
-        }
+            killingPlayer->GroupEventHappens(QUEST_SECOND_TRIAL, Killer);
     }
 }
 

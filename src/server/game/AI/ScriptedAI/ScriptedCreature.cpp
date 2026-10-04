@@ -13,6 +13,7 @@
 #include "ObjectMgr.h"
 #include "ObjectVisitors.hpp"
 #include "Packets/InstancePackets.h"
+#include <algorithm>
 #include "ScriptedCreature.h"
 #include "Spell.h"
 
@@ -1143,4 +1144,17 @@ void GetRandPosFromCenterInDist(float centerX, float centerY, float dist, float&
 
     x = centerX + (dist * cos(randOrientation));
     y = centerY + (dist * sin(randOrientation));
+}
+
+
+void GetKillCreditPlayers(Creature* creature, Unit* killer, std::list<Player*>& players, float range)
+{
+    Player* killingPlayer = killer ? killer->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr;
+
+    players.clear();
+    creature->GetPlayerListInGrid(players, range);
+    players.remove_if([creature, killingPlayer](Player* player) { return player != killingPlayer && !creature->isTappedBy(player); });
+
+    if (killingPlayer && std::find(players.begin(), players.end(), killingPlayer) == players.end())
+        players.push_back(killingPlayer);
 }

@@ -611,8 +611,9 @@ public:
         
         void JustDied(Unit* who) override
         {
-            if (who->GetTypeId() == TYPEID_PLAYER)
-                who->ToPlayer()->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 48582);
+            // a pet's killing blow counts too
+            if (Player* killingPlayer = who ? who->GetCharmerOrOwnerPlayerOrPlayerItself() : nullptr)
+                killingPlayer->UpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 48582);
             Talk(4);
             if (auto blades = me->SummonCreature(112817, -1353.04f, 6307.06f, 8.60f, 1.99f))
                 blades->SetDisplayId(72343);

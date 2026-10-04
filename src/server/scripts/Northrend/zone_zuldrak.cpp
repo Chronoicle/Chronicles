@@ -693,8 +693,9 @@ public:
                 if (Creature* pWhisker = me->GetCreature(*me, uiWhisker))
                     pWhisker->RemoveFromWorld();
 
-            if (killer->GetTypeId() == TYPEID_PLAYER)
-                killer->GetCharmerOrOwnerPlayerOrPlayerItself()->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_TUSKARRMAGEDDON, killer);
+            // a pet's killing blow counts too
+            if (Player* player = killer->GetCharmerOrOwnerPlayerOrPlayerItself())
+                player->GroupEventHappens(QUEST_AMPHITHEATER_ANGUISH_TUSKARRMAGEDDON, killer);
 
         }
     };

@@ -70,8 +70,13 @@ public:
             {
                 case 0:
                     spawnCreatureID = 17681;
-                    if (Player* player = killer->ToPlayer())
-                        player->KilledMonsterCredit(spawnCreatureID, ObjectGuid::Empty);
+                    {
+                        // every tapper, not only the killing blow (a pet's kill / a groupmate gave nothing)
+                        std::list<Player*> players;
+                        GetKillCreditPlayers(me, killer, players);
+                        for (Player* player : players)
+                            player->KilledMonsterCredit(spawnCreatureID, ObjectGuid::Empty);
+                    }
                     break;
                 case 1:
                 case 2:

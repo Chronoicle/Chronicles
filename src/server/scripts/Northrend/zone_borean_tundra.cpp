@@ -365,20 +365,22 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            Player* player = killer->ToPlayer();
-            if (!player)
-                return;
-
-            if (player->GetQuestStatus(11611) == QUEST_STATUS_INCOMPLETE)
+            // every tapper on the quest rolls for himself (the killing blow alone used to)
+            std::list<Player*> players;
+            GetKillCreditPlayers(me, killer, players);
+            for (Player* player : players)
             {
-                uint8 uiRand = urand(0, 99);
-                if (uiRand < 25)
+                if (player->GetQuestStatus(11611) == QUEST_STATUS_INCOMPLETE)
                 {
-                    player->CastSpell(me, 45532, true);
-                    player->KilledMonsterCredit(WARSONG_PEON, ObjectGuid::Empty);
+                    uint8 uiRand = urand(0, 99);
+                    if (uiRand < 25)
+                    {
+                        player->CastSpell(me, 45532, true);
+                        player->KilledMonsterCredit(WARSONG_PEON, ObjectGuid::Empty);
+                    }
+                    else if (uiRand < 75)
+                        player->CastSpell(me, nerubarVictims[urand(0, 2)], true);
                 }
-                else if (uiRand < 75)
-                    player->CastSpell(me, nerubarVictims[urand(0, 2)], true);
             }
         }
     };
