@@ -744,6 +744,10 @@ void Battleground::EndBattleground(uint32 winner)
         if (!IsWargame() && (player->IsInvitedForBattlegroundQueueType(MS::Battlegrounds::BattlegroundQueueTypeId::BattlegroundRandom) || IsArena() || IsSkirmish() || IsRBG() || IsBG() || IsBrawl()))
             PlayerReward(player, team == winner);
 
+        // custom daily quest 60012 "To battle!": every player of a random battleground, winner or loser (credit only counts with the quest active)
+        if (!IsWargame() && IsBattleground() && !IsSkirmish() && player->IsInvitedForBattlegroundQueueType(MS::Battlegrounds::BattlegroundQueueTypeId::BattlegroundRandom))
+            player->KilledMonsterCredit(542182);
+
         if (team == winner)
         {
             if (!IsWargame() && !player->HasWinToday(sBattlegroundMgr->GetPvpRewardType(this)))
