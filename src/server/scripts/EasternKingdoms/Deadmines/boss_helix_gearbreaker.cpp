@@ -27,7 +27,8 @@ enum Spells
     SPELL_CHARGE                = 88288,
     SPELL_FORCE_PLAYER_RIDE_OAF = 88278,
     SPELL_RIDE_OAF              = 88277,
-    SPELL_ACHIEV_CREDIT         = 88337
+    SPELL_ACHIEV_CREDIT         = 88337,
+    SPELL_OAFGUARD              = 90546
 };
 
 enum Adds
@@ -140,7 +141,11 @@ class boss_helix_gearbreaker : public CreatureScript
                     if (!oaf)
                         oaf = me->SummonCreature(NPC_LUMBERING_OAF, oafPos[0]);
                     if (oaf)
+                    {
                         me->EnterVehicle(oaf, 0);
+                        if (!me->HasAura(SPELL_OAFGUARD))
+                            DoCast(me, SPELL_OAFGUARD, true); // protected while the Oaf lives (CPP JustAppeared)
+                    }
                 });
             }
 
@@ -149,6 +154,7 @@ class boss_helix_gearbreaker : public CreatureScript
                 if (summon->GetEntry() == NPC_LUMBERING_OAF)
                 {
                     Talk(SAY_OAF_DEAD);
+                    me->RemoveAurasDueToSpell(SPELL_OAFGUARD); // #176: he kept Oaf Guard after the Oaf died (CPP removes it here)
                     me->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE | UNIT_FLAG_NON_ATTACKABLE);
                 }
             }
@@ -356,11 +362,14 @@ class npc_lumbering_oaf : public CreatureScript
                                 42.0f, POINT_END);
                             break;
                         case EVENT_CHARGE_OAF3:
-                            DoCastAOE(SPELL_OAF_SMASH);
+                            // #176: the smashed player did no damage / no sound: Oaf Smash 88300 (3 yd physical damage + knockback +
+                            // cancel Ride Oaf 88277) hit nobody because the rider was still on the Oaf. Retail: Charge 88295 ejects the
+                            // passenger (62539) first, then triggers 88300. Eject, then smash.
+                            me->RemoveAurasDueToSpell(SPELL_RIDE_OAF);
+                            DoCastAOE(SPELL_OAF_SMASH, true);
                             me->SetReactState(REACT_AGGRESSIVE);
                             if (me->getVictim())
                                 me->GetMotionMaster()->MoveChase(me->getVictim());
-                            me->RemoveAurasDueToSpell(SPELL_RIDE_OAF);
                             instance->DoCastSpellOnPlayers(SPELL_ACHIEV_CREDIT);
                             for (uint8 i = 0; i < 7; i++)
                                 me->SummonCreature(NPC_MINE_RAT, RatPos[i], TEMPSUMMON_CORPSE_DESPAWN, 5000);
