@@ -122,7 +122,8 @@ class instance_shadowfang_keep : public InstanceMapScript
                 for (uint32 stop = 0; stop < STOP_COUNT; ++stop)
                     if (creature->GetPhaseMask() == SfkStopMask(stop))
                     {
-                        stopMembers[stop].push_back(creature->GetGUID());
+                        if (std::find(stopMembers[stop].begin(), stopMembers[stop].end(), creature->GetGUID()) == stopMembers[stop].end())
+                            stopMembers[stop].push_back(creature->GetGUID());
                         if (shownStops.count(stop) && IsOwnFaction(creature->GetEntry()))
                             creature->SetPhaseMask(1, true);
                         break;
