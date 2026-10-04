@@ -2964,6 +2964,7 @@ void LootTemplate::ProcessItemLoot(Loot& loot) const
 
     LootStoreItemList ItemPossibleDrops;
     LootStoreItemList APPossibleDrops;
+    LootStoreItemList ItemFallbackDrops; // gear refused only by CanGetItemForLoot (level / spec), see below
 
     if (loot._isEmissaryLoot || loot._itemContext == 43)
         loot.AddLegendaryItemToDrop(); //Generate Loot Legendary Item
@@ -2986,7 +2987,11 @@ void LootTemplate::ProcessItemLoot(Loot& loot) const
                 }
 
                 if(!lootOwner->CanGetItemForLoot(_proto, loot._specCheck))
+                {
+                    if (!_delete && i->reference <= 0)
+                        ItemFallbackDrops.push_back(*i);
                     _delete = true;
+                }
             }
             else
                 _delete = true;
@@ -3013,6 +3018,11 @@ void LootTemplate::ProcessItemLoot(Loot& loot) const
     }
 
     TC_LOG_DEBUG("loot", "ProcessItemLoot ItemPossibleDrops %zu APPossibleDrops %zu Groups %zu", ItemPossibleDrops.size(), APPossibleDrops.size(), Groups.size());
+
+    // A container of gear (e.g. Satchel of Helpful Goods 51999-52005) opened inside the dungeon refused every item whose
+    // required level is above the player's or that does not fit the loot spec, and came out empty (#175): give one anyway.
+    if (ItemPossibleDrops.empty())
+        ItemPossibleDrops = ItemFallbackDrops;
 
     if (!ItemPossibleDrops.empty()) // If nothing selected yet - an item is taken from equal-chanced part
     {

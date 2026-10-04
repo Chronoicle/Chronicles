@@ -19290,8 +19290,19 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
                     SendDisplayToast(itemId, ToastType::ITEM, false, quest->RewardItemCount[i], DisplayToastMethod::DISPLAY_TOAST_SPECIAL_UNK, quest_id, item);
                     SendNewItem(item, quest->RewardItemCount[i], true, false);
                 }
-//                else if (quest->IsDFQuest())
-//                    SendItemRetrievalMail(quest->RewardItemId[i], quest->RewardItemCount[i]);
+                else if (quest->IsDFQuest())
+                {
+                    // Dungeon Finder reward with full bags: mail it, like retail (the Satchel of Helpful Goods was lost, #175)
+                    if (Item* item = Item::CreateItem(itemId, quest->RewardItemCount[i], this))
+                    {
+                        CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+                        item->SaveToDB(trans);
+                        MailDraft draft("Dungeon Finder reward", "Your bags were full, so your dungeon reward was sent here.");
+                        draft.AddItem(item);
+                        draft.SendMailTo(trans, this, MailSender(this, MAIL_STATIONERY_GM), MAIL_CHECK_MASK_COPIED);
+                        CharacterDatabase.CommitTransaction(trans);
+                    }
+                }
             }
         }
     }
