@@ -38,4 +38,3 @@ UPDATE world.smart_scripts SET event_param1=12000, event_param2=4000 WHERE entry
 UPDATE world.smart_scripts SET event_param1=3000, event_param2=2000 WHERE entryorguid=11005273 AND source_type=9 AND id=1;
 UPDATE world.smart_scripts SET event_param1=4000, event_param2=2000 WHERE entryorguid=11005273 AND source_type=9 AND id=4;
 UPDATE world.smart_scripts SET event_param1=8000, event_param2=5000 WHERE entryorguid=11555700 AND source_type=9 AND id=8;
-UPDATE world.smart_scripts SET event_flags=16 WHERE entryorguid=60005200 AND source_type=9 AND id=1;
