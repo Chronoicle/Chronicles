@@ -308,16 +308,18 @@ public:
 
         void JustDied(Unit* killer) override
         {
-            Player* player = killer->ToPlayer();
-            if (!player)
-                return;
+            // every tapper on the quest gets the credit, not only the killing blow
+            std::list<Player*> players;
+            GetKillCreditPlayers(me, killer, players);
+            players.remove_if([](Player* p) { return p->GetQuestStatus(10873) != QUEST_STATUS_INCOMPLETE; });
 
-            if (player->GetQuestStatus(10873) == QUEST_STATUS_INCOMPLETE)
+            if (!players.empty())
             {
                 if (rand()%100 < 25)
                 {
                     me->SummonCreature(QUEST_TARGET, 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
-                    player->KilledMonsterCredit(QUEST_TARGET, ObjectGuid::Empty);
+                    for (Player* player : players)
+                        player->KilledMonsterCredit(QUEST_TARGET, ObjectGuid::Empty);
                 }
                 else
                     me->SummonCreature(netherwebVictims[rand()%6], 0.0f, 0.0f, 0.0f, 0.0f, TEMPSUMMON_TIMED_DESPAWN_OUT_OF_COMBAT, 60000);
