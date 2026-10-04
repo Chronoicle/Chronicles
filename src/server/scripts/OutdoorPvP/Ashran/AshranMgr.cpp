@@ -1459,6 +1459,7 @@ void OutdoorPvPAshran::SetEventData(uint8 p_EventID, uint8 teamID, uint32 p_Data
 
             if (m_StadiumRacingLaps[teamID] + p_Data >= MaxStadiumRacingLaps)
             {
+                GiveEventVictoryCredit(teamID);
                 EndEvent(EventStadiumRacing);
 
                 if (Creature* l_Herald = GetHerald())
@@ -2049,6 +2050,16 @@ uint32 OutdoorPvPAshran::GetCurrentBattleType() const
         default:
             return TheCrossroads;
     }
+}
+
+void OutdoorPvPAshran::GiveEventVictoryCredit(uint8 p_Team)
+{
+    if (p_Team >= TEAM_NEUTRAL)
+        return;
+
+    for (ObjectGuid const& l_Guid : m_PlayersInWar[p_Team])
+        if (Player* l_Player = sObjectAccessor->FindPlayer(l_Guid))
+            l_Player->KilledMonsterCredit(95099); ///< counts only with quest 38923 (or its twin) active
 }
 
 void OutdoorPvPAshran::HandleFactionBossDeath(uint8 p_Faction)

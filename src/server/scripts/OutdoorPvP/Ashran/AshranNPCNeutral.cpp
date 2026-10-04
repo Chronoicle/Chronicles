@@ -206,7 +206,10 @@ public:
             });
 
             for (Player* l_Player : l_PlayerList)
+            {
                 l_Player->RewardHonor(l_Player, 1, 50 * 100);
+                l_Player->KilledMonsterCredit(98332); ///< criteria 29154 of tree 46081 "Kill enemy faction leader" (quest 38923 "Ashran Dominance")
+            }
 
             /// Trigger strongboxes loot for near players
             if (me->GetEntry() == GrandMarshalTremblade)
@@ -508,11 +511,15 @@ public:
             switch (p_Action)
             {
                 case ActionAllianceRecruit:
+                    if (OutdoorPvPAshran* l_Ashran = static_cast<OutdoorPvPAshran*>(m_OutdoorPvP))
+                        l_Ashran->GiveEventVictoryCredit(TEAM_ALLIANCE); ///< quest 38923 "Event victory"
                     Talk(TalkRecruitedByAlliance);
                     me->setFaction(KorlokForAlliance);
                     HandleJumpToFight();
                     break;
                 case ActionHordeRecruit:
+                    if (OutdoorPvPAshran* l_Ashran = static_cast<OutdoorPvPAshran*>(m_OutdoorPvP))
+                        l_Ashran->GiveEventVictoryCredit(TEAM_HORDE); ///< quest 38923 "Event victory"
                     Talk(TalkRecruitedByHorde);
                     me->setFaction(KorlokForHorde);
                     HandleJumpToFight();

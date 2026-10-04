@@ -158,6 +158,8 @@ public:
     uint32 GetCurrentBattleType() const;
 
     void HandleFactionBossDeath(uint8 p_Faction);
+    /// Quest 38923 "Ashran Dominance": "Event victory" credit (95099) for every player of the winning team in the war
+    void GiveEventVictoryCredit(uint8 p_Team);
     void HandleCaptainDeath(uint32 type);
 
     OPvPCapturePoint_Middle* GetCapturePoint(uint8 p_Index) const;
