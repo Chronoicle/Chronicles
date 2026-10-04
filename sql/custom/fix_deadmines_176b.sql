@@ -27,10 +27,10 @@ UPDATE world.creature_template_addon a JOIN world.bak_dm176b_addon b ON b.entry 
 -- if diagnostic c shows no row for 48441: INSERT INTO world.creature_template_addon (entry, path_id, mount, bytes1, bytes2, emote, auras) VALUES (48441, 0, 0, 0, 1, 233, '');   (then add 48441 to the undo by hand)
 
 -- 4) Miner Johnson 3586 "[UNUSED 4.x ]Miner Johnson": CPP has NO spawn of 3586 (nor of 598) in the Deadmines; at that spot (-151.3, -532.3, 49.6) CPP has Mining Powder 48284, a Goblin Overseer and Mining Monkeys.
---    The spawn guid 246468 is a leftover of the unused entry. OWNER DECISION (deleting data): uncomment to delete it.
--- CREATE TABLE IF NOT EXISTS world.bak_dm176b_creature LIKE world.creature;
--- INSERT INTO world.bak_dm176b_creature SELECT * FROM world.creature WHERE guid = 246468 AND id = 3586;
--- DELETE FROM world.creature WHERE guid = 246468 AND id = 3586;
+--    The spawn guid 246468 is a leftover of the unused entry. Owner approved the delete (2026-10-04).
+CREATE TABLE IF NOT EXISTS world.bak_dm176b_creature LIKE world.creature;
+INSERT INTO world.bak_dm176b_creature SELECT * FROM world.creature WHERE guid = 246468 AND id = 3586;
+DELETE FROM world.creature WHERE guid = 246468 AND id = 3586;
 -- (creature_addon / smart_scripts of that guid, if any: SELECT * FROM world.creature_addon WHERE guid = 246468;)
 
 -- dev-owner: part 5 (wandering rats) left out: CPP/retail have them static at that spot; part 6 (second patrol pass) matched 0 of our creatures on the live DB, left out.
