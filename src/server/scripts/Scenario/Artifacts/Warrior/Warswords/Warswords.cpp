@@ -17,6 +17,9 @@ public:
     {
         go_mystic_bonfireAI(GameObject* go) : GameObjectAI(go) {}
 
+        // a click only reaches GossipUse, never GossipHello(isUse = true) (#148 pattern)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
@@ -60,6 +63,9 @@ public:
         }
 
         bool check;
+
+        // a click only reaches GossipUse, never GossipHello(isUse = true) (#148 pattern)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
 
         bool GossipHello(Player* player, bool isUse) override
         {

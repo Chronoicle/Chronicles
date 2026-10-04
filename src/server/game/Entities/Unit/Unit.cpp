@@ -14992,6 +14992,13 @@ bool Unit::_IsValidAttackTarget(Unit const* target, SpellInfo const* bySpell, Wo
         && GetEntry() != WORLD_TRIGGER)
         return false;
 
+    // TrinityCore checks IMMUNE_TO_PC both ways; here only the player side was checked, so a creature immune to players still
+    // aggroed and meleed them (Ragefire Chasm quest NPCs, #174). Melee / aggro only: our trigger NPCs carry the flag and their
+    // spells must keep hitting players.
+    if (!bySpell && !HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE) && HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC)
+        && target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE))
+        return false;
+
     // CvC case - can attack each other only when one of them is hostile
     if (!HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE) && !target->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE))
         return GetReactionTo(target) <= REP_HOSTILE || target->GetReactionTo(this) <= REP_HOSTILE;

@@ -427,6 +427,9 @@ public:
             SOUTH_SCENE = 159127,
             EASTERN_SCENE = 159126
         };
+        // a click only reaches GossipUse, never GossipHello(isUse = true) (#148 pattern)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
@@ -1416,6 +1419,9 @@ public:
             SPELL_CINEMA = 176159,
 
         };
+        // a click only reaches GossipUse, never GossipHello(isUse = true) (#148 pattern)
+        bool GossipUse(Player* player) override { return GossipHello(player, true); }
+
         bool GossipHello(Player* player, bool isUse) override
         {
             if (!isUse)
