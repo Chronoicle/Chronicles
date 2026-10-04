@@ -2150,6 +2150,64 @@ public:
 	}
 };*/
 
+// Comet Storm (Frost talent 153595): 7 comets land around the target spot (TrinityCore spell_mage_comet_storm; #missing-class-scripts)
+class CometStormEvent : public BasicEvent
+{
+public:
+    CometStormEvent(Unit* caster, Position const& dest) : _caster(caster), _dest(dest), _count(0) { }
+
+    bool Execute(uint64 /*time*/, uint32 /*diff*/) override
+    {
+        _caster->CastSpell(_dest.GetPositionX() + frand(-3.0f, 3.0f), _dest.GetPositionY() + frand(-3.0f, 3.0f), _dest.GetPositionZ(), SPELL_MAGE_COMET_STORM_VISUAL, true);
+        ++_count;
+
+        if (_count >= 7)
+            return true;
+
+        _caster->m_Events.AddEvent(this, _caster->m_Events.CalculateTime(urand(100, 275)));
+        return false;
+    }
+
+private:
+    Unit* _caster;
+    Position _dest;
+    uint8 _count;
+};
+
+// 153595 - Comet Storm (launch)
+class spell_mage_comet_storm : public SpellScript
+{
+    PrepareSpellScript(spell_mage_comet_storm);
+
+    void EffectHit(SpellEffIndex /*effIndex*/)
+    {
+        if (WorldLocation* dest = GetHitDest())
+            GetCaster()->m_Events.AddEvent(new CometStormEvent(GetCaster(), *dest), GetCaster()->m_Events.CalculateTime(urand(100, 275)));
+    }
+
+    void Register() override
+    {
+        OnEffectHit += SpellEffectFn(spell_mage_comet_storm::EffectHit, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
+// 228601 - Comet Storm (damage, triggered by the visual 242210)
+class spell_mage_comet_storm_damage : public SpellScript
+{
+    PrepareSpellScript(spell_mage_comet_storm_damage);
+
+    void HandleEffectHitTarget(SpellEffIndex /*effIndex*/)
+    {
+        if (WorldLocation* dest = GetHitDest())
+            GetCaster()->CastSpell(dest->GetPositionX(), dest->GetPositionY(), dest->GetPositionZ(), SPELL_MAGE_COMET_STORM_DAMAGE, true);
+    }
+
+    void Register() override
+    {
+        OnEffectHit += SpellEffectFn(spell_mage_comet_storm_damage::HandleEffectHitTarget, EFFECT_0, SPELL_EFFECT_DUMMY);
+    }
+};
+
 void AddSC_mage_spell_scripts()
 {
     new spell_mage_mirror_image_summon();
@@ -2192,5 +2250,7 @@ void AddSC_mage_spell_scripts()
     RegisterAuraScript(spell_mage_immolation);
     RegisterAuraScript(spell_mage_highblades_will);
     RegisterSpellScript(spell_mage_phoenixs_flames);
+    RegisterSpellScript(spell_mage_comet_storm);
+    RegisterSpellScript(spell_mage_comet_storm_damage);
 	//new areatrigger_at_mage_frozen_orb();
 }

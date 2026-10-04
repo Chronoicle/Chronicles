@@ -2231,12 +2231,30 @@ class spell_dru_ashamane_frenzy_proc : public AuraScript
     }
 };
 
+// 93622 - Gore: the proc resets the cooldown of Mangle (33917) (TrinityCore resets it in the proc of 210706; here on the buff the proc applies)
+class spell_dru_mangle : public AuraScript
+{
+    PrepareAuraScript(spell_dru_mangle);
+
+    void HandleApply(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        if (Player* player = GetTarget()->ToPlayer())
+            player->RemoveSpellCooldown(33917, true);
+    }
+
+    void Register() override
+    {
+        AfterEffectApply += AuraEffectApplyFn(spell_dru_mangle::HandleApply, EFFECT_FIRST_FOUND, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL_OR_REAPPLY_MASK);
+    }
+};
+
 void AddSC_druid_spell_scripts()
 {
     new spell_dru_ferocious_bite();
     new spell_dru_lifebloom();
     new spell_dru_cat_form();
     RegisterAuraScript(spell_dru_frenzied_regeneration);
+    RegisterAuraScript(spell_dru_mangle);
     new spell_dru_stampeding_roar_speed();
     new spell_dru_teleport_moonglade();
     new spell_dru_swift_flight_passive();
