@@ -483,6 +483,10 @@ inline void GetPlayerListInGrid(std::list<Player*>& list, WorldObject* source, f
     source->GetPlayerListInGrid(list, maxSearchRange);
 }
 
+// Players who earn the kill of `creature`: everyone who tapped it within `range` yd plus the player behind the killing blow (a pet's, a guardian's).
+// For JustDied credit (KilledMonsterCredit, quest events, criteria): `killer->ToPlayer()` alone leaves groupmates and pet kills without it.
+TC_GAME_API void GetKillCreditPlayers(Creature* creature, Unit* killer, std::list<Player*>& players, float range = 100.0f);
+
 TC_GAME_API void GetPositionWithDistInOrientation(Unit* pUnit, float dist, float orientation, float& x, float& y);
 TC_GAME_API void GetPosInRadiusWithRandomOrientation(Unit* unit, float dist, float &x, float &y);
 TC_GAME_API void GetRandPosFromCenterInDist(float centerX, float centerY, float dist, float& x, float& y);
