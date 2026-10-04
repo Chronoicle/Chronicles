@@ -1737,6 +1737,10 @@ void LFGMgr::FinishDungeon(ObjectGuid gguid, const uint32 dungeonId)
             continue;
         }
 
+        // custom daily quest 60014 "Dungeon siege": a Legion heroic dungeon finished through the dungeon finder (credit only counts with the quest active)
+        if (rDungeon->difficulty == DIFFICULTY_HEROIC && dungeonDone->dbc->ExpansionLevel == EXPANSION_LEGION)
+            player->KilledMonsterCredit(542181);
+
         // Update achievements
         if (rDungeon->difficulty == DIFFICULTY_HEROIC)
             player->UpdateAchievementCriteria(CRITERIA_TYPE_USE_LFD_TO_GROUP_WITH_PLAYERS, 1);
