@@ -2379,9 +2379,49 @@ class spell_warl_incinerate : public SpellScript
     }
 };
 
+// 48181 - Haunt: the cooldown resets when the target dies under it (TrinityCore spell_warl_haunt; #missing-class-scripts)
+class spell_warl_haunt : public AuraScript
+{
+    PrepareAuraScript(spell_warl_haunt);
+
+    void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        if (GetTargetApplication()->GetRemoveMode() != AURA_REMOVE_BY_DEATH)
+            return;
+
+        if (Unit* caster = GetCaster())
+            if (Player* player = caster->ToPlayer())
+                player->RemoveSpellCooldown(GetId(), true);
+    }
+
+    void Register() override
+    {
+        OnEffectRemove += AuraEffectRemoveFn(spell_warl_haunt::HandleRemove, EFFECT_FIRST_FOUND, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// 603 - Doom: every tick gives the Demonology warlock a Soul Shard (Doom energize 193318; TrinityCore spell_warl_doom)
+class spell_warl_doom : public AuraScript
+{
+    PrepareAuraScript(spell_warl_doom);
+
+    void HandleEffectPeriodic(AuraEffect const* /*aurEff*/)
+    {
+        if (Unit* caster = GetCaster())
+            caster->CastSpell(caster, 193318, true);
+    }
+
+    void Register() override
+    {
+        OnEffectPeriodic += AuraEffectPeriodicFn(spell_warl_doom::HandleEffectPeriodic, EFFECT_0, SPELL_AURA_PERIODIC_DAMAGE);
+    }
+};
+
 void AddSC_warlock_spell_scripts()
 {
     new spell_warl_burning_rush();
+    RegisterAuraScript(spell_warl_haunt);
+    RegisterAuraScript(spell_warl_doom);
     new spell_warl_banish();
     new spell_warl_demonic_circle_summon();
     new spell_warl_demonic_circle_teleport();
