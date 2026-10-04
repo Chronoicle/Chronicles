@@ -5,7 +5,7 @@
 --   actions: talk, sound, emote, cast (out-of-combat casts only on self), emote state, auto attack, combat movement,
 --           phase / inc phase, flee, call for help, sheath, store target, self / cross cast, interrupt, home pos,
 --           health regen, root, random sound, corpse delay, animkit.
--- (counts in the commit message). The 370 with any other row (despawn, faction, flags, visibility, waypoints, data / instance
+-- Mana % (event 3) is a combat event too. (counts in the commit message) The 370 with any other row (despawn, faction, flags, visibility, waypoints, data / instance
 -- calls, summons, action lists, quest credit ...) are left for a separate review. Apply once, right before a restart.
 DROP TEMPORARY TABLE IF EXISTS world.sai_b2;
 CREATE TEMPORARY TABLE world.sai_b2 (entry INT PRIMARY KEY)
@@ -22,8 +22,13 @@ WHERE t.AIName = '' AND t.ScriptName = ''
 DROP TEMPORARY TABLE IF EXISTS world.sai_b2_risky;
 CREATE TEMPORARY TABLE world.sai_b2_risky (e INT PRIMARY KEY)
 SELECT DISTINCT s.entryorguid e FROM world.smart_scripts s JOIN world.sai_b2 b ON b.entry = s.entryorguid
-WHERE s.source_type = 0 AND (
-      s.event_type NOT IN (0, 1, 2, 4, 5, 6, 7, 9, 11, 12, 13, 14, 16, 23, 25, 61, 67, 74)
+LEFT JOIN world.smart_scripts p ON p.entryorguid = s.entryorguid AND p.source_type = 0 AND p.link = s.id AND s.event_type = 61
+WHERE s.source_type = 0
+  -- rows that only fire on player interaction (spell hit, quest accept / reward, gossip select / hello, text over) or a link
+  -- directly behind one of those are allowed whatever they do: that is how quest NPCs give credit / react (owner: fix all)
+  AND NOT (s.event_type IN (8, 19, 20, 52, 62, 64) OR (s.event_type = 61 AND p.event_type IN (8, 19, 20, 52, 62, 64)))
+  AND (
+      s.event_type NOT IN (0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 16, 23, 25, 61, 67, 74)
    OR s.action_type NOT IN (1, 4, 5, 11, 17, 20, 21, 22, 23, 25, 39, 40, 64, 85, 86, 92, 100, 101, 102, 103, 115, 116, 128)
    OR (s.event_type IN (1, 11, 25) AND s.action_type IN (11, 85, 86) AND s.target_type NOT IN (0, 1))
    -- out-of-combat chains: a link row behind an OOC / respawn / reset event that casts on someone else
