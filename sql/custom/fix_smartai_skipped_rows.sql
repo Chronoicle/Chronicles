@@ -1,28 +1,16 @@
 -- Claude (dev-owner) 2026-10-04, owner: fix all. SmartAI rows the loader skipped at every start (DBErrors): min/max event
--- params swapped or max 0 (28), rows linking to themselves (12), deprecated per-difficulty event flags 2|4|8|16 (7, cleared:
+-- params swapped or max 0 (28), (rows linking to themselves are left: the key includes link, they duplicate an existing row and never load), deprecated per-difficulty event flags 2|4|8|16 (7, cleared:
 -- the row then runs on every difficulty), target max distance 0 (5, -> 100 yd). Generated row by row from the load log.
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=1519 AND source_type=13 AND id=1 AND link=1;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=6854 AND source_type=2 AND id=1 AND link=1;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=11441 AND source_type=0 AND id=5 AND link=5;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=14322 AND source_type=0 AND id=8 AND link=8;
 UPDATE world.smart_scripts SET target_param1=100 WHERE entryorguid=22337 AND source_type=0 AND id=2 AND target_param1=0;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=26811 AND source_type=0 AND id=7 AND link=7;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=26812 AND source_type=0 AND id=7 AND link=7;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=26917 AND source_type=0 AND id=1 AND link=1;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=33044 AND source_type=0 AND id=1 AND link=1;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=38017 AND source_type=0 AND id=1 AND link=1;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=38923 AND source_type=0 AND id=1 AND link=1;
 UPDATE world.smart_scripts SET event_flags=event_flags & ~30 WHERE entryorguid=53693 AND source_type=0 AND id=0;
 UPDATE world.smart_scripts SET event_flags=event_flags & ~30 WHERE entryorguid=53693 AND source_type=9 AND id=0;
 UPDATE world.smart_scripts SET event_param3=1, event_param4=1 WHERE entryorguid=77893 AND source_type=0 AND id=0;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=79243 AND source_type=0 AND id=1 AND link=1;
 UPDATE world.smart_scripts SET event_param1=4, event_param2=4 WHERE entryorguid=79490 AND source_type=0 AND id=7;
 UPDATE world.smart_scripts SET target_param1=100 WHERE entryorguid=93838 AND source_type=0 AND id=4 AND target_param1=0;
 UPDATE world.smart_scripts SET target_param1=100 WHERE entryorguid=93839 AND source_type=0 AND id=4 AND target_param1=0;
 UPDATE world.smart_scripts SET event_param1=1000, event_param2=1000 WHERE entryorguid=95834 AND source_type=0 AND id=2;
 UPDATE world.smart_scripts SET event_param1=3000, event_param2=3000 WHERE entryorguid=95842 AND source_type=0 AND id=2;
 UPDATE world.smart_scripts SET event_param1=500, event_param2=500 WHERE entryorguid=97087 AND source_type=0 AND id=2;
-UPDATE world.smart_scripts SET link=0 WHERE entryorguid=101846 AND source_type=0 AND id=18 AND link=18;
 UPDATE world.smart_scripts SET event_param3=12000, event_param4=120000 WHERE entryorguid=105038 AND source_type=0 AND id=0;
 UPDATE world.smart_scripts SET event_param1=1000, event_param2=10000 WHERE entryorguid=111357 AND source_type=9 AND id=2;
 UPDATE world.smart_scripts SET event_param3=2000, event_param4=6000 WHERE entryorguid=115751 AND source_type=0 AND id=0;
