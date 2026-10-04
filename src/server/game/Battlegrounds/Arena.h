@@ -47,6 +47,7 @@ private:
     void CheckWinConditions() override;
     void ApplyDampeningIfNeeded();
     IntervalTimer _dampeningTimer;
+    Milliseconds _fightTime = Milliseconds(0); // since the gates opened (GetElapsedTime also counts the preparation)
     IntervalTimer _winConditionCheckTimer;
     LogsSystem::MainData _logData;
 };

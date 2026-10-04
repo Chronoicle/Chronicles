@@ -41,6 +41,7 @@ void Arena::PostUpdateImpl(uint32 diff)
     if (GetStatus() != STATUS_IN_PROGRESS)
         return;
 
+    _fightTime += Milliseconds(diff);
     _dampeningTimer.Update(diff);
     _winConditionCheckTimer.Update(diff);
 
@@ -284,7 +285,7 @@ void Arena::ApplyDampeningIfNeeded()
             break;
         case MS::Battlegrounds::JoinType::ArenaSoloQ3v3:
         case MS::Battlegrounds::JoinType::Arena3v3:
-            if (GetElapsedTime() >= std::chrono::minutes(5))
+            if (_fightTime >= std::chrono::minutes(5)) // retail: 5 min after the gates open, not after the arena was created
                 applyDampening();
             break;
         default:

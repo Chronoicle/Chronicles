@@ -3672,10 +3672,15 @@ class spell_gen_dampening : public SpellScriptLoader
             {
                 if (Player* player = GetCaster()->ToPlayer())
                 {
-                    if (player->GetBattleground() && player->GetBattleground()->GetJoinType() == MS::Battlegrounds::JoinType::Arena2v2)
+                    Battleground* bg = player->GetBattleground();
+                    uint8 joinType = bg ? (bg->GetBrawlJoinType() ? bg->GetBrawlJoinType() : bg->GetJoinType()) : 0;
+                    if (joinType == MS::Battlegrounds::JoinType::Arena2v2)
                     {
                         amount = 20;
                         const_cast<AuraEffect*>(aurEff)->ChangeAmount(amount);
+                        // the healing reduction itself, at once (retail: 20 % from the start; it only came with the first 10 s tick)
+                        float bp0 = -amount;
+                        player->CastCustomSpell(player, 74410, &bp0, &bp0, &bp0, true);
                     }
                 }
             }
@@ -3689,7 +3694,7 @@ class spell_gen_dampening : public SpellScriptLoader
                 if (AuraEffect* aurEff0 = aurEff->GetBase()->GetEffect(EFFECT_0))
                 {
                     amount = aurEff0->GetAmount() + 1;
-                    if (amount >= 100)
+                    if (amount > 100) // retail caps at 100 %
                         return;
 
                     aurEff0->ChangeAmount(amount);
