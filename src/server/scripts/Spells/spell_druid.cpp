@@ -529,6 +529,10 @@ class spell_dru_frenzied_regeneration : public AuraScript
             if (Player* plr = caster->ToPlayer())
                 AddPct(heal, plr->GetFloatValue(PLAYER_FIELD_VERSATILITY) + plr->GetFloatValue(PLAYER_FIELD_VERSATILITY_BONUS));
 
+            // Guardian of Elune (talent 155578, buff 213680 from Mangle): the next Frenzied Regeneration heals 20 % more
+            if (AuraEffect const* goe = caster->GetAuraEffect(213680, EFFECT_1))
+                AddPct(heal, goe->GetAmount());
+
             heal /= aurEff->GetTotalTicks();
             amount += heal;
         }
@@ -538,6 +542,7 @@ class spell_dru_frenzied_regeneration : public AuraScript
     {
         if (Unit* caster = GetCaster())
         {
+            caster->RemoveAurasDueToSpell(213680); // Guardian of Elune used up (its bonus is in the tick amount)
             if (Player* plr = caster->ToPlayer())
             {
                 if (AuraEffect const* aurEff = plr->GetAuraEffect(242236, EFFECT_0)) // Item - Druid T20 Guardian 2P Bonus
