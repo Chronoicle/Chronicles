@@ -2896,6 +2896,17 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
         // currently visible objects at player client
         GuidSet m_clientGUIDs;
         GuidSet m_extraLookList;
+
+        // creatures that only this player sees for a quest in the log (world.quest_personal_spawn)
+        struct QuestPersonalSpawnState
+        {
+            ObjectGuid Guid;
+            time_t RespawnAt = 0;
+        };
+        std::map<std::pair<uint32, uint32>, QuestPersonalSpawnState> m_questPersonalSpawns; // (quest, row index)
+        uint32 m_questPersonalSpawnTimer = 0;
+        void UpdateQuestPersonalSpawns();
+        void DespawnQuestPersonalSpawns();
         sf::contention_free_shared_mutex< > i_clientGUIDLock;
         std::recursive_mutex i_killMapLock;
         std::recursive_mutex i_personalLootLock;

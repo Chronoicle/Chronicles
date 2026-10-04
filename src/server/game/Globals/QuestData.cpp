@@ -3165,3 +3165,51 @@ WorldQuestRecipe const* QuestDataStoreMgr::GetRecipesForQuest(uint32 QuestID)
         return &itr->second;
     return nullptr;
 }
+
+
+void QuestDataStoreMgr::LoadQuestPersonalSpawns()
+{
+    uint32 oldMSTime = getMSTime();
+
+    mQuestPersonalSpawns.clear();
+
+    QueryResult result = WorldDatabase.Query("SELECT quest, creature, map, x, y, z, o, respawn_secs FROM quest_personal_spawn ORDER BY quest, id");
+    if (!result)
+    {
+        TC_LOG_INFO("server.loading", ">> Loaded 0 quest personal spawns. DB table `quest_personal_spawn` is empty.");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        QuestPersonalSpawn spawn;
+        spawn.Quest = fields[0].GetUInt32();
+        spawn.Entry = fields[1].GetUInt32();
+        spawn.Map = fields[2].GetUInt32();
+        spawn.X = fields[3].GetFloat();
+        spawn.Y = fields[4].GetFloat();
+        spawn.Z = fields[5].GetFloat();
+        spawn.O = fields[6].GetFloat();
+        spawn.RespawnSecs = fields[7].GetUInt32();
+
+        if (!GetQuestTemplate(spawn.Quest))
+        {
+            TC_LOG_ERROR("sql.sql", "Table `quest_personal_spawn` has unknown quest %u, skipped.", spawn.Quest);
+            continue;
+        }
+
+        if (!sObjectMgr->GetCreatureTemplate(spawn.Entry))
+        {
+            TC_LOG_ERROR("sql.sql", "Table `quest_personal_spawn` quest %u has unknown creature %u, skipped.", spawn.Quest, spawn.Entry);
+            continue;
+        }
+
+        mQuestPersonalSpawns[spawn.Quest].push_back(spawn);
+        ++count;
+    }
+    while (result->NextRow());
+
+    TC_LOG_INFO("server.loading", ">> Loaded %u quest personal spawns in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+}
