@@ -1438,6 +1438,13 @@ void Player::Update(uint32 p_time)
 
     m_isUpdate = true;
 
+    m_questPersonalSpawnTimer += p_time;
+    if (m_questPersonalSpawnTimer >= 5000)
+    {
+        m_questPersonalSpawnTimer = 0;
+        UpdateQuestPersonalSpawns();
+    }
+
     // undelivered mail
     if (m_nextMailDelivereTime && m_nextMailDelivereTime <= GameTime::GetGameTime())
     {
@@ -2818,8 +2825,99 @@ void Player::AddToWorld()
     GetCheatData()->InitSpeeds(this);
 }
 
+void Player::DespawnQuestPersonalSpawns()
+{
+    for (auto const& itr : m_questPersonalSpawns)
+        if (Creature* creature = ObjectAccessor::GetCreature(*this, itr.second.Guid))
+            creature->DespawnOrUnsummon();
+
+    m_questPersonalSpawns.clear();
+}
+
+// Every few seconds: for each quest in the log that is still incomplete and has rows in quest_personal_spawn, keep one personal creature per
+// row alive near the player (private visibility); despawn it when the quest is completed/abandoned/rewarded, the player leaves the map or goes far away.
+void Player::UpdateQuestPersonalSpawns()
+{
+    if (!sQuestDataStore->HasQuestPersonalSpawns() || !IsInWorld() || !GetMap())
+        return;
+
+    std::set<std::pair<uint32, uint32>> wanted;
+    time_t now = GameTime::GetGameTime();
+
+    for (uint8 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = GetQuestSlotQuestId(slot);
+        if (!questId || GetQuestStatus(questId) != QUEST_STATUS_INCOMPLETE)
+            continue;
+
+        std::vector<QuestPersonalSpawn> const* spawns = sQuestDataStore->GetQuestPersonalSpawns(questId);
+        if (!spawns)
+            continue;
+
+        for (uint32 i = 0; i < spawns->size(); ++i)
+        {
+            QuestPersonalSpawn const& row = (*spawns)[i];
+            std::pair<uint32, uint32> key(questId, i);
+            auto itr = m_questPersonalSpawns.find(key);
+
+            // wrong map or far away: nothing there (and the grid may not even be loaded)
+            if (GetMapId() != row.Map || GetExactDist2d(row.X, row.Y) > (itr != m_questPersonalSpawns.end() ? 200.0f : 120.0f))
+                continue;
+
+            wanted.insert(key);
+
+            if (itr != m_questPersonalSpawns.end())
+            {
+                Creature* creature = ObjectAccessor::GetCreature(*this, itr->second.Guid);
+                if (creature && creature->IsAlive())
+                    continue;
+
+                // killed (or gone): respawn after the delay while the quest is still incomplete
+                if (!itr->second.RespawnAt)
+                    itr->second.RespawnAt = now + row.RespawnSecs;
+                if (now < itr->second.RespawnAt)
+                    continue;
+
+                if (creature)
+                    creature->DespawnOrUnsummon();
+                m_questPersonalSpawns.erase(itr);
+            }
+
+            float z = row.Z;
+            float ground = GetMap()->GetHeight(row.X, row.Y, z ? z + 30.0f : 3000.0f, true, z ? 60.0f : 6000.0f);
+            if (ground > INVALID_HEIGHT)
+                z = ground;
+            else if (!z)
+                continue; // no ground known there
+
+            if (TempSummon* summon = SummonCreature(row.Entry, row.X, row.Y, z + 0.5f, row.O, TEMPSUMMON_MANUAL_DESPAWN, 0, GetGUID()))
+            {
+                QuestPersonalSpawnState state;
+                state.Guid = summon->GetGUID();
+                m_questPersonalSpawns[key] = state;
+            }
+        }
+    }
+
+    // everything that is no longer wanted (quest done/abandoned, other map, too far)
+    for (auto itr = m_questPersonalSpawns.begin(); itr != m_questPersonalSpawns.end();)
+    {
+        if (wanted.count(itr->first))
+        {
+            ++itr;
+            continue;
+        }
+
+        if (Creature* creature = ObjectAccessor::GetCreature(*this, itr->second.Guid))
+            creature->DespawnOrUnsummon();
+        itr = m_questPersonalSpawns.erase(itr);
+    }
+}
+
 void Player::RemoveFromWorld()
 {
+    DespawnQuestPersonalSpawns();
+
     if (m_areaId)
         RemovePlayerFromArea(m_areaId);
 

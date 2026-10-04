@@ -198,6 +198,19 @@ typedef std::multimap<int32, uint32> ExclusiveQuestGroups;
 typedef std::unordered_map<uint32, PointOfInterestLocale> PointOfInterestLocaleContainer;
 typedef std::unordered_map<uint32, PointOfInterest> PointOfInterestContainer;
 
+// A creature that exists only for the player who has the quest (kill targets / credit NPCs the world has no spawn row for): world.quest_personal_spawn
+struct QuestPersonalSpawn
+{
+    uint32 Quest = 0;
+    uint32 Entry = 0;
+    uint32 Map = 0;
+    float X = 0.0f;
+    float Y = 0.0f;
+    float Z = 0.0f;           // 0 = take the ground height at spawn time
+    float O = 0.0f;
+    uint32 RespawnSecs = 60;  // after it was killed/despawned and the quest is still incomplete
+};
+
 class TC_GAME_API QuestDataStoreMgr
 {
     QuestDataStoreMgr();
@@ -227,6 +240,14 @@ public:
     void LoadPointOfInterestLocales();
     void LoadQuestRelations();
     void LoadGameObjectForQuests();
+    void LoadQuestPersonalSpawns();
+    bool HasQuestPersonalSpawns() const { return !mQuestPersonalSpawns.empty(); }
+    std::vector<QuestPersonalSpawn> const* GetQuestPersonalSpawns(uint32 questId) const
+    {
+        auto itr = mQuestPersonalSpawns.find(questId);
+        return itr != mQuestPersonalSpawns.end() ? &itr->second : nullptr;
+    }
+    std::unordered_map<uint32, std::vector<QuestPersonalSpawn>> mQuestPersonalSpawns;
 
     Quest const* GetQuestTemplate(uint32 quest_id) const;
     uint32 GetMaxQuestID();

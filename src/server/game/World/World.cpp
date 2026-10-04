@@ -1886,6 +1886,7 @@ void World::SetInitialWorldSettings()
 
     sQuestDataStore->LoadQuestPOI();
     sQuestDataStore->LoadQuestRelations();                            // must be after quest load
+    sQuestDataStore->LoadQuestPersonalSpawns();                       // must be after quest and creature template load
 
     TC_LOG_INFO("server.loading", "Loading Scenario POI");
     sObjectMgr->LoadScenarioPOI();
