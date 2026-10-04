@@ -41,6 +41,9 @@ INSERT INTO world.waypoint_data (id, point, position_x, position_y, position_z, 
 SELECT b.new_path, w.point, w.position_x, w.position_y, w.position_z, w.orientation, w.delay, w.move_type, w.action, w.action_chance
 FROM world.bak_patrols_without_path b JOIN world.pp_match m ON m.guid = b.guid JOIN world.tdb735_waypoint_data w ON w.id = m.tpath
 WHERE b.new_path > 0;
+-- TDB waypoint actions point to TDB waypoint_scripts we do not have: drop those actions (dev-check)
+UPDATE world.waypoint_data w JOIN world.bak_patrols_without_path b ON b.new_path = w.id LEFT JOIN world.waypoint_scripts s ON s.id = w.action
+SET w.action = 0, w.action_chance = 100 WHERE b.new_path > 0 AND w.action <> 0 AND s.id IS NULL;
 UPDATE world.creature_addon a JOIN world.bak_patrols_without_path b ON b.guid = a.guid SET a.path_id = b.new_path WHERE b.new_path > 0;
 INSERT INTO world.creature_addon (guid, path_id) SELECT b.guid, b.new_path FROM world.bak_patrols_without_path b WHERE b.new_path > 0 AND b.had_addon = 0;
 -- A2) TDB wanders / stands
@@ -59,7 +62,17 @@ WHERE c.MovementType = 2
   AND c.map NOT IN (SELECT map FROM world.instance_template)
   AND IF(c.npcflag, c.npcflag, t.npcflag) = 0 AND t.VehicleId = 0 AND t.ScriptName = ''
   AND IFNULL(a.bytes1, IFNULL(ta.bytes1, 0)) = 0 AND IFNULL(a.emote, IFNULL(ta.emote, 0)) = 0
-  AND NOT EXISTS (SELECT 1 FROM world.smart_scripts s WHERE s.entryorguid = c.id AND s.source_type = 0 AND s.action_type IN (53, 113));
+  AND NOT EXISTS (SELECT 1 FROM world.smart_scripts s WHERE s.entryorguid = c.id AND s.source_type = 0 AND s.action_type IN (53, 113))
+  -- dev-check: no triggers / invisible helpers (their visuals and area effects stay put), no formation members, no mounted,
+  -- event or phased (quest scene) spawns, no guards at their post
+  AND t.flags_extra & 128 = 0 AND IF(c.unit_flags, c.unit_flags, t.unit_flags) & 33554432 = 0
+  AND 11686 NOT IN (SELECT w.Displayid1 FROM world.creature_template_wdb w WHERE w.Entry = c.id
+                    UNION SELECT w.Displayid2 FROM world.creature_template_wdb w WHERE w.Entry = c.id)
+  AND c.guid NOT IN (SELECT memberGUID FROM world.creature_formations) AND c.guid NOT IN (SELECT leaderGUID FROM world.creature_formations)
+  AND IFNULL(a.mount, IFNULL(ta.mount, 0)) = 0
+  AND c.guid NOT IN (SELECT guid FROM world.game_event_creature)
+  AND TRIM(c.PhaseId) IN ('', '0') AND c.phaseMask IN (0, 1)
+  AND c.id NOT IN (SELECT w.Entry FROM world.creature_template_wdb w WHERE w.Name1 LIKE '%Guard%' OR w.Name1 LIKE '%Sentinel%');
 
 -- C) the rest stand (as before)
 UPDATE world.creature c JOIN world.pp_ours o ON o.guid = c.guid SET c.MovementType = 0 WHERE c.MovementType = 2;
