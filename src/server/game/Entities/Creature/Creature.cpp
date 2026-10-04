@@ -2451,6 +2451,11 @@ bool Creature::canStartAttack(Unit const* who, bool force) const
     if (HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_NPC))
         return false;
 
+    // A creature immune to players does not start a fight with them either (TrinityCore checks the flag both ways; here only
+    // the player side was checked, Ragefire Chasm #174). Only here where aggro starts: keeping a victim / spells are untouched.
+    if (HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_IMMUNE_TO_PC) && who->IsControlledByPlayer())
+        return false;
+
     // Do not attack non-combat pets
     if (who->IsCreature() && who->GetCreatureType() == CREATURE_TYPE_NON_COMBAT_PET)
         return false;
