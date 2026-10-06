@@ -26,3 +26,10 @@ UPDATE world.creature_template SET AIName = 'SmartAI' WHERE entry = 105724 AND A
 
 -- 3) The End of the Saga: script on the three gravestones (C++ go_sr_gravestone of PR helper/189-truthguard)
 UPDATE world.gameobject_template SET ScriptName = 'go_sr_gravestone' WHERE entry IN (249044, 249045, 251288) AND ScriptName = '';
+
+-- 4) dev-owner: the real reason "the 2 NPCs are not there": Orik 105724 and Tahu 105727 exist at Shield Hill but in phase 6285, which
+--    Howling Fjord (phase_definitions zone 495 entry 2) gives only when To Northrend 42002 is COMPLETE or REWARDED, while finding Orik IS
+--    the objective of 42002. Also give the phase while the quest is taken (ElseGroup 2, condition 9 QUESTTAKEN).
+DELETE FROM world.conditions WHERE SourceTypeOrReferenceId = 23 AND SourceGroup = 495 AND SourceEntry = 2 AND ElseGroup = 2 AND ConditionTypeOrReference = 9 AND ConditionValue1 = 42002;
+INSERT INTO world.conditions (SourceTypeOrReferenceId, SourceGroup, SourceEntry, SourceId, ElseGroup, ConditionTypeOrReference, ConditionTarget, ConditionValue1, ConditionValue2, ConditionValue3, NegativeCondition, ErrorTextId, ScriptName, Comment)
+VALUES (23, 495, 2, 0, 2, 9, 0, 42002, 0, 0, 0, 0, '', 'Howling Fjord phase 6285 (Orik, Tahu) while To Northrend is taken (#189)');
