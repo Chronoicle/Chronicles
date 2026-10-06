@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-10-06 (Oslo)
+
+- Claude (desktop team dev-owner + help-helper, dev-check reviews) — restart 19:12 UTC 2026-10-06 (owner OK, 60 s timer, clean shutdown), worldserver 92cf185 (ready 19:13:25 UTC): #189 Protection Paladin artifact chain (PR #190 + 0ed4e92 + 50956e3 + 92cf185: phase 6285 while 42002 taken, TDB 735 quest POIs, Correct Grave spell + scene credit, Truthguard on open, Dalaran arrival credit, scenario companions/drake/tornadoes), #187 Legion intro skip (1313b5d), #188 160 humanoids walk (TDB InhabitType 3), #186 Sea Gulls stand, #50 Sharpen Blade removes Mortal Wounds (actiontype 4) — live, changelog 1557108702694088707 — undo: git revert 92cf185 ee0d196 50956e3 b00b083 1313b5d; sql/custom/undo_sea_gull_anim_186, undo_humanoids_hovering_188, undo_sharpen_blade_50b, undo_truthguard_poi_189, undo_truthguard_npcs_189
+
 ## 2026-10-04 (Oslo)
 
 - Claude (desktop team dev-owner + help-helper, dev-check reviews) — restart 20:50 UTC 2026-10-04 (owner OK, 60 s timer, clean shutdown), worldserver cabddd8 (= 957edf4 code, ready 20:52:23 UTC): quest audit #183: PR #184 (60012/60014 credits, Ashran Dominance), PR #185 personal quest spawns (owner approved, table quest_personal_spawn, 3 rows); SQL quest_personal_spawn, fix_quest_event_flag_smartai (8 quests), fix_smartai_skipped_rows (39 rows) — live, changelog 1556408884959387749 — undo: git revert 957edf4 1b23a99 (merges), sql/custom/undo_quest_personal_spawn, undo_quest_event_flag_smartai, undo_smartai_skipped_rows
