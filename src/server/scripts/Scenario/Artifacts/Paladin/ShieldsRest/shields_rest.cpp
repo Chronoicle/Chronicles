@@ -4,6 +4,7 @@
 
 #include "ScriptMgr.h"
 #include "ScriptedCreature.h"
+#include "GameObjectAI.h"
 #include "shields_rest.h"
 
 //Phases: 6363
@@ -111,6 +112,14 @@ public:
 
         void IsSummonedBy(Unit* summoner) override
         {
+            // #189: both companions followed on the same side and ran through each other: Orik behind-right, Cato behind-left
+            if (summoner && (me->GetEntry() == NPC_ORIK_TRUEHEART_PET || me->GetEntry() == NPC_CATO_PET))
+            {
+                float angle = me->GetEntry() == NPC_ORIK_TRUEHEART_PET ? float(M_PI) * 0.75f : float(M_PI) * 1.25f;
+                me->SetFollowAngle(angle);
+                me->GetMotionMaster()->MoveFollow(summoner, 3.0f, angle);
+            }
+
             if (instance)
                 if (instance->GetData(DATA_YRGRIM_EVENT) < 5)
                     if (me->GetEntry() == NPC_ORIK_TRUEHEART_PET)
@@ -341,6 +350,14 @@ public:
             }
         }
 
+        // #189: after a wipe the drake came back hovering at -7.3, out of melee reach; when the fight starts again it comes down to just above the ground
+        void LowerForMelee()
+        {
+            float ground = me->GetMap()->GetHeight(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), true, 40.0f);
+            if (ground > INVALID_HEIGHT && me->GetPositionZ() - ground > 3.0f)
+                me->GetMotionMaster()->MovePoint(2, me->GetPositionX(), me->GetPositionY(), ground + 2.0f);
+        }
+
         void IsSummonedBy(Unit* summoner) override
         {
             if (me->GetEntry() == NPC_DRAKE_SHAE)
@@ -357,6 +374,7 @@ public:
             DoZoneInCombat();
             if (me->GetEntry() == NPC_DRAKE_SHAE)
             {
+                LowerForMelee();
                 events.RescheduleEvent(EVENT_4, 1000); //Drake
             }
             else
@@ -536,7 +554,7 @@ public:
 
         EventMap events;
         bool checkWindPos;
-        uint32 windSpell;
+        uint32 windSpell = SPELL_FIERCE_WINDS;
 
         void Reset() override
         {
@@ -547,9 +565,13 @@ public:
             if (!checkWindPos)
             {
                 checkWindPos = true;
-                for (uint8 i = 0; i < 3; i++)
-                    if (me->GetDistance(windshaperPos[i]) < 1.0f)
-                        windSpell = SPELL_FIERCE_WINDS + i;
+                // #189: the lane was only found when the spawn was within 1 yd of the hard coded point; with any other spawn position windSpell stayed
+                // uninitialised and no tornado ever came: take the nearest of the three lanes
+                uint8 lane = 0;
+                for (uint8 i = 1; i < 3; i++)
+                    if (me->GetDistance(windshaperPos[i]) < me->GetDistance(windshaperPos[lane]))
+                        lane = i;
+                windSpell = SPELL_FIERCE_WINDS + lane;
             }
         }
 
@@ -636,9 +658,12 @@ public:
                     startTimer = 0;
                     DoCast(me, SPELL_FIERCE_WINDS_AT, true);
 
-                    for (uint8 i = 0; i < 3; i++)
-                        if (me->GetDistance(windshaperPos[i]) < 2.0f)
-                            me->GetMotionMaster()->MovePoint(1, windEndPos[i].GetPositionX(), windEndPos[i].GetPositionY(), windEndPos[i].GetPositionZ(), false);
+                    // nearest lane (#189: exact 2 yd match found none for a shifted spawn, so the wind never moved)
+                    uint8 lane = 0;
+                    for (uint8 i = 1; i < 3; i++)
+                        if (me->GetDistance(windshaperPos[i]) < me->GetDistance(windshaperPos[lane]))
+                            lane = i;
+                    me->GetMotionMaster()->MovePoint(1, windEndPos[lane].GetPositionX(), windEndPos[lane].GetPositionY(), windEndPos[lane].GetPositionZ(), false);
                 }
                 else
                     startTimer -= diff;
@@ -1146,8 +1171,55 @@ public:
     }
 };
 
+// 249044, 249045, 251288 - Gravestone (quest 42005 "The End of the Saga"): the right grave (251288, the one the quest POI marks at (-198, -5160)) gives
+// "Correct Grave Found" (108670) and Orik + Tahu Sagewind appear beside it for the player only; "Finished Northrend Ritual" (105788) follows after their talk.
+// The wrong graves do nothing. (#189: no script existed, nothing spawned and nothing was credited; Orik 105777 / Tahu 105776 have no creature_text in any
+// data source I have, so they appear silently.)
+class go_sr_gravestone : public GameObjectScript
+{
+public:
+    go_sr_gravestone() : GameObjectScript("go_sr_gravestone") {}
+
+    struct go_sr_gravestoneAI : public GameObjectAI
+    {
+        go_sr_gravestoneAI(GameObject* go) : GameObjectAI(go) {}
+
+        bool GossipUse(Player* player) override
+        {
+            if (player->GetQuestStatus(42005) != QUEST_STATUS_INCOMPLETE)
+                return false;
+
+            if (go->GetEntry() != 251288 || player->GetReqKillOrCastCurrentCount(42005, 108670))
+                return true;
+
+            player->KilledMonsterCredit(108670);
+
+            Position orikPos = go->GetNearPosition(2.0f, go->GetOrientation() + float(M_PI) / 2.0f);
+            Position tahuPos = go->GetNearPosition(2.0f, go->GetOrientation() - float(M_PI) / 2.0f);
+            if (Creature* orik = player->SummonCreature(105777, orikPos, TEMPSUMMON_TIMED_DESPAWN, 45000, 0, player->GetGUID()))
+                orik->SetFacingToObject(go);
+            if (Creature* tahu = player->SummonCreature(105776, tahuPos, TEMPSUMMON_TIMED_DESPAWN, 45000, 0, player->GetGUID()))
+                tahu->SetFacingToObject(go);
+
+            ObjectGuid playerGuid = player->GetGUID();
+            player->AddDelayedEvent(8000, [playerGuid]() -> void
+            {
+                if (Player* p = ObjectAccessor::FindPlayer(playerGuid))
+                    p->KilledMonsterCredit(105788);
+            });
+            return true;
+        }
+    };
+
+    GameObjectAI* GetAI(GameObject* go) const override
+    {
+        return new go_sr_gravestoneAI(go);
+    }
+};
+
 void AddSC_shields_rest()
 {
+    new go_sr_gravestone();
     new npc_sr_orik_trueheart_intro();
     new npc_sr_orik_cato_script();
     new npc_sr_cryptstalker_event();
