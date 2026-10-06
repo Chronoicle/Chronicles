@@ -4,3 +4,4 @@ DELETE FROM world.smart_scripts WHERE entryorguid = 105724 AND source_type = 0 A
 UPDATE world.gameobject_template SET ScriptName = '' WHERE entry IN (249044, 249045, 251288) AND ScriptName = 'go_sr_gravestone';
 -- (AIName of 105724 was only set when it was empty; leave it SmartAI if other rows exist.)
 DELETE FROM world.conditions WHERE SourceTypeOrReferenceId = 23 AND SourceGroup = 495 AND SourceEntry = 2 AND ElseGroup = 2 AND ConditionTypeOrReference = 9 AND ConditionValue1 = 42002;
+DELETE FROM world.spell_script_names WHERE spell_id = 209705 AND ScriptName = 'spell_sr_vrykul_ghost_scene';
