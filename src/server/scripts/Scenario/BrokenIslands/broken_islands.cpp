@@ -2782,8 +2782,25 @@ public:
         if (!quest)
             return false;
 
-        player->AddQuest(quest, NULL);
+        // #187: the skip also finishes The Legion Returns (40519), else Stormwind offers it again on every visit
+        if (Quest const* legionReturns = sQuestDataStore->GetQuestTemplate(40519))
+        {
+            if (player->GetQuestStatus(40519) != QUEST_STATUS_REWARDED)
+            {
+                if (player->GetQuestStatus(40519) == QUEST_STATUS_NONE)
+                    player->AddQuest(legionReturns, creature);
+                player->CompleteQuest(40519);
+                player->RewardQuest(legionReturns, 0, creature, false);
+            }
+        }
+
+        if (player->GetQuestStatus(44663) == QUEST_STATUS_NONE)
+            player->AddQuest(quest, NULL);
+        // the objective's own credit (not only CompleteQuest), so the counter and the turn-in mark show (#187)
+        player->KilledMonsterCredit(114506);
         player->CompleteQuest(44663);
+        // the portal cast fails while mounted (#187)
+        player->RemoveAurasByType(SPELL_AURA_MOUNTED);
         ObjectGuid clickerGUID = player->GetGUID();
         creature->AddDelayedEvent(1500, [creature, clickerGUID] {
             if (auto unit = ObjectAccessor::GetUnit(*creature, clickerGUID))
