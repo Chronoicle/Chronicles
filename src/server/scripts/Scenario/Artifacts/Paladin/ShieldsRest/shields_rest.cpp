@@ -1157,8 +1157,9 @@ public:
             if (InstanceScript* instance = player->GetInstanceScript())
                 if (instance->getScenarionStep() == DATA_STAGE_FINAL)
                 {
-                    if (!player->HasItemCount(128866))
-                        player->AddItem(128866, 1);
+                    // full bags: nothing stored, so nothing else may happen (the object stays to click again) (dev-check)
+                    if (!player->HasItemCount(128866) && !player->AddItem(128866, 1))
+                        return;
                     go->loot.clear();
 
                     instance->DoUpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 50545); //Step End
@@ -1193,7 +1194,8 @@ public:
             if (player->GetQuestStatus(42005) != QUEST_STATUS_INCOMPLETE)
                 return false;
 
-            if (go->GetEntry() == 251288 && !player->GetReqKillOrCastCurrentCount(42005, 108670))
+            // re-usable until the scene credit (105788) is in, so a scene lost on logout can be replayed
+            if (go->GetEntry() == 251288 && !player->GetReqKillOrCastCurrentCount(42005, 105788))
                 player->CastSpell(player, 209576, true);
 
             return true;
@@ -1214,8 +1216,13 @@ class spell_sr_vrykul_ghost_scene : public AuraScript
     void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
     {
         if (Player* player = GetTarget()->ToPlayer())
+        {
+            // logout / teardown also removes the aura: no credit then (it would be lost after the save), the grave can be used again
+            if (!player->IsInWorld() || player->GetSession()->PlayerLogout())
+                return;
             if (player->GetQuestStatus(42005) == QUEST_STATUS_INCOMPLETE)
                 player->CastSpell(player, 209726, true); // credit 105788 "Finished Northrend Ritual"
+        }
     }
 
     void Register() override
