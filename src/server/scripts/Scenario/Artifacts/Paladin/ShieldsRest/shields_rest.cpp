@@ -1137,7 +1137,11 @@ public:
     }
 };
 
-//249420
+//249420 - Truthguard (the artifact object)
+// #189: every other artifact scenario (Silver Hand, Dreadblades, Sheylun, ...) gives the weapon by script the moment the object is opened
+// (GO_ACTIVATED). This one waited for the loot window to be emptied (GO_JUST_DEACTIVATED / HasItemCount): the window showed an empty slot
+// (an artifact is unique, the slot of a second copy cannot be taken) and the item only arrived after several clicks. Same flow as the others now,
+// and the loot of the object is cleared so no empty slot is shown.
 class go_sr_truthguard : public GameObjectScript
 {
 public:
@@ -1145,7 +1149,7 @@ public:
 
     void OnLootStateChanged(GameObject* go, uint32 state, Unit* target) override
     {
-        if (!target)
+        if (!target || state != GO_ACTIVATED)
             return;
 
         if (Player* player = target->ToPlayer())
@@ -1153,28 +1157,28 @@ public:
             if (InstanceScript* instance = player->GetInstanceScript())
                 if (instance->getScenarionStep() == DATA_STAGE_FINAL)
                 {
-                    if (state == GO_JUST_DEACTIVATED || player->HasItemCount(128866))
-                    {
-                        instance->DoUpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 50545); //Step End
-                        if (instance->GetData(DATA_YRGRIM_EVENT) == 6)
-                            instance->SetData(DATA_YRGRIM_EVENT, 7);
-                        player->CastSpell(player, SPELL_TRUTHGUARD_CREDIT, true);
-                        player->CastSpell(player, SPELL_TRUTHGUARD_SCENE, true);
-                        if (Creature* trigger = go->FindNearestCreature(NPC_TRUTHGUARD_OATHSEEKER, 20.0f, true))
-                            trigger->DespawnOrUnsummon();
+                    if (!player->HasItemCount(128866))
+                        player->AddItem(128866, 1);
+                    go->loot.clear();
 
-                        if (state == GO_ACTIVATED)
-                            go->Delete();
-                    }
+                    instance->DoUpdateAchievementCriteria(CRITERIA_TYPE_SCRIPT_EVENT_2, 50545); //Step End
+                    if (instance->GetData(DATA_YRGRIM_EVENT) == 6)
+                        instance->SetData(DATA_YRGRIM_EVENT, 7);
+                    player->CastSpell(player, SPELL_TRUTHGUARD_CREDIT, true);
+                    player->CastSpell(player, SPELL_TRUTHGUARD_SCENE, true);
+                    if (Creature* trigger = go->FindNearestCreature(NPC_TRUTHGUARD_OATHSEEKER, 20.0f, true))
+                        trigger->DespawnOrUnsummon();
+
+                    go->Delete();
                 }
         }
     }
 };
 
-// 249044, 249045, 251288 - Gravestone (quest 42005 "The End of the Saga"): the right grave (251288, the one the quest POI marks at (-198, -5160)) gives
-// "Correct Grave Found" (108670) and Orik + Tahu Sagewind appear beside it for the player only; "Finished Northrend Ritual" (105788) follows after their talk.
-// The wrong graves do nothing. (#189: no script existed, nothing spawned and nothing was credited; Orik 105777 / Tahu 105776 have no creature_text in any
-// data source I have, so they appear silently.)
+// 249044, 249045, 251288 - Gravestone (quest 42005 "The End of the Saga"). 7.3.5 data: the right grave casts "Use - Correct Grave" 209576 (credit
+// 108670 + Vrykul Ghost Scene aura 209705 = scene 1256 with Orik, Tahu and the ghost, all their dialogue lives in the scene); when the scene ends 209726
+// "Complete Scene - Vrykul Ghost Scene" gives "Finished Northrend Ritual" 105788 (see spell_sr_vrykul_ghost_scene). The quest POI marks (-198, -5160) = 251288 as
+// the ritual spot, so 251288 is treated as the right grave (assumption). Wrong graves do nothing. (#189: nothing handled the use.)
 class go_sr_gravestone : public GameObjectScript
 {
 public:
@@ -1189,24 +1193,9 @@ public:
             if (player->GetQuestStatus(42005) != QUEST_STATUS_INCOMPLETE)
                 return false;
 
-            if (go->GetEntry() != 251288 || player->GetReqKillOrCastCurrentCount(42005, 108670))
-                return true;
+            if (go->GetEntry() == 251288 && !player->GetReqKillOrCastCurrentCount(42005, 108670))
+                player->CastSpell(player, 209576, true);
 
-            player->KilledMonsterCredit(108670);
-
-            Position orikPos = go->GetNearPosition(2.0f, go->GetOrientation() + float(M_PI) / 2.0f);
-            Position tahuPos = go->GetNearPosition(2.0f, go->GetOrientation() - float(M_PI) / 2.0f);
-            if (Creature* orik = player->SummonCreature(105777, orikPos, TEMPSUMMON_TIMED_DESPAWN, 45000, 0, player->GetGUID()))
-                orik->SetFacingToObject(go);
-            if (Creature* tahu = player->SummonCreature(105776, tahuPos, TEMPSUMMON_TIMED_DESPAWN, 45000, 0, player->GetGUID()))
-                tahu->SetFacingToObject(go);
-
-            ObjectGuid playerGuid = player->GetGUID();
-            player->AddDelayedEvent(8000, [playerGuid]() -> void
-            {
-                if (Player* p = ObjectAccessor::FindPlayer(playerGuid))
-                    p->KilledMonsterCredit(105788);
-            });
             return true;
         }
     };
@@ -1217,9 +1206,48 @@ public:
     }
 };
 
+// 209705 - Vrykul Ghost Scene (aura 430 = scene 1256): the player finishing/leaving the scene removes the aura; retail then casts 209726 ("Complete Scene")
+class spell_sr_vrykul_ghost_scene : public AuraScript
+{
+    PrepareAuraScript(spell_sr_vrykul_ghost_scene);
+
+    void HandleRemove(AuraEffect const* /*aurEff*/, AuraEffectHandleModes /*mode*/)
+    {
+        if (Player* player = GetTarget()->ToPlayer())
+            if (player->GetQuestStatus(42005) == QUEST_STATUS_INCOMPLETE)
+                player->CastSpell(player, 209726, true); // credit 105788 "Finished Northrend Ritual"
+    }
+
+    void Register() override
+    {
+        AfterEffectRemove += AuraEffectRemoveFn(spell_sr_vrykul_ghost_scene::HandleRemove, EFFECT_FIRST_FOUND, SPELL_AURA_ANY, AURA_EFFECT_HANDLE_REAL);
+    }
+};
+
+// Quest 42017 "Shrine of the Truthguard", objective 105892 "Go to Dalaran": 7.3.5 credits it only in the return flight spell 210360 (hippogryph at the
+// end of the scenario). Hearthing (or flying out another way) skipped it and the quest could not be turned in (no question mark, wrong minimap blob):
+// credit it when the player arrives in Dalaran with the scenario won (105891) and the quest still incomplete. (#189)
+class player_sr_return_to_dalaran : public PlayerScript
+{
+public:
+    player_sr_return_to_dalaran() : PlayerScript("player_sr_return_to_dalaran") {}
+
+    void OnUpdateZone(Player* player, uint32 newZone, uint32 /*newArea*/) override
+    {
+        if (newZone != 7502) // Dalaran (Broken Isles)
+            return;
+
+        if (player->GetQuestStatus(42017) == QUEST_STATUS_INCOMPLETE
+            && player->GetReqKillOrCastCurrentCount(42017, 105891) && !player->GetReqKillOrCastCurrentCount(42017, 105892))
+            player->KilledMonsterCredit(105892);
+    }
+};
+
 void AddSC_shields_rest()
 {
     new go_sr_gravestone();
+    RegisterAuraScript(spell_sr_vrykul_ghost_scene);
+    new player_sr_return_to_dalaran();
     new npc_sr_orik_trueheart_intro();
     new npc_sr_orik_cato_script();
     new npc_sr_cryptstalker_event();

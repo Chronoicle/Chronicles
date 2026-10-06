@@ -26,3 +26,10 @@ UPDATE world.creature_template SET AIName = 'SmartAI' WHERE entry = 105724 AND A
 
 -- 3) The End of the Saga: script on the three gravestones (C++ go_sr_gravestone of PR helper/189-truthguard)
 UPDATE world.gameobject_template SET ScriptName = 'go_sr_gravestone' WHERE entry IN (249044, 249045, 251288) AND ScriptName = '';
+
+-- 4) Spell scripts / scene (points 3, 8): 209705 = Vrykul Ghost Scene aura (scene 1256); its removal casts 209726 = credit 105788 (C++ spell_sr_vrykul_ghost_scene).
+--    DIAGNOSTIC: SELECT * FROM world.scene_template WHERE SceneId IN (1256, 1259, 1260);   -- 1256 = ghost scene, 1259 chest scene, 1260 boss reveal: a missing row = scene never plays (then Orik/Tahu/ghost never appear)
+--                SELECT entry, type, Data0, Data1, Data2, Data3, ScriptName FROM world.gameobject_template WHERE entry IN (249420, 249044, 249045, 251288);
+--                SELECT * FROM world.gameobject_loot_template WHERE Entry = (SELECT Data1 FROM world.gameobject_template WHERE entry = 249420);   -- point 7: the chest should have no loot row of item 128866
+DELETE FROM world.spell_script_names WHERE spell_id = 209705 AND ScriptName = 'spell_sr_vrykul_ghost_scene';
+INSERT INTO world.spell_script_names (spell_id, ScriptName) VALUES (209705, 'spell_sr_vrykul_ghost_scene');
