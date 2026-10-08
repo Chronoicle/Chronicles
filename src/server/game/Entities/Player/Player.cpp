@@ -19301,6 +19301,8 @@ void Player::RewardQuestPackage(uint32 questPackageId, uint32 onlyItemId /*= 0*/
     }
 }
 
+static Item* GetArtifactWeaponOrBagged(Player* player);
+
 void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, bool announce)
 {
     //this THING should be here to protect code from quest, which cast on player far teleport as a reward
@@ -19583,8 +19585,8 @@ void Player::RewardQuest(Quest const* quest, uint32 reward, Object* questGiver, 
         SendDisplayToast(0, ToastType::HONOR, false, quest->RewardHonor, DisplayToastMethod::DISPLAY_TOAST_SPECIAL_UNK);
     }
 
-    if (Item* artifact = GetArtifactWeapon())
-        if (quest->RewardArtifactCategoryID || quest->RewardArtifactXP)
+    if (quest->RewardArtifactCategoryID || quest->RewardArtifactXP)
+        if (Item* artifact = GetArtifactWeaponOrBagged(this))
             artifact->GiveArtifactXp(quest->RewardArtifactXP * quest->RewardArtifactXPMultiplier, nullptr, quest->RewardArtifactCategoryID);
 
     if (CharTitlesEntry const* titleEntry = sCharTitlesStore.LookupEntry(quest->RewardTitleId))
@@ -35369,6 +35371,28 @@ Item* Player::GetArtifactWeapon()
         artifact = GetItemByPos(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND);
     if (artifact && artifact->GetTemplate() && artifact->GetTemplate()->GetArtifactID())
         return artifact;
+
+    return nullptr;
+}
+
+// Quest artifact power (#192): the equipped artifact, else the first artifact in the bags (a freshly rewarded
+// artifact is not equipped yet and its power used to be dropped)
+static Item* GetArtifactWeaponOrBagged(Player* player)
+{
+    if (Item* artifact = player->GetArtifactWeapon())
+        return artifact;
+
+    for (int i = INVENTORY_SLOT_ITEM_START; i < player->GetInventoryEndSlot(); ++i)
+        if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+            if (item->GetTemplate() && item->GetTemplate()->GetArtifactID())
+                return item;
+
+    for (int i = INVENTORY_SLOT_BAG_START; i < INVENTORY_SLOT_BAG_END; ++i)
+        if (Bag* bag = player->GetBagByPos(i))
+            for (uint32 j = 0; j < bag->GetBagSize(); ++j)
+                if (Item* item = bag->GetItemByPos(j))
+                    if (item->GetTemplate() && item->GetTemplate()->GetArtifactID())
+                        return item;
 
     return nullptr;
 }
