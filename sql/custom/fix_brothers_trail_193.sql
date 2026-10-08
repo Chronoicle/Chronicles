@@ -14,6 +14,8 @@
 -- 3) The three clue goobers get quest 42377 (Data1: quest sparkle only while the quest is open; the event itself still
 --    fires for anyone, as for every goober in this core) and English names (Russian in the DB).
 -- 4) Gossip 19700 option 0 (Lanigosa's answer) was Russian.
+-- 5) Creature templates 113913 / 113914 / 113915 (the clue credits) did not exist, and event_scripts loading drops a
+--    KILL_CREDIT row whose creature template is missing (ScriptsData.cpp:306-313): copied from the credit template 107295.
 
 -- backups for the undo
 DROP TABLE IF EXISTS world.bak_bt193_quest_objectives;
@@ -59,5 +61,28 @@ UPDATE world.gameobject_template SET Data1 = 42377, name = 'Old Campfire' WHERE 
 UPDATE world.gameobject_template SET Data1 = 42377, name = 'Broken Sword' WHERE entry = 250364;
 UPDATE world.gameobject_template SET Data1 = 42377, name = 'Broken Statue' WHERE entry = 250367;
 
--- 4) Lanigosa's answer in English (broadcast text 111589: if the client still shows Russian, the broadcast_text row itself is Russian)
-UPDATE world.gossip_menu_option SET OptionText = 'Honestly, I do not know. But I will find him.' WHERE MenuID = 19700 AND OptionID = 0;
+-- 4) Lanigosa's answer in English (exact text of broadcast_text 111589)
+UPDATE world.gossip_menu_option SET OptionText = 'In truth I do not know, I will seek him out.' WHERE MenuID = 19700 AND OptionID = 0;
+
+-- 5) credit templates 113913 / 113914 / 113915 = copies of 107295 (creature_template + creature_template_wdb)
+DROP TEMPORARY TABLE IF EXISTS world.tmp_bt193_ct;
+CREATE TEMPORARY TABLE world.tmp_bt193_ct AS SELECT * FROM world.creature_template WHERE entry = 107295;
+DROP TEMPORARY TABLE IF EXISTS world.tmp_bt193_wdb;
+CREATE TEMPORARY TABLE world.tmp_bt193_wdb AS SELECT * FROM world.creature_template_wdb WHERE Entry = 107295;
+
+UPDATE world.tmp_bt193_ct SET entry = 113913;
+INSERT INTO world.creature_template SELECT * FROM world.tmp_bt193_ct WHERE NOT EXISTS (SELECT 1 FROM world.creature_template WHERE entry = 113913);
+UPDATE world.tmp_bt193_ct SET entry = 113914;
+INSERT INTO world.creature_template SELECT * FROM world.tmp_bt193_ct WHERE NOT EXISTS (SELECT 1 FROM world.creature_template WHERE entry = 113914);
+UPDATE world.tmp_bt193_ct SET entry = 113915;
+INSERT INTO world.creature_template SELECT * FROM world.tmp_bt193_ct WHERE NOT EXISTS (SELECT 1 FROM world.creature_template WHERE entry = 113915);
+
+UPDATE world.tmp_bt193_wdb SET Entry = 113913, Name1 = 'Campfire Investigated';
+INSERT INTO world.creature_template_wdb SELECT * FROM world.tmp_bt193_wdb WHERE NOT EXISTS (SELECT 1 FROM world.creature_template_wdb WHERE Entry = 113913);
+UPDATE world.tmp_bt193_wdb SET Entry = 113914, Name1 = 'Broken Sword Found';
+INSERT INTO world.creature_template_wdb SELECT * FROM world.tmp_bt193_wdb WHERE NOT EXISTS (SELECT 1 FROM world.creature_template_wdb WHERE Entry = 113914);
+UPDATE world.tmp_bt193_wdb SET Entry = 113915, Name1 = 'Broken Statue Investigated';
+INSERT INTO world.creature_template_wdb SELECT * FROM world.tmp_bt193_wdb WHERE NOT EXISTS (SELECT 1 FROM world.creature_template_wdb WHERE Entry = 113915);
+
+DROP TEMPORARY TABLE world.tmp_bt193_ct;
+DROP TEMPORARY TABLE world.tmp_bt193_wdb;
