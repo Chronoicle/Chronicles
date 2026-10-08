@@ -16,6 +16,6 @@ UPDATE world.gameobject_template g JOIN world.bak_bt193_gameobject_template b ON
 UPDATE world.gossip_menu_option g JOIN world.bak_bt193_gossip_option b ON b.MenuID = g.MenuID AND b.OptionID = g.OptionID SET g.OptionText = b.OptionText WHERE g.MenuID = 19700;
 
 -- the clue credit templates created by the fix (they did not exist before)
-DELETE FROM world.creature_template_wdb WHERE Entry IN (113913, 113914, 113915);
+-- (creature_template_wdb 113913-113915 already existed before the fix: kept)
 DELETE FROM world.creature_template WHERE entry IN (113913, 113914, 113915);
 -- the bak_bt193_* tables can be dropped once the undo is confirmed
