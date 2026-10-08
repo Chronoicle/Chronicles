@@ -9,12 +9,15 @@
 
 // #194: the waypoint paths 10993804-10993807 these Travar scripts were written for never existed in our DB, so Travar stood
 // still after the gossip and the scenario stopped at stage 2. Walk the points the scripts react to over the navmesh instead;
-// wp = the waypoint id the script's MovementInform expects there.
+// wp = the waypoint id the script's MovementInform expects there (0 = none).
 enum { POINT_TRAVAR_ROUTE = 100 };
 
-struct TravarNode { float x, y, z; uint32 wp; };
+struct TravarNode { float x, y, z; uint32 wp; bool straight; }; // straight is false where it is left out
 
-TravarNode const TravarRouteToTomb[]     = { { 2021.0f, 2346.0f, 75.4f, 7 }, { 2017.0f, 2338.0f, 75.4f, 10 } };   // was 10993804
+// The tomb is in a cave under the lake: the navmesh has no way from the lake (z 118) down to the cave pool (z 68),
+// so he swims to a spot above the pool and dives straight down (straight = no pathfinding)
+TravarNode const TravarRouteToTomb[]     = { { 2046.5f, 2354.0f, 117.5f, 0 }, { 2048.0f, 2350.0f, 68.5f, 0, true },
+                                             { 2021.0f, 2346.0f, 75.4f, 7 }, { 2017.0f, 2338.0f, 75.4f, 10 } };   // was 10993804
 TravarNode const TravarRouteInTomb[]     = { { 1926.0f, 2335.5f, 75.5f, 18 } };                                    // was 10993805
 TravarNode const TravarRouteToCrypt[]    = { { 1861.0f, 2326.6f, 48.9f, 7 }, { 1874.5f, 2273.5f, 37.0f, 11 }, { 1876.5f, 2262.0f, 36.1f, 14 } }; // was 10993806
 TravarNode const TravarRouteAberration[] = { { 1877.5f, 2200.0f, 36.0f, 8 }, { 1878.0f, 2182.0f, 36.0f, 9 }, { 1840.0f, 2300.0f, 46.8f, 19 } }; // was 10993807
@@ -31,7 +34,7 @@ public:
         Next(me);
     }
 
-    // Arrived at POINT_TRAVAR_ROUTE: returns the waypoint id of that node and walks on, -1 when no route is running
+    // Arrived at POINT_TRAVAR_ROUTE: returns the waypoint id of that node and walks on, -1 when no route is running or the node has none
     int32 Arrived(Creature* me)
     {
         if (!_nodes)
@@ -42,7 +45,7 @@ public:
             Next(me);
         else
             _nodes = nullptr;
-        return wp;
+        return wp ? wp : -1;
     }
 
     // after a fight (JustReachedHome): go on with the node it was walking to
@@ -56,7 +59,7 @@ private:
     void Next(Creature* me)
     {
         TravarNode const& node = _nodes[_index];
-        me->GetMotionMaster()->MovePoint(POINT_TRAVAR_ROUTE, node.x, node.y, node.z);
+        me->GetMotionMaster()->MovePoint(POINT_TRAVAR_ROUTE, node.x, node.y, node.z, !node.straight);
     }
 
     TravarNode const* _nodes = nullptr;
