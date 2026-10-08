@@ -7,6 +7,63 @@
 #include "CreatureTextMgr.h"
 #include "GameObjectAI.h"
 
+// #194: the waypoint paths 10993804-10993807 these Travar scripts were written for never existed in our DB, so Travar stood
+// still after the gossip and the scenario stopped at stage 2. Walk the points the scripts react to over the navmesh instead;
+// wp = the waypoint id the script's MovementInform expects there.
+enum { POINT_TRAVAR_ROUTE = 100 };
+
+struct TravarNode { float x, y, z; uint32 wp; };
+
+TravarNode const TravarRouteToTomb[]     = { { 2021.0f, 2346.0f, 75.4f, 7 }, { 2017.0f, 2338.0f, 75.4f, 10 } };   // was 10993804
+TravarNode const TravarRouteInTomb[]     = { { 1926.0f, 2335.5f, 75.5f, 18 } };                                    // was 10993805
+TravarNode const TravarRouteToCrypt[]    = { { 1861.0f, 2326.6f, 48.9f, 7 }, { 1874.5f, 2273.5f, 37.0f, 11 }, { 1876.5f, 2262.0f, 36.1f, 14 } }; // was 10993806
+TravarNode const TravarRouteAberration[] = { { 1877.5f, 2200.0f, 36.0f, 8 }, { 1878.0f, 2182.0f, 36.0f, 9 }, { 1840.0f, 2300.0f, 46.8f, 19 } }; // was 10993807
+
+class TravarRoute
+{
+public:
+    template<size_t N>
+    void Start(Creature* me, TravarNode const (&nodes)[N])
+    {
+        _nodes = nodes;
+        _count = N;
+        _index = 0;
+        Next(me);
+    }
+
+    // Arrived at POINT_TRAVAR_ROUTE: returns the waypoint id of that node and walks on, -1 when no route is running
+    int32 Arrived(Creature* me)
+    {
+        if (!_nodes)
+            return -1;
+
+        int32 wp = _nodes[_index].wp;
+        if (++_index < _count)
+            Next(me);
+        else
+            _nodes = nullptr;
+        return wp;
+    }
+
+    // after a fight (JustReachedHome): go on with the node it was walking to
+    void Resume(Creature* me)
+    {
+        if (_nodes)
+            Next(me);
+    }
+
+private:
+    void Next(Creature* me)
+    {
+        TravarNode const& node = _nodes[_index];
+        me->GetMotionMaster()->MovePoint(POINT_TRAVAR_ROUTE, node.x, node.y, node.z);
+    }
+
+    TravarNode const* _nodes = nullptr;
+    size_t _count = 0;
+    size_t _index = 0;
+};
+
 
 // 106429
 class npc_travar_first : public CreatureScript
@@ -16,7 +73,8 @@ public:
 
     bool OnGossipSelect(Player* player, Creature* creature, uint32 /*sender*/, uint32 action) override
     {
-        creature->GetMotionMaster()->MovePath(10993804, false);
+        if (npc_travar_firstAI* ai = CAST_AI(npc_travar_firstAI, creature->AI()))
+            ai->route.Start(creature, TravarRouteToTomb);
         player->CLOSE_GOSSIP_MENU();
         creature->SetUInt32Value(UNIT_FIELD_NPC_FLAGS, 0); // госсип
         return true;
@@ -41,6 +99,7 @@ public:
         EventMap events;
         bool _introDone, wait_heal, firstwp, secondwp, firstfight;
         FunctionProcessor _functions;
+        TravarRoute route;
 
         void Reset() override
         {
@@ -53,8 +112,17 @@ public:
             events.RescheduleEvent(EVENT_2, 8000); // 210371
         }
 
+        void JustReachedHome() override
+        {
+            route.Resume(me);
+        }
+
         void EnterEvadeMode() override
         {
+            // #194: leave combat and walk back to the last route point (JustReachedHome goes on with the route);
+            // without it a fight on the way (the mobs in front of the tomb) left him in combat for good
+            ScriptedAI::EnterEvadeMode();
+
             // need to activate it ONLY if creature isn't stunned
             _functions.AddFunction([this]() -> void
             {
@@ -101,6 +169,14 @@ public:
         void MovementInform(uint32 type, uint32 id) override
         {
             me->SetHomePosition(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation());
+            if (type == POINT_MOTION_TYPE && id == POINT_TRAVAR_ROUTE)
+            {
+                int32 wp = route.Arrived(me);
+                if (wp < 0)
+                    return;
+                type = WAYPOINT_MOTION_TYPE;
+                id = uint32(wp);
+            }
             if (type == WAYPOINT_MOTION_TYPE)
             {
                 if (firstwp)
@@ -123,7 +199,7 @@ public:
                         _functions.AddFunction([this]() -> void
                         {
                             Talk(8);
-                            me->GetMotionMaster()->MovePath(10993805, false);
+                            route.Start(me, TravarRouteInTomb);
                         }, _functions.CalculateTime(9000));
                     }
                 }
@@ -299,7 +375,8 @@ public:
         if (Creature* duval = creature->FindNearestCreature(106370, 30.0f, true))
             duval->GetMotionMaster()->MoveFollow(creature, PET_FOLLOW_DIST, float(PET_FOLLOW_ANGLE), MOTION_SLOT_IDLE);
 
-        creature->GetMotionMaster()->MovePath(10993806, false);
+        if (npc_travar_secondAI* ai = CAST_AI(npc_travar_secondAI, creature->AI()))
+            ai->route.Start(creature, TravarRouteToCrypt);
         creature->AI()->Talk(0);
         player->CLOSE_GOSSIP_MENU();
         creature->SetUInt32Value(UNIT_FIELD_NPC_FLAGS, 0); // госсип
@@ -322,10 +399,16 @@ public:
         EventMap events;
         bool wait_heal;
         FunctionProcessor _functions;
+        TravarRoute route;
 
         void Reset() override
         {
             events.Reset();
+        }
+
+        void JustReachedHome() override
+        {
+            route.Resume(me);
         }
 
         void EnterCombat(Unit* who) override
@@ -366,6 +449,14 @@ public:
         void MovementInform(uint32 type, uint32 id) override
         {
             me->SetHomePosition(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation());
+            if (type == POINT_MOTION_TYPE && id == POINT_TRAVAR_ROUTE)
+            {
+                int32 wp = route.Arrived(me);
+                if (wp < 0)
+                    return;
+                type = WAYPOINT_MOTION_TYPE;
+                id = uint32(wp);
+            }
             if (type == WAYPOINT_MOTION_TYPE)
             {
                 if (id == 7)
@@ -458,10 +549,16 @@ public:
         EventMap events;
         bool wait_heal, _introDone;
         FunctionProcessor _functions;
+        TravarRoute route;
 
         void Reset() override
         {
             events.Reset();
+        }
+
+        void JustReachedHome() override
+        {
+            route.Resume(me);
         }
 
         void EnterCombat(Unit* who) override
@@ -510,6 +607,14 @@ public:
         void MovementInform(uint32 type, uint32 id) override
         {
             me->SetHomePosition(me->GetPositionX(), me->GetPositionY(), me->GetPositionZ(), me->GetOrientation());
+            if (type == POINT_MOTION_TYPE && id == POINT_TRAVAR_ROUTE)
+            {
+                int32 wp = route.Arrived(me);
+                if (wp < 0)
+                    return;
+                type = WAYPOINT_MOTION_TYPE;
+                id = uint32(wp);
+            }
             if (type == WAYPOINT_MOTION_TYPE)
             {
                 if (id == 8)
@@ -553,7 +658,7 @@ public:
                         efrin->GetMotionMaster()->MoveFollow(me, PET_FOLLOW_DIST, float(- PET_FOLLOW_ANGLE), MOTION_SLOT_IDLE);
                     if (Creature* duval = me->FindNearestCreature(106370, 30.0f, true))
                         duval->GetMotionMaster()->MoveFollow(me, PET_FOLLOW_DIST, float(PET_FOLLOW_ANGLE), MOTION_SLOT_IDLE);
-                    me->GetMotionMaster()->MovePath(10993807, false);
+                    route.Start(me, TravarRouteAberration);
                 });
             }
         }
