@@ -79,8 +79,9 @@ foreach ($s in $todo) {
         if ($dir -eq 'right') { $anchor = $pane }
     }
     Wait-Prompt $pane
-    # Panes inherit the Herdr server's environment, including a CLAUDE_CONFIG_DIR left in the shell that started herdr,
-    # so set it for every seat (otherwise the Max seats can end up on the Pro account).
+    # Panes inherit the Herdr server's environment from whenever herdr was started: reload PATH (tools installed since,
+    # e.g. node for the ponytail plugin hooks) and set CLAUDE_CONFIG_DIR per seat (a leftover one put the Max seats on Pro).
+    & $HerdrExe pane run $pane "`$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')" | Out-Null
     $cfg = if ($s.Account -eq 'Pro') { "`$env:CLAUDE_CONFIG_DIR = '$ProCfg'" } else { 'Remove-Item Env:CLAUDE_CONFIG_DIR -ErrorAction SilentlyContinue' }
     & $HerdrExe pane run $pane $cfg | Out-Null
     if ($s.Cwd -ne $Repo -and $pane -eq $ws.result.root_pane.pane_id) { & $HerdrExe pane run $pane "Set-Location '$($s.Cwd)'" | Out-Null }
