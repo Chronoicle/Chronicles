@@ -26,19 +26,22 @@ if (-not (Get-Command claude -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-function Herdr {
-    $out = & herdr @args
+# A function named Herdr would shadow herdr.exe (PowerShell names are case-insensitive), so call the exe by path.
+$HerdrExe = (Get-Command herdr -CommandType Application | Select-Object -First 1).Source
+
+function Invoke-HerdrJson {
+    $out = & $HerdrExe @args
     if ($LASTEXITCODE -ne 0) { throw "herdr $($args -join ' ') failed: $out" }
     if ($out) { ($out | Out-String) | ConvertFrom-Json }
 }
 
 function Wait-Prompt($pane) {
     # A new pane's PowerShell profile can take a while; agent start needs the prompt.
-    & herdr pane wait-output $pane --regex 'PS [^>]*> ?$' --timeout 60000 | Out-Null
+    & $HerdrExe pane wait-output $pane --regex 'PS [^>]*> ?$' --timeout 60000 | Out-Null
 }
 
 $running = @()
-$agents = Herdr agent list
+$agents = Invoke-HerdrJson agent list
 if ($agents.result.agents) { $running = @($agents.result.agents | ForEach-Object { if ($_.name) { $_.name } else { $_.agent_name } } | Where-Object { $_ }) }
 
 $common = @(
@@ -59,7 +62,7 @@ $seats = @(
 $todo = @($seats | Where-Object { $running -notcontains $_.Name })
 if ($todo.Count -eq 0) { Write-Host 'All three seats are already running.'; exit 0 }
 
-$ws = Herdr workspace create --cwd $Repo --label chronicles --no-focus
+$ws = Invoke-HerdrJson workspace create --cwd $Repo --label chronicles --no-focus
 $wsId = $ws.result.workspace.workspace_id
 $anchor = $ws.result.root_pane.pane_id
 $first = $true
@@ -68,19 +71,28 @@ foreach ($s in $todo) {
     if ($first) {
         $pane = $anchor
         $first = $false
-        foreach ($e in $s.Env) { & herdr pane run $pane "`$env:$($e.Split('=')[0]) = '$($e.Split('=',2)[1])'" | Out-Null }
+        foreach ($e in $s.Env) { & $HerdrExe pane run $pane "`$env:$($e.Split('=')[0]) = '$($e.Split('=',2)[1])'" | Out-Null }
     } else {
         $dir = if ($s.Name -eq 'help-helper') { 'down' } else { 'right' }
         $split = @('pane', 'split', $anchor, '--direction', $dir, '--cwd', $s.Cwd, '--no-focus')
         foreach ($e in $s.Env) { $split += @('--env', $e) }
-        $pane = (Herdr @split).result.pane.pane_id
+        $pane = (Invoke-HerdrJson @split).result.pane.pane_id
         if ($dir -eq 'right') { $anchor = $pane }
     }
-    if ($s.Cwd -ne $Repo -and $pane -eq $ws.result.root_pane.pane_id) { & herdr pane run $pane "Set-Location '$($s.Cwd)'" | Out-Null }
+    if ($s.Cwd -ne $Repo -and $pane -eq $ws.result.root_pane.pane_id) { & $HerdrExe pane run $pane "Set-Location '$($s.Cwd)'" | Out-Null }
     Wait-Prompt $pane
     Write-Host "Starting $($s.Name) ($($s.Model)) in $pane"
-    Herdr agent start $s.Name --kind claude --pane $pane --timeout 120000 -- --model $s.Model | Out-Null
-    Herdr agent prompt $s.Name $s.Role | Out-Null
+    $ErrorActionPreference = 'Continue'   # herdr reports errors as JSON on stderr; 'Stop' would turn that into an exception
+    $start = & $HerdrExe agent start $s.Name --kind claude --pane $pane --timeout 120000 '--' --model $s.Model 2>&1 | Out-String
+    $ErrorActionPreference = 'Stop'
+    if ($LASTEXITCODE -ne 0) {
+        if ($start -notmatch 'agent_not_ready') { throw "Starting $($s.Name) failed: $start" }
+        # First run: Claude asks to trust the folder and/or to log in. That is the owner's answer to give.
+        Write-Host "  $($s.Name) is waiting for you (trust folder / login): answer it in that pane. Waiting up to 10 minutes..."
+        & $HerdrExe agent wait $s.Name --until idle --until done --timeout 600000 | Out-Null
+        if ($LASTEXITCODE -ne 0) { Write-Host "  $($s.Name) is still not ready; run this script again when it is."; continue }
+    }
+    Invoke-HerdrJson agent prompt $s.Name $s.Role | Out-Null
 }
 
 Write-Host "Done: workspace $wsId. Check the seats with: herdr agent list"
