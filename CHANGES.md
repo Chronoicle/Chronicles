@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-10-08 (Oslo)
+
+- Claude (desktop team dev-owner + help-helper, dev-check reviews) — restart 11:29 UTC 2026-10-08 (owner OK, 60 s timer, clean shutdown), worldserver 32bd7e5 (ready 11:31:09 UTC): #186 Sea Gulls 44880 ground movement; #192 A United Force 38566 rewards 100 Artifact Power + quest AP reaches a bagged artifact (PR #195); #193 The Brother's Trail clues (PR #196: own objective counters, one credit per clue, credit templates 113913-15, sparkle, English names, gossip 19700 English); #194 Silver Hand scenario Travar routes (2cb6f3c) — live, changelog 1557717082320281652 — undo: git revert 2cb6f3c 32bd7e5 (merge #195); sql/custom/undo_sea_gull_ground_186b, undo_forging_new_strength_192, undo_brothers_trail_193 (needs bak_bt193_*)
+
 ## 2026-10-06 (Oslo)
 
 - Claude (desktop team dev-owner + help-helper, dev-check reviews) — restart 19:12 UTC 2026-10-06 (owner OK, 60 s timer, clean shutdown), worldserver 92cf185 (ready 19:13:25 UTC): #189 Protection Paladin artifact chain (PR #190 + 0ed4e92 + 50956e3 + 92cf185: phase 6285 while 42002 taken, TDB 735 quest POIs, Correct Grave spell + scene credit, Truthguard on open, Dalaran arrival credit, scenario companions/drake/tornadoes), #187 Legion intro skip (1313b5d), #188 160 humanoids walk (TDB InhabitType 3), #186 Sea Gulls stand, #50 Sharpen Blade removes Mortal Wounds (actiontype 4) — live, changelog 1557108702694088707 — undo: git revert 92cf185 ee0d196 50956e3 b00b083 1313b5d; sql/custom/undo_sea_gull_anim_186, undo_humanoids_hovering_188, undo_sharpen_blade_50b, undo_truthguard_poi_189, undo_truthguard_npcs_189
