@@ -22,7 +22,7 @@ These were given in chat and saved as private memory, so a new account does not 
 - Repo: `C:\Users\Chr\Documents\GitHub\Chronicles`. Locally `origin` = Chronoicle/Chronicles (push here: `git push origin main`).
   On the server the same repo is `~/LegionCore` with remote `chronicles` (`git pull --ff-only chronicles main`).
   Workflow: edit + commit + push locally, then pull on the server and build there.
-- SSH: `ssh -o BatchMode=yes wow@184.174.37.33 '<cmd>'` (the desktop key `chronicles_windows`, the only key `wow` accepts; root accepts no keys, only the owner's password; fail2ban bans an IP for 1 h after 5 failed SSH logins). Services: `~/start_all.sh` (also @reboot) starts the tmux sessions bnet, world, cdn, status, discord.
+- SSH: `ssh -o BatchMode=yes wow@184.174.37.33 '<cmd>'` (the desktop key `chronicles_windows`, the only key `wow` accepts; root accepts no keys, only the owner's password; fail2ban bans an IP for 1 h after 5 failed SSH logins). Services: `~/start_all.sh` (also @reboot) starts the tmux sessions bnet, world, cdn, status, discord. The same server also runs the owner's public Minecraft server (systemd `minecraft`, user `minecraft`, `/srv/minecraft`, port 25565; capped at 6 GB and below WoW in CPU/IO priority): not part of Chronicles, leave it alone unless the owner asks; `mc <command>` sends console commands.
 - The Bash tool is Git Bash on Windows: **no `jq`, no `python`** locally. Parse JSON with `--jq` of `gh`, PowerShell
   `ConvertFrom-Json`, or run Python on the server (`python3` there).
 - Many repo files are **CRLF**. `perl -0pi -e` patterns must use `\r?\n`, or use the Edit tool (safest for multi-line edits).
