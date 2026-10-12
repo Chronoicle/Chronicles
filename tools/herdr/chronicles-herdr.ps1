@@ -6,7 +6,8 @@
 #   help-helper  Sonnet, Pro account (~\.claude-pro), C:\Users\<you>\Chronicles-pro  side jobs, helper/... branches + PRs
 #
 # Run it from a pane inside Herdr:  powershell -ExecutionPolicy Bypass -File tools\herdr\chronicles-herdr.ps1
-# Seats that are already running are left alone; missing ones are started in a new "chronicles" workspace.
+# At Windows login chronicles-autostart.ps1 runs it. Seats that are already running are left alone; missing ones are
+# started in a new "chronicles" workspace.
 
 $ErrorActionPreference = 'Stop'
 
@@ -63,6 +64,12 @@ $seats = @(
 
 $todo = @($seats | Where-Object { $running -notcontains $_.Name })
 if ($todo.Count -eq 0) { Write-Host 'All three seats are already running.'; exit 0 }
+
+# After a PC restart Herdr restores the old "chronicles" workspace as empty shells: with no seat running, replace it.
+if ($todo.Count -eq $seats.Count) {
+    (Invoke-HerdrJson workspace list).result.workspaces | Where-Object { $_.label -eq 'chronicles' } |
+        ForEach-Object { Invoke-HerdrJson workspace close $_.workspace_id | Out-Null }
+}
 
 $ws = Invoke-HerdrJson workspace create --cwd $Repo --label chronicles --no-focus
 $wsId = $ws.result.workspace.workspace_id
