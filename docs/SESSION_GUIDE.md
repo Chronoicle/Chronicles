@@ -9,7 +9,7 @@ the practical know-how that is not written down there. Written 2026-09-27 by Cla
 These were given in chat and saved as private memory, so a new account does not have them. They still hold:
 
 - **Run server work yourself** (SSH as `wow`, builds, SQL with fix/undo files, deploy lock, changelog, Discord replies).
-  Don't hand the owner commands to paste. The server (184.174.37.33, since 2026-09-28) is the owner's own Contabo VPS (8 cores, 23 GB). The old Kamatera VPS 194.146.39.126 is retired (2026-10-12: its last services stopped, the owner cancels it); what only it had is in `~/kamatera_archive` on the server.
+  Don't hand the owner commands to paste. The server (184.174.37.33, since 2026-09-28) is the owner's own Contabo VPS (8 cores, 23 GB). The old Kamatera VPS 194.146.39.126 was cancelled on 2026-10-12; what only it had is in `~/kamatera_archive` on the server.
 - **Never restart without an explicit OK in chat** ("restart now"). Build, stage and keep working, then ask.
   "restart now" means: the whole restart routine in section 4, including the changelog and reporter updates.
 - **Discord:** Grok (the intake bot) is out of usage. You relay every new `For the reporter:` line yourself and comment
