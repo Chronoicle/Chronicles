@@ -1062,7 +1062,9 @@ void Player::CalculateMinMaxDamage(WeaponAttackType attType, bool normalized, bo
         {
             if (ItemTemplate const* temp = pItem->GetTemplate())
             {
-                float pvpDamageTemp = GetPvpDamageTemplate(GetUInt32Value(PLAYER_FIELD_CURRENT_SPEC_ID));
+                // the item level bonus (1% per 10 item levels) applies to the weapon too, like every other template stat;
+                // without it weapon specs gained less per item level than casters
+                float pvpDamageTemp = GetPvpDamageTemplate(GetUInt32Value(PLAYER_FIELD_CURRENT_SPEC_ID)) * GetPvpStatScalar();
 
                 weaponMinDamage = (temp->GetDelay() / 1000.f) * pvpDamageTemp;
                 weaponMaxDamage = (temp->GetDelay() / 1000.f) * pvpDamageTemp;
