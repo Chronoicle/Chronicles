@@ -636,8 +636,11 @@ void Pet::setDeathState(DeathState s)                       // overwrite virtual
             //SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);
 
             // update health so pet can be resurrected
+            // LoadPetFromDB kills a dead pet before it is the current one (Revive Pet crashed here on 2026-10-19)
             if (Player* player = Unit::ToPlayer(GetOwner()))
-                player->GetPetStable()->GetCurrentPet()->Health = GetHealth();
+                if (PetStable* petStable = player->GetPetStable())
+                    if (PetStable::PetInfo* petInfo = petStable->GetCurrentPet())
+                        petInfo->Health = GetHealth();
         }
     }
     else if (getDeathState() == ALIVE)
