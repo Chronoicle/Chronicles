@@ -53,7 +53,7 @@ UPDATE hotfixes.item_sparse SET Display='Семена Сна' WHERE ID=139380;
 UPDATE hotfixes.item_sparse SET Display='Барабаны племени Морозных Утесов' WHERE ID=139501;
 UPDATE hotfixes.item_sparse SET Display='Стильные шпионские очки' WHERE ID=140395;
 UPDATE hotfixes.item_sparse SET Display='Сумеречная Лилия Сигил', Description='A warm piece of enchanted stone carved in the shape of a lily.' WHERE ID=142065;
-UPDATE hotfixes.item_sparse SET Display='Небольшая лодка', Description='NULL' WHERE ID=143931;
+UPDATE hotfixes.item_sparse SET Display='Небольшая лодка', Description=NULL WHERE ID=143931;
 UPDATE hotfixes.item_sparse SET Description='Словно приспешник Иллидана, вы оставляете за собой пылающий след Скверны...' WHERE ID=160000;
 UPDATE hotfixes.item_sparse SET Description='Могущество Сюэня всегда будет с вами. Для этого вам совсем не нужен плащ...' WHERE ID=160001;
 UPDATE hotfixes.item_sparse SET Description='Доброта Чи-Цзи будет всегда с вами. Для этого вам совсем не нужен плащ...' WHERE ID=160002;
