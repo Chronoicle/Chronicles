@@ -392,7 +392,7 @@ struct npc_amalgam_restless_soul : public ScriptedAI
     npc_amalgam_restless_soul(Creature* creature) : ScriptedAI(creature) 
     {
         me->SetReactState(REACT_PASSIVE);
-        me->SetSpeed(MOVE_FLIGHT, 0.3f);
+        me->SetSpeed(MOVE_FLIGHT, 0.1f); // #197: souls are 15 yd out since #89, 0.3 gave ~7 s to kill them; ~20 s now
         me->ApplySpellImmune(0, IMMUNITY_EFFECT, SPELL_EFFECT_KNOCK_BACK, true);
         me->ApplySpellImmune(0, IMMUNITY_MECHANIC, MECHANIC_GRIP, true);
         me->ApplySpellImmune(0, IMMUNITY_MECHANIC, MECHANIC_FEAR, true);

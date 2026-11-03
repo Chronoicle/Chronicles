@@ -272,10 +272,11 @@ public:
             {
                 case DATA_STAIRS_BOULDER_1:
                 {
-                    if (HasPlayerUpperThan(125.f))
+                    if (boulderStairs1State || HasPlayerUpperThan(125.f)) // #197: a scared trickster also ends the boulders
                     {
                         events.CancelEvent(DATA_STAIRS_BOULDER_1);
-                        boulderStairs1State = DONE;
+                        if (!boulderStairs1State)
+                            boulderStairs1State = DONE;
                         events.RescheduleEvent(DATA_STAIRS_BOULDER_2, 3000);
                         break;
                     }
@@ -301,10 +302,11 @@ public:
                 }
                 case DATA_STAIRS_BOULDER_2:
                 {
-                    if (HasPlayerUpperThan(190.f))
+                    if (boulderStairs2State || HasPlayerUpperThan(190.f))
                     {
                         events.CancelEvent(DATA_STAIRS_BOULDER_2);
-                        boulderStairs2State = DONE;
+                        if (!boulderStairs2State)
+                            boulderStairs2State = DONE;
                         break;
                     }
 
