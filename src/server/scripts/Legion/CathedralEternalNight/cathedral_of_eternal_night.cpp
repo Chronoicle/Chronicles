@@ -1,4 +1,5 @@
 #include "cathedral_of_eternal_night.h"
+#include "WaypointManager.h"
 
 enum Paths
 {
@@ -10,6 +11,23 @@ enum Paths
     PATH_FROM_THIRD          = 387385,
     
 };
+
+// #198: every CoEN script path (387377-387379, 387384, 387385) has 0 rows in waypoint_data, so MovePath did nothing and
+// Illidan / Maiev never walked ahead. Without points, walk over the navmesh to an ESTIMATED destination (not retail).
+// MovePoint id = the path id, so MovementInform can replace LastWPReached.
+static void MovePathOrTo(Creature* c, uint32 pathId, Position const& dest, float randomX = 0.0f, float randomY = 0.0f)
+{
+    WaypointPath const* path = sWaypointMgr->GetPathScript(pathId);
+    if (path && !path->empty())
+        c->GetMotionMaster()->MovePath(pathId, false, randomX, randomY);
+    else
+        c->GetMotionMaster()->MovePoint(pathId, dest.GetPositionX() + randomX, dest.GetPositionY() + randomY, dest.GetPositionZ());
+}
+
+Position const introIllidanDest = {-606.0f, 2531.0f, 334.4f};          // estimate: just past the demons (-613, 334.4)
+Position const introMaievDest = {-606.0f, 2522.0f, 334.4f};            // estimate
+Position const toThirdBossDest = {-592.0f, 2526.5f, 532.4f};           // estimate: Khadgar is summoned at (-594.75,2526.8,532.37) when Maiev arrives
+Position const fromThirdDest = {-548.0f, 2532.2f, 533.9f};             // estimate: toward the Aegis / Domatrax room
 
 // 120793
 class npc_mefistrot_intro : public CreatureScript
@@ -38,7 +56,7 @@ public:
                 eventDone = true;
                 if (Creature* illidan = me->FindNearestCreature(NPC_ILLIDAN_INTRO, 130.0f, true))
                 {
-                    illidan->GetMotionMaster()->MovePath(PATH_ILLIDAN_INTRO, false);
+                    MovePathOrTo(illidan, PATH_ILLIDAN_INTRO, introIllidanDest);
                     illidan->AddDelayedEvent(20000, [illidan] () -> void
                     {
                         illidan->CastSpell(illidan, 239485);
@@ -48,7 +66,7 @@ public:
                 }
                 if (Creature* maiev = me->FindNearestCreature(NPC_MAIEV_INTRO, 130.0f, true))
                 {
-                    maiev->GetMotionMaster()->MovePath(PATH_MAIEV_INTRO, false);
+                    MovePathOrTo(maiev, PATH_MAIEV_INTRO, introMaievDest);
                     maiev->AddDelayedEvent(25000, [maiev] ()-> void
                     {
                         maiev->CastSpell(maiev, 240727);
@@ -246,6 +264,17 @@ public:
         
         void LastWPReached() override
         {
+            ThirdBossArrived();
+        }
+
+        void MovementInform(uint32 type, uint32 id) override
+        {
+            if (type == POINT_MOTION_TYPE && id == PATH_TO_THIRD_BOSS) // path has no rows: see MovePathOrTo
+                ThirdBossArrived();
+        }
+
+        void ThirdBossArrived()
+        {
             if (isThirdBossIntro)
             {
                 isThirdBossIntro = false;
@@ -263,13 +292,13 @@ public:
                 if (Creature* illidan = me->FindNearestCreature(NPC_ILLIDAN_INTRO, 40.0f, true))
                     illidan->AddDelayedEvent(3000, [illidan]()-> void
                     {
-                        illidan->GetMotionMaster()->MovePath(PATH_FROM_THIRD, false, frand(-3, 3), frand(-3, 3));
+                        MovePathOrTo(illidan, PATH_FROM_THIRD, fromThirdDest, frand(-3, 3), frand(-3, 3));
                         illidan->DespawnOrUnsummon(25000);
                     });
                     
                     me->AddDelayedEvent(3000, [this]()-> void
                     {
-                        me->GetMotionMaster()->MovePath(PATH_FROM_THIRD, false, frand(-3, 3), frand(-3, 3));
+                        MovePathOrTo(me, PATH_FROM_THIRD, fromThirdDest, frand(-3, 3), frand(-3, 3));
                         me->DespawnOrUnsummon(25000);
                     });
                 
@@ -320,11 +349,11 @@ public:
                             isThirdBossIntro = true;
                             if (Creature* illidan = me->FindNearestCreature(NPC_ILLIDAN_INTRO, 40.0f, true))
                             {
-                                illidan->GetMotionMaster()->MovePath(PATH_TO_THIRD_BOSS ,false, frand(-3, 3), frand(-3, 3));
+                                MovePathOrTo(illidan, PATH_TO_THIRD_BOSS, toThirdBossDest, frand(-3, 3), frand(-3, 3));
                                 
                                 me->AddDelayedEvent(500, [this] () -> void
                                 {
-                                    me->GetMotionMaster()->MovePath(PATH_TO_THIRD_BOSS, false, frand(-3, 3), frand(-3, 3));
+                                    MovePathOrTo(me, PATH_TO_THIRD_BOSS, toThirdBossDest, frand(-3, 3), frand(-3, 3));
                                     me->CreateConversation(4910);
                                 });
                             }
