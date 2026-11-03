@@ -155,6 +155,8 @@ public:
         
         void SpellFinishCast(const SpellInfo* spell) override
         {
+            // TEMP #198
+            TC_LOG_INFO("server.coen", "CoEN Domatrax finished cast %u", spell->Id);
             switch(spell->Id)
             {
                 case SPELL_WAVE_TWO:
@@ -196,7 +198,10 @@ public:
         {
             Talk(SAY_DEATH);
             _JustDied();
-            
+            // TEMP #198
+            TC_LOG_INFO("server.coen", "CoEN Domatrax died, boss state %u, aegis starter found %u", uint32(instance->GetBossState(DATA_DOMATRAX)),
+                uint32(instance->instance->GetCreature(instance->GetGuidData(NPC_EGIDA_START)) != nullptr));
+
             if (Creature* egida = instance->instance->GetCreature(instance->GetGuidData(NPC_EGIDA_START)))
             {
                 instance->SendEncounterUnit(ENCOUNTER_FRAME_DISENGAGE, egida);
@@ -217,6 +222,8 @@ public:
         {
             if (phase < 3 && me->HealthBelowPct(phases_hp_required[phase]))
             {
+                // TEMP #198: Domatrax abilities (reporter saw only Felsoul Cleave). Remove after the test.
+                TC_LOG_INFO("server.coen", "CoEN Domatrax phase %u -> %u at %u%% hp", uint32(phase), uint32(phase + 1), uint32(me->GetHealthPct()));
                 switch(phase++)
                 {
                     case 0:
@@ -246,6 +253,8 @@ public:
 
             if (uint32 eventId = events.ExecuteEvent())
             {
+                // TEMP #198
+                TC_LOG_INFO("server.coen", "CoEN Domatrax event %u energy %u hp %u%%", eventId, me->GetPower(POWER_ENERGY), uint32(me->GetHealthPct()));
                 switch (eventId)
                 {
                     case EVENT_FELSOUL_CLEAVE:

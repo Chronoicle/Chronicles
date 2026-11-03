@@ -102,6 +102,9 @@ public:
                     break;
                 case NPC_BATS_INTRO:
                 case NPC_BATS_FLY:
+                    // TEMP #198: Domatrax -> bats -> Mephistroth chain. Remove after the test.
+                    TC_LOG_INFO("server.coen", "CoEN create bat %u guid %s domatrax state %u difficulty %u",
+                        creature->GetEntry(), creature->GetGUID().ToString().c_str(), uint32(GetBossState(DATA_DOMATRAX)), uint32(instance->GetDifficultyID()));
                     if (GetBossState(DATA_DOMATRAX) != DONE || (creature->GetEntry() == NPC_BATS_FLY && instance->GetDifficultyID() == DIFFICULTY_HEROIC))
                     {
                         creature->SetVisible(false);
@@ -169,7 +172,11 @@ public:
                             if (creature->GetEntry() == NPC_BATS_INTRO)
                                 if (creature->isDead())
                                     deads_npc++;
-                                
+
+                    // TEMP #198
+                    TC_LOG_INFO("server.coen", "CoEN bat died guid %s, dead count %u (needs 4), tracked adds %u, mephistroth %s",
+                        creature->GetGUID().ToString().c_str(), uint32(deads_npc), uint32(introMephistrothAdds.size()), MephistrothGuid.ToString().c_str());
+
                     if (deads_npc >= 4)
                     {
                         if (Creature* illidan = instance->SummonCreature(NPC_ILLIDAN_INTRO, { -600.66f, 2527.25f, 532.47f, 0.02f }))
@@ -259,6 +266,16 @@ public:
                         }
                         case DONE:
                         {
+                            // TEMP #198
+                            {
+                                uint32 found = 0;
+                                for (auto guid : introMephistrothAdds)
+                                    if (instance->GetCreature(guid))
+                                        ++found;
+                                TC_LOG_INFO("server.coen", "CoEN Domatrax DONE: tracked adds %u, found in map %u, aegis buff npc %s found %u",
+                                    uint32(introMephistrothAdds.size()), found, EgidaMephistrothBuffGuid.ToString().c_str(),
+                                    uint32(instance->GetCreature(EgidaMephistrothBuffGuid) != nullptr));
+                            }
                             for (auto guid : introMephistrothAdds)
                                 if (Creature* creature = instance->GetCreature(guid))
                                 {
