@@ -1728,6 +1728,17 @@ void Loot::BuildLootResponse(WorldPackets::Loot::LootResponse& packet, Player* v
         }
     }
 
+    // #199: the chest keystone has no Item yet, so the client got no dungeon/level and showed "M0"; send what InitChallengeKey stamps on pickup
+    if (viewer && viewer->m_challengeKeyInfo.IsActive())
+        for (WorldPackets::Loot::LootItem& li : packet.Items)
+            if (li.Loot.ItemID == 138019)
+            {
+                if (!li.Loot.Modifications)
+                    li.Loot.Modifications.emplace();
+                li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_ID, viewer->m_challengeKeyInfo.ID);
+                li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_LEVEL, viewer->m_challengeKeyInfo.Level);
+            }
+
     return;
 }
 
