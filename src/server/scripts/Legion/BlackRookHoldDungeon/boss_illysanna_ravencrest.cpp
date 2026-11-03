@@ -739,7 +739,14 @@ struct npc_brh_wyrmtongue_trickster : public ScriptedAI
         {
             uint32 state = instance ? instance->GetData(stairsData) : 0;
             if (state != DONE && state != SPECIAL)
-                return;
+            {
+                // #197: scared as soon as a player is in sight, not only at the top of the staircase; the instance stops the boulders on DONE
+                Player* seen = instance ? me->SelectNearestPlayer(40.0f) : nullptr;
+                if (!seen || !me->IsWithinLOSInMap(seen))
+                    return;
+                instance->SetData(stairsData, DONE);
+                state = DONE;
+            }
 
             scared = true;
             if (state == DONE)
