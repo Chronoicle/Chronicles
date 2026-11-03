@@ -2,8 +2,8 @@
 UPDATE hotfixes.item_sparse SET Display='Лук сильваны (Custom bow)', Description='Only for trnas by donate' WHERE ID=42775;
 UPDATE hotfixes.item_sparse SET Display='Артефакт погибшего орка из клана', Description='Crafted by Frostwolf orcs, this token is an honored remembrance of its fallen owner.' WHERE ID=100899;
 UPDATE hotfixes.item_sparse SET Display='Ключ от клада Кукуру' WHERE ID=101538;
-UPDATE hotfixes.item_sparse SET Display='Загадка Роло' WHERE ID=102225;
-UPDATE hotfixes.item_sparse SET Display='Клятва хранителя огня' WHERE ID=102463;
+UPDATE hotfixes.item_sparse SET Display='Загадка Роло', Description='The old piece of tattered parchment has barely survived the test of time.' WHERE ID=102225;
+UPDATE hotfixes.item_sparse SET Display='Клятва хранителя огня', Description='' WHERE ID=102463;
 UPDATE hotfixes.item_sparse SET Display='Пыльца болотного светляка', Description='Сияет.' WHERE ID=104350;
 UPDATE hotfixes.item_sparse SET Display='Амулет иллюзий Силены' WHERE ID=107076;
 UPDATE hotfixes.item_sparse SET Display='Сосуд с жабьей слизью', Description='Светится.' WHERE ID=110723;
@@ -37,7 +37,7 @@ UPDATE hotfixes.item_sparse SET Display='"Последствия битвы за
 UPDATE hotfixes.item_sparse SET Display='Ключ звездочета' WHERE ID=133924;
 UPDATE hotfixes.item_sparse SET Display='Нестабильное средоточие заклинаний', Description='Мерно гудит, излучая энергию.' WHERE ID=133956;
 UPDATE hotfixes.item_sparse SET Display='Рецепт Штормового Меда', Description='Рецепт представляет собой сложную диаграмму со множественными примечаниями и рисунками.' WHERE ID=133995;
-UPDATE hotfixes.item_sparse SET Display='Инертный кристалл' WHERE ID=133999;
+UPDATE hotfixes.item_sparse SET Display='Инертный кристалл', Description='' WHERE ID=133999;
 UPDATE hotfixes.item_sparse SET Display='Котел Одина', Description='Огромный котел, облицован древними рунами.' WHERE ID=134005;
 UPDATE hotfixes.item_sparse SET Display='Слеза Элуны', Description='Затвердевшая слеза, лежащая на вашей ладони, кажется совершенно невесомой.' WHERE ID=136409;
 UPDATE hotfixes.item_sparse SET Display='Шлем командира Домитилль' WHERE ID=136851;
@@ -52,8 +52,8 @@ UPDATE hotfixes.item_sparse SET Display='Чародейский усилител
 UPDATE hotfixes.item_sparse SET Display='Семена Сна' WHERE ID=139380;
 UPDATE hotfixes.item_sparse SET Display='Барабаны племени Морозных Утесов' WHERE ID=139501;
 UPDATE hotfixes.item_sparse SET Display='Стильные шпионские очки' WHERE ID=140395;
-UPDATE hotfixes.item_sparse SET Display='Сумеречная Лилия Сигил' WHERE ID=142065;
-UPDATE hotfixes.item_sparse SET Display='Небольшая лодка' WHERE ID=143931;
+UPDATE hotfixes.item_sparse SET Display='Сумеречная Лилия Сигил', Description='A warm piece of enchanted stone carved in the shape of a lily.' WHERE ID=142065;
+UPDATE hotfixes.item_sparse SET Display='Небольшая лодка', Description='NULL' WHERE ID=143931;
 UPDATE hotfixes.item_sparse SET Description='Словно приспешник Иллидана, вы оставляете за собой пылающий след Скверны...' WHERE ID=160000;
 UPDATE hotfixes.item_sparse SET Description='Могущество Сюэня всегда будет с вами. Для этого вам совсем не нужен плащ...' WHERE ID=160001;
 UPDATE hotfixes.item_sparse SET Description='Доброта Чи-Цзи будет всегда с вами. Для этого вам совсем не нужен плащ...' WHERE ID=160002;
