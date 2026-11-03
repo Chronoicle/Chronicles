@@ -1737,6 +1737,15 @@ void Loot::BuildLootResponse(WorldPackets::Loot::LootResponse& packet, Player* v
                     li.Loot.Modifications.emplace();
                 li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_ID, viewer->m_challengeKeyInfo.ID);
                 li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_LEVEL, viewer->m_challengeKeyInfo.Level);
+                // affixes as InitChallengeKey (read-only: world states unless GM-set affixes)
+                ChallengeKeyInfo const& ki = viewer->m_challengeKeyInfo;
+                bool const gm = viewer->HasGmChallengeAffixes();
+                if (ki.Level > 3)
+                    li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_1, gm ? ki.Affix : sWorld->getWorldState(WS_CHALLENGE_AFFIXE1_RESET_TIME));
+                if (ki.Level > 6)
+                    li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_2, gm ? ki.Affix1 : sWorld->getWorldState(WS_CHALLENGE_AFFIXE2_RESET_TIME));
+                if (ki.Level > 9)
+                    li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_3, gm ? ki.Affix2 : sWorld->getWorldState(WS_CHALLENGE_AFFIXE3_RESET_TIME));
             }
 
     return;
