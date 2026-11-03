@@ -1,4 +1,5 @@
 #include "cathedral_of_eternal_night.h"
+#include "WaypointManager.h"
 
 DoorData const doorData[] =
 {
@@ -181,7 +182,13 @@ public:
                     {
                         if (Creature* illidan = instance->SummonCreature(NPC_ILLIDAN_INTRO, { -600.66f, 2527.25f, 532.47f, 0.02f }))
                         {
-                            illidan->GetMotionMaster()->MovePath(387354, false);
+                            // #198: path 387354 has no rows in waypoint_data; without it walk over the navmesh into the
+                            // room toward Mephistroth's spot (-542.1, 2526.1). Destination is an ESTIMATE, not retail.
+                            WaypointPath const* path = sWaypointMgr->GetPathScript(387354);
+                            if (path && !path->empty())
+                                illidan->GetMotionMaster()->MovePath(387354, false);
+                            else
+                                illidan->GetMotionMaster()->MovePoint(387354, -560.0f, 2527.0f, 533.94f);
                             illidan->AddDelayedEvent(10000, [illidan] () -> void
                             {
                                 illidan->AI()->Talk(0);
