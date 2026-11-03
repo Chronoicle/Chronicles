@@ -101,28 +101,30 @@ public:
             DoZoneInCombat(summon, 150.0f);
             
             summon->RemoveAurasDueToSpell(175057);
-            
-            switch(summon->GetEntry())
+
+            if (summon->GetEntry() == NPC_CHOKING_VINES)
+                summon->SetControlled(true, UNIT_STATE_ROOT);
+        }
+
+        // #198: the add's target is set by the caller AFTER SummonCreature returns, so JustSummoned (which runs inside it)
+        // saw no target and the lashers never followed / the vines never jumped. Called once the target is set.
+        void InitAddTarget(Creature* add, Player* player)
+        {
+            add->SetTargetGUID(player->GetGUID());
+
+            if (add->GetEntry() == NPC_FLUMINATING_LASHERS)
             {
-                case NPC_FLUMINATING_LASHERS:
-                    if (Unit* target = summon->GetTargetUnit())
-                    {
-                        summon->GetMotionMaster()->MoveFollow(target, 0, summon->GetFollowAngle());
-                        summon->CastSpell(target, SPELL_FOCUS);
-                    }
-                    break;
-                case NPC_CHOKING_VINES:
-                    summon->SetControlled(true, UNIT_STATE_ROOT);
-                    if (Unit* target = summon->GetTargetUnit())
-                    {
-                        target->CastSpell(summon, SPELL_CHOKING_VINES_JUMP);
-                        summon->AddDelayedEvent(1000, [summon] () -> void
-                        {
-                            if (Unit* target = summon->GetTargetUnit()) // it's better, than use target, as ready
-                                summon->CastSpell(target, SPELL_CHOKING_VINES_DMG);
-                        });
-                    }
-                    break;
+                add->GetMotionMaster()->MoveFollow(player, 0, add->GetFollowAngle());
+                add->CastSpell(player, SPELL_FOCUS);
+            }
+            else if (add->GetEntry() == NPC_CHOKING_VINES)
+            {
+                player->CastSpell(add, SPELL_CHOKING_VINES_JUMP);
+                add->AddDelayedEvent(1000, [add] () -> void
+                {
+                    if (Unit* target = add->GetTargetUnit())
+                        add->CastSpell(target, SPELL_CHOKING_VINES_DMG);
+                });
             }
         }
 
@@ -154,8 +156,8 @@ public:
                         Map::PlayerList const& pPlayers = me->GetMap()->GetPlayers();
                         for (Map::PlayerList::const_iterator itr = pPlayers.begin(); itr != pPlayers.end(); ++itr)
                             if (Player* player = itr->getSource())
-                                if (Creature* add = me->SummonCreature(NPC_FLUMINATING_LASHERS, adds_pos[cur_position++],TEMPSUMMON_CORPSE_TIMED_DESPAWN, 3000))
-                                    add->SetTargetGUID(player->GetGUID());
+                                if (Creature* add = me->SummonCreature(NPC_FLUMINATING_LASHERS, adds_pos[cur_position++ % 5], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 3000))
+                                    InitAddTarget(add, player);
                         break;
                     }
                     case EVENT_FLUMINATING_DEBUFF:
@@ -166,7 +168,7 @@ public:
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1, 0.0f, true))
                             if (Player* player = target->ToPlayer())
                                 if (Creature* add = me->SummonCreature(NPC_CHOKING_VINES, vines_pos[urand(0,3)], TEMPSUMMON_CORPSE_TIMED_DESPAWN, 3000))
-                                    add->SetTargetGUID(player->GetGUID());
+                                    InitAddTarget(add, player);
                         
                         Talk(SAY_VINES);
                         events.RescheduleEvent(EVENT_CHOKING_VINES, 35000); 
