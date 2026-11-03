@@ -1728,6 +1728,26 @@ void Loot::BuildLootResponse(WorldPackets::Loot::LootResponse& packet, Player* v
         }
     }
 
+    // #199: the chest keystone has no Item yet, so the client got no dungeon/level and showed "M0"; send what InitChallengeKey stamps on pickup
+    if (viewer && viewer->m_challengeKeyInfo.IsActive())
+        for (WorldPackets::Loot::LootItem& li : packet.Items)
+            if (li.Loot.ItemID == 138019)
+            {
+                if (!li.Loot.Modifications)
+                    li.Loot.Modifications.emplace();
+                li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_ID, viewer->m_challengeKeyInfo.ID);
+                li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_LEVEL, viewer->m_challengeKeyInfo.Level);
+                // affixes as InitChallengeKey (read-only: world states unless GM-set affixes)
+                ChallengeKeyInfo const& ki = viewer->m_challengeKeyInfo;
+                bool const gm = viewer->HasGmChallengeAffixes();
+                if (ki.Level > 3)
+                    li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_1, gm ? ki.Affix : sWorld->getWorldState(WS_CHALLENGE_AFFIXE1_RESET_TIME));
+                if (ki.Level > 6)
+                    li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_2, gm ? ki.Affix1 : sWorld->getWorldState(WS_CHALLENGE_AFFIXE2_RESET_TIME));
+                if (ki.Level > 9)
+                    li.Loot.Modifications->Insert(ITEM_MODIFIER_CHALLENGE_KEYSTONE_AFFIX_ID_3, gm ? ki.Affix2 : sWorld->getWorldState(WS_CHALLENGE_AFFIXE3_RESET_TIME));
+            }
+
     return;
 }
 
