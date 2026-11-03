@@ -27,6 +27,7 @@ static void MovePathOrTo(Creature* c, uint32 pathId, Position const& dest, float
 Position const introIllidanDest = {-606.0f, 2531.0f, 334.4f};          // estimate: just past the demons (-613, 334.4)
 Position const introMaievDest = {-606.0f, 2522.0f, 334.4f};            // estimate
 Position const toThirdBossDest = {-592.0f, 2526.5f, 532.4f};           // estimate: Khadgar is summoned at (-594.75,2526.8,532.37) when Maiev arrives
+Position const secondBossDest = {-580.0f, 2526.4f, 439.7f};          // estimate: just inside Thrashbite's door (-587, 2526.4), room floor ~439.7
 Position const fromThirdDest = {-548.0f, 2532.2f, 533.9f};             // estimate: toward the Aegis / Domatrax room
 
 // 120793
@@ -331,7 +332,7 @@ public:
                         
                         me->AddDelayedEvent(3000, [this]()-> void
                         {
-                            me->GetMotionMaster()->MovePath(PATH_MAIEV_SECOND_BOSS, false);
+                            MovePathOrTo(me, PATH_MAIEV_SECOND_BOSS, secondBossDest);
                         });
                         
                         me->AddDelayedEvent(25000, [this]()-> void
