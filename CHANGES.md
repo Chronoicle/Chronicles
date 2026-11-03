@@ -2,6 +2,10 @@
 
 Format: `date — who — what — status — undo`. Core code changes are also git commits in `~/LegionCore`.
 
+## 2026-11-03 (Oslo)
+
+- Claude (desktop team dev-owner, dev-check review) — live since the VPS reboot 2026-10-28 15:16 UTC (not a planned restart): fc6dd67 PvP weapon damage template gets the item level scalar, 9fa5276 Pet::setDeathState null checks (Revive Pet crash); changelog 1567106405259808901 posted 2026-11-03 together with #194 Travar (live since the 10-18 reboot). Staged (built 2026-11-03, live next restart): b1b116d removes the temporary #70 Concordance log — undo: git revert
+
 ## 2026-10-08 (Oslo)
 
 - Claude (desktop team dev-owner + help-helper, dev-check reviews) — restart 11:29 UTC 2026-10-08 (owner OK, 60 s timer, clean shutdown), worldserver 32bd7e5 (ready 11:31:09 UTC): #186 Sea Gulls 44880 ground movement; #192 A United Force 38566 rewards 100 Artifact Power + quest AP reaches a bagged artifact (PR #195); #193 The Brother's Trail clues (PR #196: own objective counters, one credit per clue, credit templates 113913-15, sparkle, English names, gossip 19700 English); #194 Silver Hand scenario Travar routes (2cb6f3c) — live, changelog 1557717082320281652 — undo: git revert 2cb6f3c 32bd7e5 (merge #195); sql/custom/undo_sea_gull_ground_186b, undo_forging_new_strength_192, undo_brothers_trail_193 (needs bak_bt193_*)
